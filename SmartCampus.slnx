@@ -1,0 +1,42 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/SmartCampus.Contracts/SmartCampus.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/SmartCampus.ServiceDefaults/SmartCampus.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Gateway/">
+    <Project Path="src/Gateway/SmartCampus.Gateway/SmartCampus.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Catalogo/">
+    <Project Path="src/Services/Catalogo/SmartCampus.Catalogo.Api/SmartCampus.Catalogo.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Identity/">
+    <Project Path="src/Services/Identity/SmartCampus.Identity.Api/SmartCampus.Identity.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Prenotazioni/">
+    <Project Path="src/Services/Prenotazioni/SmartCampus.Prenotazioni.Api/SmartCampus.Prenotazioni.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Utilizzo/">
+    <Project Path="src/Services/Utilizzo/SmartCampus.Utilizzo.Api/SmartCampus.Utilizzo.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SmartCampus.EndToEnd.Tests/SmartCampus.EndToEnd.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Catalogo/">
+    <Project Path="tests/Catalogo/SmartCampus.Catalogo.IntegrationTests/SmartCampus.Catalogo.IntegrationTests.csproj" />
+    <Project Path="tests/Catalogo/SmartCampus.Catalogo.UnitTests/SmartCampus.Catalogo.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Identity/">
+    <Project Path="tests/Identity/SmartCampus.Identity.IntegrationTests/SmartCampus.Identity.IntegrationTests.csproj" />
+    <Project Path="tests/Identity/SmartCampus.Identity.UnitTests/SmartCampus.Identity.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Prenotazioni/">
+    <Project Path="tests/Prenotazioni/SmartCampus.Prenotazioni.IntegrationTests/SmartCampus.Prenotazioni.IntegrationTests.csproj" />
+    <Project Path="tests/Prenotazioni/SmartCampus.Prenotazioni.UnitTests/SmartCampus.Prenotazioni.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Utilizzo/">
+    <Project Path="tests/Utilizzo/SmartCampus.Utilizzo.IntegrationTests/SmartCampus.Utilizzo.IntegrationTests.csproj" />
+    <Project Path="tests/Utilizzo/SmartCampus.Utilizzo.UnitTests/SmartCampus.Utilizzo.UnitTests.csproj" />
+  </Folder>
+</Solution>

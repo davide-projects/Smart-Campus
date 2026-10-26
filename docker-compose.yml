@@ -1,0 +1,68 @@
+# Avvio locale completo: docker compose up --build
+# Prerequisito: copiare .env.example in .env
+name: smartcampus
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Imposta MSSQL_SA_PASSWORD nel file .env}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Imposta RABBITMQ_USER nel file .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Imposta RABBITMQ_PASSWORD nel file .env}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  identity:
+    build: { context: ., dockerfile: src/Services/Identity/SmartCampus.Identity.Api/Dockerfile }
+    environment:
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Identity"
+    depends_on: [sqlserver]
+
+  catalogo:
+    build: { context: ., dockerfile: src/Services/Catalogo/SmartCampus.Catalogo.Api/Dockerfile }
+    environment:
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Catalogo"
+    depends_on: [sqlserver, rabbitmq]
+
+  prenotazioni:
+    build: { context: ., dockerfile: src/Services/Prenotazioni/SmartCampus.Prenotazioni.Api/Dockerfile }
+    environment:
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Prenotazioni"
+    depends_on: [sqlserver, rabbitmq]
+
+  utilizzo:
+    build: { context: ., dockerfile: src/Services/Utilizzo/SmartCampus.Utilizzo.Api/Dockerfile }
+    environment:
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Utilizzo"
+    depends_on: [sqlserver, rabbitmq]
+
+  gateway:
+    build: { context: ., dockerfile: src/Gateway/SmartCampus.Gateway/Dockerfile }
+    environment:
+      ReverseProxy__Clusters__identity__Destinations__d1__Address: http://identity:8080
+      ReverseProxy__Clusters__catalogo__Destinations__d1__Address: http://catalogo:8080
+      ReverseProxy__Clusters__prenotazioni__Destinations__d1__Address: http://prenotazioni:8080
+      ReverseProxy__Clusters__utilizzo__Destinations__d1__Address: http://utilizzo:8080
+      Cors__AllowedOrigins__0: http://localhost:4200
+    ports:
+      - "5000:8080"
+    depends_on: [identity, catalogo, prenotazioni, utilizzo]
+
+  web:
+    build: { context: ./frontend }
+    ports:
+      - "4200:8080"
+    depends_on: [gateway]
+
+volumes:
+  sqlserver-data:
