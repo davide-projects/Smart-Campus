@@ -22,16 +22,16 @@ services:
       - "5672:5672"
       - "15672:15672"
 
-  identity:
-    build: { context: ., dockerfile: src/Services/Identity/SmartCampus.Identity.Api/Dockerfile }
+  autenticazione:
+    build: { context: ., dockerfile: src/Services/Autenticazione/SmartCampus.Autenticazione.Api/Dockerfile }
     environment:
-      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Identity"
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Autenticazione"
     depends_on: [sqlserver]
 
-  catalogo:
-    build: { context: ., dockerfile: src/Services/Catalogo/SmartCampus.Catalogo.Api/Dockerfile }
+  spazi:
+    build: { context: ., dockerfile: src/Services/Spazi/SmartCampus.Spazi.Api/Dockerfile }
     environment:
-      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Catalogo"
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Spazi"
     depends_on: [sqlserver, rabbitmq]
 
   prenotazioni:
@@ -40,23 +40,23 @@ services:
       ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Prenotazioni"
     depends_on: [sqlserver, rabbitmq]
 
-  utilizzo:
-    build: { context: ., dockerfile: src/Services/Utilizzo/SmartCampus.Utilizzo.Api/Dockerfile }
+  presenze:
+    build: { context: ., dockerfile: src/Services/Presenze/SmartCampus.Presenze.Api/Dockerfile }
     environment:
-      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Utilizzo"
+      ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Presenze"
     depends_on: [sqlserver, rabbitmq]
 
   gateway:
     build: { context: ., dockerfile: src/Gateway/SmartCampus.Gateway/Dockerfile }
     environment:
-      ReverseProxy__Clusters__identity__Destinations__d1__Address: http://identity:8080
-      ReverseProxy__Clusters__catalogo__Destinations__d1__Address: http://catalogo:8080
+      ReverseProxy__Clusters__autenticazione__Destinations__d1__Address: http://autenticazione:8080
+      ReverseProxy__Clusters__spazi__Destinations__d1__Address: http://spazi:8080
       ReverseProxy__Clusters__prenotazioni__Destinations__d1__Address: http://prenotazioni:8080
-      ReverseProxy__Clusters__utilizzo__Destinations__d1__Address: http://utilizzo:8080
+      ReverseProxy__Clusters__presenze__Destinations__d1__Address: http://presenze:8080
       Cors__AllowedOrigins__0: http://localhost:4200
     ports:
       - "5000:8080"
-    depends_on: [identity, catalogo, prenotazioni, utilizzo]
+    depends_on: [autenticazione, spazi, prenotazioni, presenze]
 
   web:
     build: { context: ./frontend }

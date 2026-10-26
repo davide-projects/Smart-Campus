@@ -20,7 +20,7 @@ User Story (issue, label story)
 | **Task** | `task` | Developers, come **sub-issue** della storia | *Task* |
 | **Bug** | `bug` | Chiunque | *Bug* |
 
-Label aggiuntive per servizio: `svc:identity`, `svc:catalogo`, `svc:prenotazioni`, `svc:utilizzo`, `svc:gateway`, `frontend`, `infra`.
+Label aggiuntive per servizio: `svc:autenticazione`, `svc:spazi`, `svc:prenotazioni`, `svc:presenze`, `svc:gateway`, `frontend`, `infra`.
 
 - Le storie descrivono **un bisogno** ("Come studente voglio…"), non una soluzione tecnica, e seguono **obbligatoriamente** il formato: `[ID] - Titolo`, *User Story* (Come / voglio / in modo da), *Descrizione*, *Criteri di accettazione*, *Story Point* (1/2/3/5/8/13). La bozza è in [docs/user-stories-bozza.md](docs/user-stories-bozza.md).
 - I task si creano **dentro la storia** con *Create sub-issue* (o *Add sub-issue* per una issue esistente): GitHub mostra l'avanzamento della storia (es. 3/5) e il Project vede la gerarchia.
@@ -61,14 +61,14 @@ Formato [Conventional Commits](https://www.conventionalcommits.org/) con riferim
 ```
 
 - **tipo:** `feat`, `fix`, `test`, `docs`, `chore`, `refactor`
-- **scope:** `identity`, `catalogo`, `prenotazioni`, `utilizzo`, `gateway`, `frontend`, `contracts`, `infra`, `ci`, `docs`
+- **scope:** `autenticazione`, `spazi`, `prenotazioni`, `presenze`, `gateway`, `frontend`, `contracts`, `infra`, `ci`, `docs`
 
 Esempi:
 
 ```
 feat(prenotazioni): blocca prenotazioni sovrapposte con UPDLOCK (#42)
 test(prenotazioni): verifica 20 richieste concorrenti sullo stesso slot (#42)
-fix(catalogo): rifiuta orario di chiusura precedente all'apertura (#57)
+fix(spazi): rifiuta orario di chiusura precedente all'apertura (#57)
 ```
 
 Il `#42` fa comparire il commit nella cronologia della issue. **Non** usare `Closes`/`Fixes` nei commit: la chiusura avviene con la PR (vedi sotto), così una issue non si chiude prima della review.
@@ -124,7 +124,7 @@ gh pr create --fill --body "Closes #42"
 ```bash
 gh label create story --color 1D76DB --description "User story"
 gh label create task --color 0E8A16 --description "Task tecnico, sub-issue di una storia"
-for s in identity catalogo prenotazioni utilizzo gateway; do gh label create "svc:$s" --color C5DEF5; done
+for s in autenticazione spazi prenotazioni presenze gateway; do gh label create "svc:$s" --color C5DEF5; done
 gh label create frontend --color C5DEF5
 gh label create infra --color C5DEF5
 ```

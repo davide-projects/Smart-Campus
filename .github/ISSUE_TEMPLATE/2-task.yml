@@ -21,10 +21,10 @@ body:
     attributes:
       label: Area
       options:
-        - identity
-        - catalogo
+        - autenticazione
+        - spazi
         - prenotazioni
-        - utilizzo
+        - presenze
         - gateway
         - frontend
         - contracts

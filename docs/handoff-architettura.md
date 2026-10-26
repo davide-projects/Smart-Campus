@@ -18,11 +18,11 @@ Permettere al gruppo di scrivere **user stories orientate al valore** che:
 ### Fonte del bisogno (traccia SmartCampus)
 | Problema osservato | Bisogno | Dove si risolve |
 |---|---|---|
-| Un gruppo trova occupata un'aula che sembrava libera | Sapere con fiducia se uno spazio è disponibile | Catalogo + Prenotazioni |
+| Un gruppo trova occupata un'aula che sembrava libera | Sapere con fiducia se uno spazio è disponibile | Spazi + Prenotazioni |
 | Le conferme passano da messaggi sparsi | Avere una conferma unica e ritrovabile | Prenotazioni |
 | Una rinuncia non libera lo spazio per altri | La cancellazione rende subito lo spazio disponibile | Prenotazioni |
 | Due gruppi si aspettano di usare lo stesso spazio | **Nessun impegno incompatibile** | Prenotazioni (invariante) |
-| Il personale ha percezioni contrastanti sull'uso | Distinguere intenzione (prenotazione), uso effettivo e assenza di informazione | Utilizzo |
+| Il personale ha percezioni contrastanti sull'uso | Distinguere intenzione (prenotazione), uso effettivo e assenza di informazione | Presenze |
 
 ### Criterio di completamento di questo handoff
 Il gruppo è in grado di produrre una prima versione di Product Backlog ordinabile dal PO, con almeno le storie del **Product Goal** e del **primo incremento** dotate di criteri di accettazione.
@@ -74,17 +74,17 @@ Usare **questi termini** in storie, codice, API e UI. Se un termine cambia, si a
 
 | Termine | Significato | Servizio proprietario |
 |---|---|---|
-| **Spazio** | Luogo prenotabile o no: aula, laboratorio, sala studio | Catalogo |
-| **Edificio** | Raggruppamento fisico di spazi | Catalogo |
-| **Attrezzatura** | Dotazione di uno spazio (proiettore, PC, lavagna…) | Catalogo |
-| **Orario di apertura** | Fasce in cui uno spazio può essere prenotato | Catalogo |
+| **Spazio** | Luogo prenotabile o no: aula, laboratorio, sala studio | Spazi |
+| **Edificio** | Raggruppamento fisico di spazi | Spazi |
+| **Attrezzatura** | Dotazione di uno spazio (proiettore, PC, lavagna…) | Spazi |
+| **Orario di apertura** | Fasce in cui uno spazio può essere prenotato | Spazi |
 | **Spazio prenotabile** | Copia locale in Prenotazioni dei soli dati che servono a prenotare | Prenotazioni |
 | **Prenotazione** | Impegno di un utente su uno spazio per un intervallo `[Inizio, Fine)` | Prenotazioni |
 | **Conflitto** | Due prenotazioni *confermate* dello stesso spazio con intervalli sovrapposti | Prenotazioni |
 | **Disponibilità** | Intervalli liberi di uno spazio in un giorno, calcolati da orari − prenotazioni | Prenotazioni |
-| **Check-in** | Registrazione che lo spazio è stato effettivamente usato | Utilizzo |
-| **No-show** | Prenotazione confermata senza check-in nella finestra prevista | Utilizzo |
-| **Nessuna informazione** | Né check-in né no-show registrato: **non** significa "non usato" | Utilizzo |
+| **Check-in** | Registrazione che lo spazio è stato effettivamente usato | Presenze |
+| **No-show** | Prenotazione confermata senza check-in nella finestra prevista | Presenze |
+| **Nessuna informazione** | Né check-in né no-show registrato: **non** significa "non usato" | Presenze |
 
 ---
 
@@ -94,13 +94,13 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 
 | Epica | Valore | Servizi coinvolti | Incremento proposto |
 |---|---|---|---|
-| **E1. Trovare uno spazio** | So quali spazi esistono e quali fanno al caso mio | Catalogo, Frontend | 1 |
-| **E2. Prenotare senza conflitti** | Ho una conferma affidabile, nessuno ha lo stesso spazio nello stesso momento | Prenotazioni, Catalogo (eventi), Frontend | 1 |
+| **E1. Trovare uno spazio** | So quali spazi esistono e quali fanno al caso mio | Spazi, Frontend | 1 |
+| **E2. Prenotare senza conflitti** | Ho una conferma affidabile, nessuno ha lo stesso spazio nello stesso momento | Prenotazioni, Spazi (eventi), Frontend | 1 |
 | **E3. Gestire le mie prenotazioni** | Ritrovo le conferme, rinuncio e libero lo spazio | Prenotazioni, Frontend | 1 |
-| **E4. Accesso e ruoli** | Ognuno vede e fa solo ciò che gli compete | Identity, Gateway, tutti | 2 |
-| **E5. Gestire il catalogo** | Il personale mantiene le informazioni aggiornate | Catalogo, Prenotazioni (eventi), Frontend | 1–2 |
-| **E6. Registrare l'utilizzo effettivo** | Distinguere intenzione e uso reale | Utilizzo, Prenotazioni (eventi), Frontend | 3 |
-| **E7. Comprendere l'utilizzo** | Il personale interpreta i dati senza trasformare ipotesi in certezze | Utilizzo, Frontend | 3 |
+| **E4. Accesso e ruoli** | Ognuno vede e fa solo ciò che gli compete | Autenticazione, Gateway, tutti | 2 |
+| **E5. Gestire il catalogo** | Il personale mantiene le informazioni aggiornate | Spazi, Prenotazioni (eventi), Frontend | 1–2 |
+| **E6. Registrare l'utilizzo effettivo** | Distinguere intenzione e uso reale | Presenze, Prenotazioni (eventi), Frontend | 3 |
+| **E7. Comprendere l'utilizzo** | Il personale interpreta i dati senza trasformare ipotesi in certezze | Presenze, Frontend | 3 |
 | **E8. Qualità, avvio e prove** *(abilitante)* | Il prodotto è riproducibile e verificabile | Tutti | trasversale |
 
 > E8 non è valore per l'utente finale: va gestita tramite **Definition of Done** e task tecnici dentro le storie, non come storie "Come sviluppatore voglio…", salvo accordo con il PO.
@@ -109,7 +109,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 
 ## 6. Dettaglio per servizio (riferimento per scrivere storie e task)
 
-### 6.1 Catalogo
+### 6.1 Spazi
 
 **Responsabilità:** cosa esiste nel campus e cosa è prenotabile.
 
@@ -123,12 +123,12 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 **API previste**
 | Metodo | Route | Ruolo | Scopo |
 |---|---|---|---|
-| GET | `/api/catalogo/spazi?tipo=&capienzaMin=&edificioId=&attrezzatura=` | tutti | Ricerca |
-| GET | `/api/catalogo/spazi/{id}` | tutti | Dettaglio |
-| POST | `/api/catalogo/spazi` | Personale | Crea |
-| PUT | `/api/catalogo/spazi/{id}` | Personale | Modifica |
-| POST | `/api/catalogo/spazi/{id}/disattiva` | Personale | Disattiva |
-| GET/POST/PUT | `/api/catalogo/edifici`, `/api/catalogo/attrezzature` | Personale (scrittura) | Anagrafiche |
+| GET | `/api/spazi?tipo=&capienzaMin=&edificioId=&attrezzatura=` | tutti | Ricerca |
+| GET | `/api/spazi/{id}` | tutti | Dettaglio |
+| POST | `/api/spazi` | Personale | Crea |
+| PUT | `/api/spazi/{id}` | Personale | Modifica |
+| POST | `/api/spazi/{id}/disattiva` | Personale | Disattiva |
+| GET/POST/PUT | `/api/spazi/edifici`, `/api/spazi/attrezzature` | Personale (scrittura) | Anagrafiche |
 
 **Eventi pubblicati:** `SpazioCreato`, `SpazioAggiornato`, `SpazioDisattivato` (+ orari di apertura, vedi incertezza I-3).
 
@@ -144,7 +144,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | Entità | Campi proposti |
 |---|---|
 | `Prenotazione` | Id, SpazioId, UtenteId, Inizio, Fine, NumeroPartecipanti, Motivo *(opz.)*, Stato (`Confermata`/`Cancellata`), CreataIl, CancellataIl, RowVersion |
-| `SpazioPrenotabile` | SpazioId, Nome, Capienza, Prenotabile, Attivo, Orari — copia aggiornata dagli eventi del Catalogo |
+| `SpazioPrenotabile` | SpazioId, Nome, Capienza, Prenotabile, Attivo, Orari — copia aggiornata dagli eventi del servizio Spazi |
 
 **API previste**
 | Metodo | Route | Ruolo | Scopo |
@@ -178,7 +178,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | Spazio non prenotabile/disattivato | 422 | "Questo spazio non è prenotabile" |
 | Cancellazione di prenotazione altrui | 403 | "Non puoi cancellare questa prenotazione" |
 
-### 6.3 Utilizzo
+### 6.3 Presenze
 
 **Responsabilità:** cosa è successo davvero e report per il personale.
 
@@ -190,9 +190,9 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 **API previste**
 | Metodo | Route | Ruolo | Scopo |
 |---|---|---|---|
-| POST | `/api/utilizzo/checkin` `{prenotazioneId}` | proprietario | Check-in |
-| POST | `/api/utilizzo/{prenotazioneId}/no-show` | Personale | Segna no-show |
-| GET | `/api/utilizzo/report/spazi?da=&a=&edificioId=` | Personale | Report aggregato |
+| POST | `/api/presenze/checkin` `{prenotazioneId}` | proprietario | Check-in |
+| POST | `/api/presenze/{prenotazioneId}/no-show` | Personale | Segna no-show |
+| GET | `/api/presenze/report/spazi?da=&a=&edificioId=` | Personale | Report aggregato |
 
 **Regole**
 - Check-in ammesso solo nella finestra `[Inizio − X min, Inizio + Y min]` *(X, Y da concordare)*.
@@ -200,7 +200,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 - Il report mostra per ogni spazio/periodo: ore prenotate, ore con check-in, no-show, **prenotazioni senza informazione**, e cancellazioni.
 - Il report **non** afferma che uno spazio sia "inutilizzato" se mancano informazioni; lo dichiara esplicitamente.
 
-### 6.4 Identity
+### 6.4 Autenticazione
 
 | Entità | Campi |
 |---|---|
@@ -208,8 +208,8 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 
 | Metodo | Route | Scopo |
 |---|---|---|
-| POST | `/api/identity/login` | Restituisce JWT |
-| GET | `/api/identity/me` | Profilo e ruolo |
+| POST | `/api/autenticazione/login` | Restituisce JWT |
+| GET | `/api/autenticazione/me` | Profilo e ruolo |
 
 - Utenti **solo sintetici**, caricati da seed.
 - Registrazione self-service **fuori perimetro** *(proposta)*.
@@ -233,27 +233,27 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 Angular → Gateway → Prenotazioni
   Prenotazioni: lock SpazioPrenotabile → verifica INV-1..6 → INSERT + outbox (1 transazione)
   → 201 Created
-  outbox → broker → Utilizzo: crea PrenotazioneProiezione
+  outbox → broker → Presenze: crea PrenotazioneProiezione
 ```
 ### F2. Cancellazione
 ```
 Angular → Gateway → Prenotazioni: Stato = Cancellata + outbox → 204
   → lo slot è subito disponibile in GET disponibilità
-  → broker → Utilizzo aggiorna la proiezione
+  → broker → Presenze aggiorna la proiezione
 ```
 ### F3. Modifica catalogo
 ```
-Personale → Gateway → Catalogo: aggiorna Spazio + outbox
+Personale → Gateway → Spazi: aggiorna Spazio + outbox
   → broker → Prenotazioni aggiorna SpazioPrenotabile
 ```
-> **Consistenza eventuale:** dopo una modifica del catalogo, Prenotazioni si aggiorna dopo pochi istanti. Va dichiarato come limite noto e considerato nei criteri di accettazione (vedi I-4).
+> **Consistenza eventuale:** dopo una modifica del servizio Spazi, Prenotazioni si aggiorna dopo pochi istanti. Va dichiarato come limite noto e considerato nei criteri di accettazione (vedi I-4).
 
 ### F4. Check-in
 ```
-Studente → Gateway → Utilizzo: verifica proprietario + finestra temporale → registra
+Studente → Gateway → Presenze: verifica proprietario + finestra temporale → registra
 ```
 
-**Implicazione per le storie:** una storia di E2 senza Catalogo e senza copia locale non è dimostrabile. Il primo incremento deve includere almeno Catalogo (lettura + seed) e Prenotazioni.
+**Implicazione per le storie:** una storia di E2 senza Spazi e senza copia locale non è dimostrabile. Il primo incremento deve includere almeno Spazi (lettura + seed) e Prenotazioni.
 
 ---
 
@@ -349,7 +349,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 - **Orari:** standard 08:00–20:00 lun–ven, almeno uno spazio con orario diverso e uno chiuso il sabato.
 - **Utenti:** 5 studenti, 2 personale (credenziali solo di sviluppo, nel seed, mai riutilizzate altrove).
 - **Prenotazioni:** su due settimane, comprese adiacenti, cancellate e passate.
-- **Utilizzo:** mix di check-in, no-show e prenotazioni senza informazione.
+- **Presenze:** mix di check-in, no-show e prenotazioni senza informazione.
 
 ---
 
@@ -359,7 +359,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 |---|---|---|
 | I-1 | Granularità delle prenotazioni: libera, a slot di 30 min o di 1 ora? | US-03, US-04, UI |
 | I-2 | Durata massima di una prenotazione e anticipo massimo (es. 14 giorni)? | Nuove invarianti |
-| I-3 | Più fasce di apertura al giorno? Chiusure straordinarie (festività)? | Catalogo, INV-3 |
+| I-3 | Più fasce di apertura al giorno? Chiusure straordinarie (festività)? | Spazi, INV-3 |
 | I-4 | È accettabile che una modifica del catalogo si rifletta sulle prenotazioni dopo qualche secondo? | Consistenza eventuale |
 | I-5 | Cosa succede alle prenotazioni future se uno spazio viene disattivato o cambia orario? | US-10: cancellazione automatica, avviso, blocco della modifica? |
 | I-6 | Limite di prenotazioni attive per studente? | Equità d'uso |
@@ -371,7 +371,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 | I-12 | Il visitatore non autenticato può consultare il catalogo? | Gateway, E1 |
 
 **Limiti noti dell'architettura**
-- La consistenza tra servizi è **eventuale**: le copie locali (spazi in Prenotazioni, prenotazioni in Utilizzo) possono essere in ritardo di qualche istante.
+- La consistenza tra servizi è **eventuale**: le copie locali (spazi in Prenotazioni, prenotazioni in Presenze) possono essere in ritardo di qualche istante.
 - I dati sintetici verificano il software, **non** dimostrano benefici o risparmi reali del campus.
 - Il deploy in cloud è **progettato, non eseguito**.
 
@@ -379,7 +379,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 
 ## 13. Indicazioni per scrivere le storie
 
-1. **Una storia è un bisogno, non un servizio.** Evitare "Creare l'API del Catalogo": è un task dentro US-01.
+1. **Una storia è un bisogno, non un servizio.** Evitare "Creare l'API del servizio Spazi": è un task dentro US-01.
 2. **Fette verticali:** ogni storia deve essere dimostrabile dalla UI (o, se concordato, dall'API).
 3. **INVEST:** indipendente, negoziabile, di valore, stimabile, piccola, testabile. Se una storia attraversa 3 servizi ed è grande, dividerla per regola (es. US-04 senza capienza, poi capienza) piuttosto che per livello tecnico.
 4. **Collegare ogni storia a:** epica, servizi coinvolti, invarianti (INV-x), domande aperte (I-x), dati di seed necessari.

@@ -1,6 +1,6 @@
 using SmartCampus.ServiceDefaults;
 
-// Servizio Prenotazioni: Prenotazioni senza conflitti e calcolo della disponibilità.
+// Servizio Prenotazioni: chi userà quale spazio e quando. Prenotazioni senza conflitti e calcolo della disponibilità.
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();

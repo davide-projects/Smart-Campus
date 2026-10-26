@@ -8,16 +8,20 @@ Prodotto per **trovare e prenotare gli spazi del campus senza impegni incompatib
 
 ## Architettura
 
-| Componente | Cartella | Porta locale | Responsabilità |
-|---|---|---|---|
-| Frontend (Angular) | `frontend/` | 4200 | Interfaccia per studenti e personale |
-| API Gateway (YARP) | `src/Gateway/` | 5000 | Unico ingresso pubblico, routing, CORS |
-| Identity | `src/Services/Identity/` | 5101 | Autenticazione, ruoli, emissione JWT |
-| Catalogo | `src/Services/Catalogo/` | 5102 | Edifici, spazi, attrezzature, orari |
-| Prenotazioni | `src/Services/Prenotazioni/` | 5103 | Prenotazioni senza conflitti, disponibilità |
-| Utilizzo | `src/Services/Utilizzo/` | 5104 | Check-in, no-show, report per il personale |
+| Componente | Cartella | Porta locale | Risponde alla domanda | Contenuto |
+|---|---|---|---|---|
+| Web (Angular) | `frontend/` | 4200 | *Cosa vede l'utente?* | Schermate per studenti e personale |
+| Gateway (YARP) | `src/Gateway/` | 5000 | *A quale servizio va la richiesta?* | Unico ingresso pubblico, routing, CORS |
+| Autenticazione | `src/Services/Autenticazione/` | 5101 | *Chi sei e cosa puoi fare?* | Login, ruoli, emissione JWT |
+| Spazi | `src/Services/Spazi/` | 5102 | *Quali spazi esistono e come sono fatti?* | Edifici, aule, attrezzature, orari |
+| Prenotazioni | `src/Services/Prenotazioni/` | 5103 | *Chi userà quale spazio e quando?* | Prenotazioni senza conflitti, disponibilità |
+| Presenze | `src/Services/Presenze/` | 5104 | *Lo spazio è stato usato davvero?* | Check-in, mancate presentazioni, report |
 
-Ogni servizio ha **il proprio database SQL Server** e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale). Dettagli in [docs/architettura.md](docs/architettura.md); per scrivere le user stories vedi [docs/handoff-architettura.md](docs/handoff-architettura.md).
+Ogni servizio ha **il proprio database SQL Server** e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale).
+
+- **Cosa fa ogni servizio, spiegato semplice:** [docs/servizi.md](docs/servizi.md)
+- Dettagli tecnici: [docs/architettura.md](docs/architettura.md)
+- Base per le user stories: [docs/handoff-architettura.md](docs/handoff-architettura.md) · bozza: [docs/user-stories-bozza.md](docs/user-stories-bozza.md)
 
 ```
 src/
@@ -25,7 +29,7 @@ src/
     SmartCampus.ServiceDefaults/   health check, ProblemDetails, OpenAPI comuni
     SmartCampus.Contracts/         SOLO eventi scambiati tra servizi
   Gateway/
-  Services/{Identity,Catalogo,Prenotazioni,Utilizzo}/
+  Services/{Autenticazione,Spazi,Prenotazioni,Presenze}/
 tests/
   {Servizio}/SmartCampus.{Servizio}.UnitTests/
   {Servizio}/SmartCampus.{Servizio}.IntegrationTests/
@@ -50,14 +54,14 @@ docker compose up --build
 ```
 
 - Frontend: http://localhost:4200
-- Gateway: http://localhost:5000 (es. `GET /api/catalogo/`)
+- Gateway: http://localhost:5000 (es. `GET /api/spazi/`)
 - RabbitMQ management: http://localhost:15672
 
 ### Sviluppo (servizi in locale, infrastruttura in Docker)
 
 ```bash
 docker compose up -d sqlserver rabbitmq
-dotnet run --project src/Services/Catalogo/SmartCampus.Catalogo.Api
+dotnet run --project src/Services/Spazi/SmartCampus.Spazi.Api
 dotnet run --project src/Gateway/SmartCampus.Gateway
 cd frontend && npm install && npm start
 ```
@@ -65,8 +69,8 @@ cd frontend && npm install && npm start
 Le connection string locali vanno negli **user-secrets**, non in `appsettings.json`:
 
 ```bash
-dotnet user-secrets init --project src/Services/Catalogo/SmartCampus.Catalogo.Api
-dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Catalogo" --project src/Services/Catalogo/SmartCampus.Catalogo.Api
+dotnet user-secrets init --project src/Services/Spazi/SmartCampus.Spazi.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Spazi" --project src/Services/Spazi/SmartCampus.Spazi.Api
 ```
 
 In sviluppo Angular inoltra `/api/*` al gateway tramite `frontend/proxy.conf.json`.

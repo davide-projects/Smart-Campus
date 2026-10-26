@@ -1,24 +1,26 @@
 # Architettura
 
+> Spiegazione non tecnica di ogni servizio: [servizi.md](servizi.md).
+
 ## Criterio di suddivisione
 
 I servizi sono divisi per **responsabilità (bounded context)**, non per entità: i dati che devono restare coerenti nella stessa transazione stanno nello stesso servizio. In particolare la prevenzione dei conflitti di prenotazione avviene tutta dentro **Prenotazioni**, su un solo database.
 
 ## Servizi
 
-### Identity
+### Autenticazione
 - **Responsabilità:** autenticazione e ruoli (`Studente`, `Personale`); emette JWT.
 - **Dati:** `Utente` (sintetici), `Ruolo`.
 - **Note cloud:** emette token standard, così in produzione si può sostituire con Entra ID senza modificare gli altri servizi.
 
-### Catalogo
+### Spazi
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
 - **Dati:** `Edificio`, `Spazio` (tipo, capienza, prenotabile), `Attrezzatura`, `OrarioApertura`.
 - **Pubblica:** `SpazioCreato`, `SpazioAggiornato`, `SpazioDisattivato`.
 
 ### Prenotazioni
 - **Responsabilità:** prenotare senza conflitti, cancellare, calcolare la disponibilità.
-- **Dati:** `Prenotazione` (con `RowVersion`), `SpazioPrenotabile` (copia locale aggiornata dagli eventi del Catalogo).
+- **Dati:** `Prenotazione` (con `RowVersion`), `SpazioPrenotabile` (copia locale aggiornata dagli eventi del servizio Spazi).
 - **Invarianti:** nessuna sovrapposizione tra prenotazioni confermate dello stesso spazio; prenotazione dentro l'orario di apertura; spazio attivo; `Fine > Inizio`.
 - **Prevenzione conflitti (SQL Server):** in un'unica transazione
   1. `SELECT ... FROM SpaziPrenotabili WITH (UPDLOCK, ROWLOCK) WHERE Id = @spazioId`, che serializza le prenotazioni dello stesso spazio;
@@ -27,7 +29,7 @@ I servizi sono divisi per **responsabilità (bounded context)**, non per entità
 - **Prova:** test di integrazione con richieste parallele sullo stesso slot contro SQL Server reale (Testcontainers): ne deve riuscire esattamente una.
 - **Pubblica:** `PrenotazioneConfermata`, `PrenotazioneCancellata`.
 
-### Utilizzo
+### Presenze
 - **Responsabilità:** utilizzo effettivo e report per il personale.
 - **Dati:** `RegistrazioneUtilizzo` (check-in, no-show), proiezione delle prenotazioni costruita dagli eventi.
 - **Regola di interpretazione:** il report distingue *prenotato e usato*, *prenotato e non usato*, *nessuna informazione*. L'assenza di dati non indica che lo spazio fosse libero.
@@ -61,6 +63,6 @@ SPA Angular che comunica solo con il gateway.
 
 ## Incrementi previsti
 
-1. Catalogo + Prenotazioni + Gateway + Frontend: prenotazione senza conflitti con test di concorrenza.
-2. Identity: ruoli reali.
-3. Utilizzo + eventi: check-in e report.
+1. Spazi + Prenotazioni + Gateway + Frontend: prenotazione senza conflitti con test di concorrenza.
+2. Autenticazione: ruoli reali.
+3. Presenze + eventi: check-in e report.

@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Services\Catalogo\SmartCampus.Catalogo.Api\SmartCampus.Catalogo.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Spazi\SmartCampus.Spazi.Api\SmartCampus.Spazi.Api.csproj" />
   </ItemGroup>
 
 </Project>

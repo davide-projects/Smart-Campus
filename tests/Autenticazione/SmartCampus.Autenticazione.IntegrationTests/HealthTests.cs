@@ -1,7 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 
-namespace SmartCampus.Catalogo.IntegrationTests;
+namespace SmartCampus.Autenticazione.IntegrationTests;
 
 public class HealthTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
