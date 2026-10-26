@@ -72,6 +72,15 @@ dotnet user-secrets init --project src/Services/Rooms/SmartCampus.Rooms.Api
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Rooms" --project src/Services/Rooms/SmartCampus.Rooms.Api
 ```
 
+Ogni servizio applica le migrazioni EF Core all'avvio. Per crearne una nuova dopo aver modificato il modello:
+
+```bash
+dotnet tool restore
+dotnet ef migrations add NomeMigrazione --project src/Services/Rooms/SmartCampus.Rooms.Api --output-dir Data/Migrations
+```
+
+Il tool `dotnet-ef` è versionato in `.config/dotnet-tools.json`: `dotnet tool restore` lo installa per il repository, senza installazioni globali. La migrazione iniziale di Rooms include anche i dati sintetici di sviluppo (edifici, spazi, attrezzature, orari).
+
 In sviluppo Angular inoltra `/api/*` al gateway tramite `frontend/proxy.conf.json`.
 
 ## Test
