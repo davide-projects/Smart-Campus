@@ -1,41 +1,42 @@
 # Architettura
 
 > Spiegazione non tecnica di ogni servizio: [servizi.md](servizi.md).
+> Nomi di servizi, entità, campi, eventi e route sono in **inglese** (vedi [CONTRIBUTING.md](../CONTRIBUTING.md#lingua)); il testo della documentazione è in italiano.
 
 ## Criterio di suddivisione
 
-I servizi sono divisi per **responsabilità (bounded context)**, non per entità: i dati che devono restare coerenti nella stessa transazione stanno nello stesso servizio. In particolare la prevenzione dei conflitti di prenotazione avviene tutta dentro **Prenotazioni**, su un solo database.
+I servizi sono divisi per **responsabilità (bounded context)**, non per entità: i dati che devono restare coerenti nella stessa transazione stanno nello stesso servizio. In particolare la prevenzione dei conflitti di prenotazione avviene tutta dentro **Bookings**, su un solo database.
 
 ## Servizi
 
-### Autenticazione
-- **Responsabilità:** autenticazione e ruoli (`Studente`, `Personale`); emette JWT.
-- **Dati:** `Utente` (sintetici), `Ruolo`.
+### Identity
+- **Responsabilità:** autenticazione e ruoli (`Student`, `Staff`); emette JWT.
+- **Dati:** `User` (sintetici), con `Role`.
 - **Note cloud:** emette token standard, così in produzione si può sostituire con Entra ID senza modificare gli altri servizi.
 
-### Spazi
+### Rooms
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
-- **Dati:** `Edificio`, `Spazio` (tipo, capienza, prenotabile), `Attrezzatura`, `OrarioApertura`.
-- **Pubblica:** `SpazioCreato`, `SpazioAggiornato`, `SpazioDisattivato`.
+- **Dati:** `Building`, `Room` (`Type`, `Capacity`, `IsBookable`), `Equipment`, `OpeningHours`.
+- **Pubblica:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`.
 
-### Prenotazioni
+### Bookings
 - **Responsabilità:** prenotare senza conflitti, cancellare, calcolare la disponibilità.
-- **Dati:** `Prenotazione` (con `RowVersion`), `SpazioPrenotabile` (copia locale aggiornata dagli eventi del servizio Spazi).
-- **Invarianti:** nessuna sovrapposizione tra prenotazioni confermate dello stesso spazio; prenotazione dentro l'orario di apertura; spazio attivo; `Fine > Inizio`.
+- **Dati:** `Reservation` (con `RowVersion`), `BookableRoom` (copia locale aggiornata dagli eventi del servizio Rooms).
+- **Invarianti:** nessuna sovrapposizione tra prenotazioni confermate dello stesso spazio; prenotazione dentro l'orario di apertura; spazio attivo; `End > Start`.
 - **Prevenzione conflitti (SQL Server):** in un'unica transazione
-  1. `SELECT ... FROM SpaziPrenotabili WITH (UPDLOCK, ROWLOCK) WHERE Id = @spazioId`, che serializza le prenotazioni dello stesso spazio;
-  2. verifica delle sovrapposizioni (`Inizio < @fine AND Fine > @inizio`);
+  1. `SELECT ... FROM BookableRooms WITH (UPDLOCK, ROWLOCK) WHERE Id = @roomId`, che serializza le prenotazioni dello stesso spazio;
+  2. verifica delle sovrapposizioni (`Start < @end AND End > @start`);
   3. `INSERT` e commit; in caso di conflitto restituisce `409 Conflict`.
 - **Prova:** test di integrazione con richieste parallele sullo stesso slot contro SQL Server reale (Testcontainers): ne deve riuscire esattamente una.
-- **Pubblica:** `PrenotazioneConfermata`, `PrenotazioneCancellata`.
+- **Pubblica:** `ReservationConfirmed`, `ReservationCancelled`.
 
-### Presenze
+### Attendance
 - **Responsabilità:** utilizzo effettivo e report per il personale.
-- **Dati:** `RegistrazioneUtilizzo` (check-in, no-show), proiezione delle prenotazioni costruita dagli eventi.
+- **Dati:** `AttendanceRecord` (`CheckIn`, `NoShow`), `ReservationProjection` (proiezione delle prenotazioni costruita dagli eventi).
 - **Regola di interpretazione:** il report distingue *prenotato e usato*, *prenotato e non usato*, *nessuna informazione*. L'assenza di dati non indica che lo spazio fosse libero.
 
 ### API Gateway
-Routing `/api/{servizio}/**`, validazione JWT, CORS. Nessuna logica di dominio.
+Routing `/api/{service}/**`, validazione JWT, CORS. Nessuna logica di dominio.
 
 ### Frontend
 SPA Angular che comunica solo con il gateway.
@@ -46,7 +47,7 @@ SPA Angular che comunica solo con il gateway.
 |---|---|
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
-| Database per servizio | 4 database SQL Server separati |
+| Database per servizio | 4 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`, `SmartCampus_Attendance`) |
 | Messaggistica | MassTransit: RabbitMQ in locale, Azure Service Bus in cloud |
 | Eventi affidabili | Outbox pattern (MassTransit + EF Core) |
 | Health check | `/health/live`, `/health/ready` |
@@ -63,6 +64,6 @@ SPA Angular che comunica solo con il gateway.
 
 ## Incrementi previsti
 
-1. Spazi + Prenotazioni + Gateway + Frontend: prenotazione senza conflitti con test di concorrenza.
-2. Autenticazione: ruoli reali.
-3. Presenze + eventi: check-in e report.
+1. Rooms + Bookings + Gateway + Frontend: prenotazione senza conflitti con test di concorrenza.
+2. Identity: ruoli reali.
+3. Attendance + eventi: check-in e report.

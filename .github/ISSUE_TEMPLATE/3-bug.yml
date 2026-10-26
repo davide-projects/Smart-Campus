@@ -32,10 +32,10 @@ body:
     attributes:
       label: Area
       options:
-        - autenticazione
-        - spazi
-        - prenotazioni
-        - presenze
+        - identity
+        - rooms
+        - bookings
+        - attendance
         - gateway
         - frontend
         - infra / ci

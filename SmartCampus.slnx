@@ -8,35 +8,35 @@
     <Project Path="src/Gateway/SmartCampus.Gateway/SmartCampus.Gateway.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
-  <Folder Name="/src/Services/Spazi/">
-    <Project Path="src/Services/Spazi/SmartCampus.Spazi.Api/SmartCampus.Spazi.Api.csproj" />
+  <Folder Name="/src/Services/Rooms/">
+    <Project Path="src/Services/Rooms/SmartCampus.Rooms.Api/SmartCampus.Rooms.Api.csproj" />
   </Folder>
-  <Folder Name="/src/Services/Autenticazione/">
-    <Project Path="src/Services/Autenticazione/SmartCampus.Autenticazione.Api/SmartCampus.Autenticazione.Api.csproj" />
+  <Folder Name="/src/Services/Identity/">
+    <Project Path="src/Services/Identity/SmartCampus.Identity.Api/SmartCampus.Identity.Api.csproj" />
   </Folder>
-  <Folder Name="/src/Services/Prenotazioni/">
-    <Project Path="src/Services/Prenotazioni/SmartCampus.Prenotazioni.Api/SmartCampus.Prenotazioni.Api.csproj" />
+  <Folder Name="/src/Services/Bookings/">
+    <Project Path="src/Services/Bookings/SmartCampus.Bookings.Api/SmartCampus.Bookings.Api.csproj" />
   </Folder>
-  <Folder Name="/src/Services/Presenze/">
-    <Project Path="src/Services/Presenze/SmartCampus.Presenze.Api/SmartCampus.Presenze.Api.csproj" />
+  <Folder Name="/src/Services/Attendance/">
+    <Project Path="src/Services/Attendance/SmartCampus.Attendance.Api/SmartCampus.Attendance.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SmartCampus.EndToEnd.Tests/SmartCampus.EndToEnd.Tests.csproj" />
   </Folder>
-  <Folder Name="/tests/Spazi/">
-    <Project Path="tests/Spazi/SmartCampus.Spazi.IntegrationTests/SmartCampus.Spazi.IntegrationTests.csproj" />
-    <Project Path="tests/Spazi/SmartCampus.Spazi.UnitTests/SmartCampus.Spazi.UnitTests.csproj" />
+  <Folder Name="/tests/Rooms/">
+    <Project Path="tests/Rooms/SmartCampus.Rooms.IntegrationTests/SmartCampus.Rooms.IntegrationTests.csproj" />
+    <Project Path="tests/Rooms/SmartCampus.Rooms.UnitTests/SmartCampus.Rooms.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/tests/Autenticazione/">
-    <Project Path="tests/Autenticazione/SmartCampus.Autenticazione.IntegrationTests/SmartCampus.Autenticazione.IntegrationTests.csproj" />
-    <Project Path="tests/Autenticazione/SmartCampus.Autenticazione.UnitTests/SmartCampus.Autenticazione.UnitTests.csproj" />
+  <Folder Name="/tests/Identity/">
+    <Project Path="tests/Identity/SmartCampus.Identity.IntegrationTests/SmartCampus.Identity.IntegrationTests.csproj" />
+    <Project Path="tests/Identity/SmartCampus.Identity.UnitTests/SmartCampus.Identity.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/tests/Prenotazioni/">
-    <Project Path="tests/Prenotazioni/SmartCampus.Prenotazioni.IntegrationTests/SmartCampus.Prenotazioni.IntegrationTests.csproj" />
-    <Project Path="tests/Prenotazioni/SmartCampus.Prenotazioni.UnitTests/SmartCampus.Prenotazioni.UnitTests.csproj" />
+  <Folder Name="/tests/Bookings/">
+    <Project Path="tests/Bookings/SmartCampus.Bookings.IntegrationTests/SmartCampus.Bookings.IntegrationTests.csproj" />
+    <Project Path="tests/Bookings/SmartCampus.Bookings.UnitTests/SmartCampus.Bookings.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/tests/Presenze/">
-    <Project Path="tests/Presenze/SmartCampus.Presenze.IntegrationTests/SmartCampus.Presenze.IntegrationTests.csproj" />
-    <Project Path="tests/Presenze/SmartCampus.Presenze.UnitTests/SmartCampus.Presenze.UnitTests.csproj" />
+  <Folder Name="/tests/Attendance/">
+    <Project Path="tests/Attendance/SmartCampus.Attendance.IntegrationTests/SmartCampus.Attendance.IntegrationTests.csproj" />
+    <Project Path="tests/Attendance/SmartCampus.Attendance.UnitTests/SmartCampus.Attendance.UnitTests.csproj" />
   </Folder>
 </Solution>
