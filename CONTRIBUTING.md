@@ -16,13 +16,13 @@ User Story (issue, label story)
 
 | Tipo | Label | Chi la crea | Template |
 |---|---|---|---|
-| **User Story** | `story` | Team leader, dopo accordo con il PO | *User Story* |
+| **User Story** | `story` | Chi cura il backlog, dopo la revisione del team leader e l'accordo con il PO | *User Story* (formato obbligatorio del corso) |
 | **Task** | `task` | Developers, come **sub-issue** della storia | *Task* |
 | **Bug** | `bug` | Chiunque | *Bug* |
 
 Label aggiuntive per servizio: `svc:identity`, `svc:catalogo`, `svc:prenotazioni`, `svc:utilizzo`, `svc:gateway`, `frontend`, `infra`.
 
-- Le storie descrivono **un bisogno** ("Come studente voglio…"), non una soluzione tecnica. Vedi [docs/handoff-architettura.md](docs/handoff-architettura.md).
+- Le storie descrivono **un bisogno** ("Come studente voglio…"), non una soluzione tecnica, e seguono **obbligatoriamente** il formato: `[ID] - Titolo`, *User Story* (Come / voglio / in modo da), *Descrizione*, *Criteri di accettazione*, *Story Point* (1/2/3/5/8/13). La bozza è in [docs/user-stories-bozza.md](docs/user-stories-bozza.md).
 - I task si creano **dentro la storia** con *Create sub-issue* (o *Add sub-issue* per una issue esistente): GitHub mostra l'avanzamento della storia (es. 3/5) e il Project vede la gerarchia.
 - Si lavora sempre su una issue: **niente branch senza issue**.
 
@@ -95,7 +95,7 @@ Il merge chiude i **task**, non la **storia**. La storia si chiude quando:
 2. i criteri di accettazione sono stati verificati;
 3. il PO ha validato l'incremento.
 
-La conformità tecnica (Definition of Done) e la validazione del PO non si sostituiscono a vicenda: per questo la storia la chiude il team leader dopo la review con il PO.
+La conformità tecnica (Definition of Done) e la validazione del PO non si sostituiscono a vicenda: per questo la storia la chiude chi cura il backlog, dopo la review con il PO.
 
 ## 6. Ciclo di lavoro in breve
 

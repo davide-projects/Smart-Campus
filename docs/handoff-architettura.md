@@ -259,6 +259,8 @@ Studente → Gateway → Utilizzo: verifica proprietario + finestra temporale �
 
 ## 8. Proposta di backlog iniziale (da validare con il PO)
 
+> La versione aggiornata e completa, nel formato obbligatorio con descrizione, criteri e story point, è in [user-stories-bozza.md](user-stories-bozza.md). La tabella seguente resta come mappa storie → epiche.
+
 Formato: *Come [attore] voglio [azione] così da [valore]*. Priorità MoSCoW **proposta**.
 
 ### Incremento 1: prenotare con fiducia
@@ -384,17 +386,27 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 5. **I task tecnici** (EF Core, migrazioni, MassTransit, outbox, JWT, Testcontainers) vanno sotto le storie che li richiedono la prima volta.
 6. **Le domande aperte** non si risolvono con un'assunzione silenziosa: si scrive l'assunzione nella storia e la si porta al PO.
 
-### Template di storia
+### Template di storia (formato obbligatorio del corso)
 ```
-ID: US-xx   Epica: Ex   Priorità proposta: Must/Should/Could
-Come <attore> voglio <azione> così da <valore>.
+[ID] - Titolo della User Story
 
-Criteri di accettazione:
-- Dato … Quando … Allora …
+User Story
+Come [tipo di utente / ruolo]
+voglio [funzionalità / azione]
+in modo da [beneficio / valore ottenuto].
 
-Servizi coinvolti: …
-Invarianti: INV-…
-Dati di seed necessari: …
-Assunzioni / domande aperte: I-…
-Task tecnici (Developers): …
+Descrizione
+Cosa deve essere realizzato e in quale contesto, senza dettagli tecnici di implementazione.
+
+Criteri di accettazione
+La storia è considerata completata quando:
+[ ] [Criterio di accettazione 1]
+[ ] [Criterio di accettazione 2]
+[ ] [Criterio di accettazione 3]
+
+Story Point
+Stima: [1 / 2 / 3 / 5 / 8 / 13]
 ```
+Le informazioni di questo handoff che il formato non prevede (servizi, invarianti, dati di seed, domande aperte) **non vanno aggiunte alla storia**: si usano per scrivere i criteri e la descrizione, e i dettagli tecnici finiscono nei task (sub-issue).
+
+La bozza completa è in [user-stories-bozza.md](user-stories-bozza.md).

@@ -1,77 +1,52 @@
 name: User Story
-description: Bisogno di un attore, concordato con il PO. I task tecnici vanno creati come sub-issue.
-title: "[US] "
+description: User story nel formato concordato. I task tecnici vanno creati come sub-issue.
+title: "[US-xx] - "
 labels: ["story"]
 body:
   - type: markdown
     attributes:
       value: |
-        Una storia descrive **un bisogno e il valore atteso**, non una soluzione tecnica.
-        Riferimento: `docs/handoff-architettura.md`. Dopo averla creata, aggiungi i task con **Create sub-issue**.
-  - type: input
-    id: storia
+        Titolo: **[ID] - Titolo della User Story** (es. `[US-04] - Prenotare uno spazio`).
+        Dopo aver creato la storia, aggiungi i task con **Create sub-issue**.
+  - type: textarea
+    id: user-story
     attributes:
-      label: Storia
-      placeholder: "Come studente voglio prenotare uno spazio per una fascia oraria così da avere la certezza di poterlo usare"
+      label: User Story
+      value: |
+        Come [tipo di utente / ruolo]
+        voglio [funzionalità / azione]
+        in modo da [beneficio / valore ottenuto].
     validations:
       required: true
-  - type: dropdown
-    id: epica
+  - type: textarea
+    id: descrizione
     attributes:
-      label: Epica
-      options:
-        - E1. Trovare uno spazio
-        - E2. Prenotare senza conflitti
-        - E3. Gestire le mie prenotazioni
-        - E4. Accesso e ruoli
-        - E5. Gestire il catalogo
-        - E6. Registrare l'utilizzo effettivo
-        - E7. Comprendere l'utilizzo
-        - E8. Qualità, avvio e prove
-    validations:
-      required: true
-  - type: dropdown
-    id: priorita
-    attributes:
-      label: Priorità concordata con il PO
-      options:
-        - Must
-        - Should
-        - Could
+      label: Descrizione
+      description: Cosa deve essere realizzato e in quale contesto verrà utilizzato. Cosa deve fare il sistema, senza dettagli tecnici di implementazione.
     validations:
       required: true
   - type: textarea
     id: criteri
     attributes:
       label: Criteri di accettazione
-      description: Risultati osservabili, formato Dato / Quando / Allora, con dati sintetici.
       value: |
-        - [ ] **CA-1** Dato … quando … allora …
-        - [ ] **CA-2** Dato … quando … allora …
+        La storia è considerata completata quando:
+        - [ ] [Criterio di accettazione 1]
+        - [ ] [Criterio di accettazione 2]
+        - [ ] [Criterio di accettazione 3]
     validations:
       required: true
-  - type: checkboxes
-    id: servizi
+  - type: dropdown
+    id: story-point
     attributes:
-      label: Servizi coinvolti
+      label: Story Point
+      description: Stima
       options:
-        - label: Identity
-        - label: Catalogo
-        - label: Prenotazioni
-        - label: Utilizzo
-        - label: Gateway
-        - label: Frontend
-  - type: input
-    id: invarianti
-    attributes:
-      label: Invarianti / regole
-      placeholder: "INV-1, INV-3"
-  - type: textarea
-    id: seed
-    attributes:
-      label: Dati sintetici necessari
-  - type: textarea
-    id: domande
-    attributes:
-      label: Assunzioni e domande aperte
-      description: Riferimenti I-x dell'handoff. Le assunzioni vanno validate con il PO.
+        - "1"
+        - "2"
+        - "3"
+        - "5"
+        - "8"
+        - "13"
+    validations:
+      required: true
