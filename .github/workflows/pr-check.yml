@@ -1,0 +1,40 @@
+name: pr-check
+
+# Verifica le convenzioni di CONTRIBUTING.md che collegano PR, branch e issue.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verifica branch, titolo e issue collegata
+        env:
+          BRANCH: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          errors=0
+
+          if ! [[ "$BRANCH" =~ ^(feat|fix|test|docs|chore|refactor)/[0-9]+-[a-z0-9-]+$ ]]; then
+            echo "::error::Branch '$BRANCH' non valido. Formato: <tipo>/<numero-issue>-<descrizione> (es. feat/42-blocca-sovrapposizioni)"
+            errors=1
+          fi
+
+          if ! [[ "$TITLE" =~ ^(feat|fix|test|docs|chore|refactor)(\([a-z-]+\))?:\ .+ ]]; then
+            echo "::error::Titolo '$TITLE' non valido. Formato: <tipo>(<scope>): <descrizione> (#<issue>)"
+            errors=1
+          fi
+
+          # I commenti HTML del template non contano: GitHub li ignora per il collegamento alle issue.
+          body_visibile=$(perl -0pe 's/<!--.*?-->//gs' <<< "$BODY")
+          if ! grep -qiE '(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+' <<< "$body_visibile"; then
+            echo "::error::La descrizione deve contenere 'Closes #<numero>' (o Fixes/Resolves) per collegare e chiudere la issue."
+            errors=1
+          fi
+
+          exit $errors

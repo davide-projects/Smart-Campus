@@ -1,0 +1,49 @@
+name: Task
+description: Lavoro tecnico per realizzare una storia. Crealo dalla storia con "Create sub-issue".
+title: "[Task] "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Se hai aperto questo form dalla storia con **Create sub-issue**, il collegamento è già fatto.
+        Altrimenti, dopo la creazione, aggiungilo alla storia con **Add sub-issue**.
+        Lavoraci da un branch creato con **Development → Create a branch** (vedi `CONTRIBUTING.md`).
+  - type: input
+    id: storia
+    attributes:
+      label: Storia
+      placeholder: "#12"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - identity
+        - catalogo
+        - prenotazioni
+        - utilizzo
+        - gateway
+        - frontend
+        - contracts
+        - infra / ci
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: descrizione
+    attributes:
+      label: Cosa fare
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Completato quando
+      description: Verifica concreta (test, comando, comportamento osservabile).
+      value: |
+        - [ ] …
+    validations:
+      required: true

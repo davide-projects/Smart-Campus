@@ -80,6 +80,10 @@ cd frontend && npx ng test --watch=false
 
 Ogni servizio ha i propri unit test (regole di dominio) e test di integrazione (API + SQL Server reale con Testcontainers). `SmartCampus.EndToEnd.Tests` verifica i flussi tra più servizi.
 
+## Contribuire
+
+Convenzioni per issue, branch, commit e pull request (collegati automaticamente al GitHub Project) in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Cloud
 
 Il sistema è progettato per il cloud (container stateless, configurazione esterna, health check `/health/live` e `/health/ready`, un database per servizio). La corrispondenza prevista con Azure è descritta in [docs/architettura.md](docs/architettura.md). **Il deploy non è stato eseguito**: la dimostrazione è locale.

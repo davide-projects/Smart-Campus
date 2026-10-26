@@ -1,0 +1,47 @@
+name: Bug
+description: Comportamento diverso da quello atteso.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: passi
+    attributes:
+      label: Passi per riprodurre
+      description: Con dati sintetici. Niente dati personali reali né segreti.
+      value: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: atteso
+    attributes:
+      label: Comportamento atteso
+      description: Indica il criterio di accettazione o la regola (INV-x) di riferimento, se esiste.
+    validations:
+      required: true
+  - type: textarea
+    id: osservato
+    attributes:
+      label: Comportamento osservato
+      description: Messaggi di errore, log (senza segreti), screenshot.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - identity
+        - catalogo
+        - prenotazioni
+        - utilizzo
+        - gateway
+        - frontend
+        - infra / ci
+        - non so
+  - type: input
+    id: storia
+    attributes:
+      label: Storia collegata (se nota)
+      placeholder: "#12"
