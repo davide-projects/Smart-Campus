@@ -3,19 +3,30 @@
 > **Stato:** bozza da revisionare con Davide, poi da validare con il PO. Dopo la validazione ogni storia diventa una issue con il template *User Story*.
 >
 > Le storie sono ordinate per **incremento proposto**: l'incremento 1 è il minimo che dimostra il valore principale (prenotare senza conflitti).
-> Le stime in story point sono relative tra loro (riferimento: US-06 = 2).
+> Le stime in story point sono relative tra loro (riferimento: US-07 = 2).
+
+## Decisioni del team
+
+| # | Decisione | Storie interessate |
+|---|---|---|
+| D1 | Si può prenotare anche **come gruppo**: chi prenota (organizzatore) sceglie i membri tra gli studenti registrati | US-05 |
+| D2 | I partecipanti sono calcolati: organizzatore + membri, entro la capienza dello spazio | US-04, US-05 |
+| D3 | **Nessun utente** può avere due prenotazioni confermate sovrapposte, da solo o in gruppo, anche in spazi diversi | US-04, US-05, US-06 |
+| D4 | I membri vedono la prenotazione e possono fare il check-in; non possono cancellarla né modificare i partecipanti | US-05, US-07, US-08, US-14 |
+
+**Domanda aperta:** l'organizzatore può aggiungere o togliere membri dopo la conferma? Se sì, serve una storia dedicata.
 
 ## Assunzioni usate nella bozza (da confermare)
 
 | # | Assunzione | Storie interessate |
 |---|---|---|
-| A1 | Le prenotazioni si fanno a blocchi di **30 minuti** | US-03, US-04, US-12 |
-| A2 | Una prenotazione dura al massimo **4 ore** e si fa al massimo **14 giorni** prima | US-04 |
-| A3 | Prenotazioni consecutive (10:00–11:00 e 11:00–12:00) **non** sono in conflitto | US-04, US-05 |
-| A4 | Uno studente vede che una fascia è occupata, ma **non chi** l'ha prenotata | US-03, US-05 |
-| A5 | Si può cancellare una prenotazione fino all'orario di inizio | US-07 |
-| A6 | Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio | US-13, US-14 |
-| A7 | Gli utenti sono già registrati (dati sintetici): non c'è la registrazione autonoma | US-08 |
+| A1 | Le prenotazioni si fanno a blocchi di **30 minuti** | US-03, US-04, US-05, US-13 |
+| A2 | Una prenotazione dura al massimo **4 ore** e si fa al massimo **14 giorni** prima | US-04, US-05 |
+| A3 | Prenotazioni consecutive (10:00–11:00 e 11:00–12:00) **non** sono in conflitto | US-04, US-05, US-06 |
+| A4 | Uno studente vede che una fascia è occupata, ma **non chi** l'ha prenotata | US-03, US-06 |
+| A5 | Si può cancellare una prenotazione fino all'orario di inizio | US-08 |
+| A6 | Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio | US-14, US-15 |
+| A7 | Gli utenti sono già registrati (dati sintetici): non c'è la registrazione autonoma | US-09 |
 | A8 | Studenti e personale possono prenotare tutti gli spazi prenotabili, laboratori compresi | US-04 |
 
 ---
@@ -97,22 +108,47 @@ voglio prenotare uno spazio per una fascia oraria
 in modo da avere la certezza di poterlo usare senza che altri contino sullo stesso spazio.
 
 **Descrizione**
-Lo studente sceglie spazio, giorno, ora di inizio e di fine e numero di partecipanti, e conferma. Il sistema accetta la prenotazione solo se lo spazio è libero per tutta la fascia e la richiesta rispetta le regole (orari, capienza, durata). È il requisito centrale del prodotto: **due prenotazioni confermate dello stesso spazio non possono mai sovrapporsi**, nemmeno se vengono richieste nello stesso istante.
+Lo studente prenota per sé stesso: sceglie spazio, giorno, ora di inizio e di fine, e conferma. Il sistema accetta la prenotazione solo se lo spazio è libero per tutta la fascia, lo studente non ha già un'altra prenotazione nello stesso orario e la richiesta rispetta le regole (orari, durata, anticipo). È il requisito centrale del prodotto: **due prenotazioni confermate dello stesso spazio non possono mai sovrapporsi**, nemmeno se vengono richieste nello stesso istante. La prenotazione per più persone è descritta in US-05.
 
 **Criteri di accettazione**
 La storia è considerata completata quando:
 - [ ] Prenotando una fascia libera, lo studente riceve una conferma con spazio, giorno e orario, e la fascia risulta occupata per tutti.
-- [ ] Una richiesta che si sovrappone anche in parte a una prenotazione confermata viene rifiutata e non crea alcuna prenotazione.
+- [ ] Una richiesta che si sovrappone anche in parte a una prenotazione confermata dello stesso spazio viene rifiutata e non crea alcuna prenotazione.
 - [ ] Una prenotazione che inizia esattamente quando finisce un'altra viene accettata.
 - [ ] Con 20 richieste contemporanee per la stessa fascia libera, ne viene confermata esattamente una (verificato su database reale).
-- [ ] Vengono rifiutate, con un messaggio che spiega il motivo, le richieste: fuori dall'orario di apertura, con più partecipanti della capienza, nel passato, più lunghe di 4 ore o oltre 14 giorni in anticipo.
+- [ ] Uno studente che ha già una prenotazione confermata (singola o di gruppo) sovrapposta alla fascia richiesta, anche in un altro spazio, non può prenotare.
+- [ ] Vengono rifiutate, con un messaggio che spiega il motivo, le richieste: fuori dall'orario di apertura, nel passato, più lunghe di 4 ore o oltre 14 giorni in anticipo.
 
 **Story Point**
 Stima: 8
 
 ---
 
-### [US-05] - Capire perché una prenotazione non è possibile
+### [US-05] - Prenotare uno spazio per un gruppo
+
+**User Story**
+Come studente
+voglio prenotare uno spazio indicando gli altri studenti che parteciperanno
+in modo che tutto il gruppo abbia la certezza dello spazio e ritrovi la prenotazione.
+
+**Descrizione**
+Durante la prenotazione lo studente (organizzatore) aggiunge come membri altri studenti registrati. Il numero di partecipanti è calcolato automaticamente: organizzatore più membri, e non può superare la capienza dello spazio. Valgono tutte le regole della prenotazione singola (US-04); in più, nessun membro può avere un'altra prenotazione confermata nello stesso orario. I membri vedono la prenotazione tra le proprie e possono fare il check-in, ma non possono cancellarla né modificare i membri.
+
+**Criteri di accettazione**
+La storia è considerata completata quando:
+- [ ] Lo studente può aggiungere come membri solo utenti registrati con ruolo studente.
+- [ ] Il numero di partecipanti mostrato e salvato è uguale a organizzatore più membri.
+- [ ] Se i partecipanti superano la capienza dello spazio, la prenotazione viene rifiutata con un messaggio che indica la capienza massima.
+- [ ] Se anche un solo membro ha già una prenotazione confermata sovrapposta, la prenotazione viene rifiutata e non crea alcuna prenotazione.
+- [ ] Dopo la conferma, la prenotazione compare tra le prenotazioni di ogni membro.
+- [ ] I membri non possono cancellare la prenotazione né aggiungere o togliere partecipanti.
+
+**Story Point**
+Stima: 5
+
+---
+
+### [US-06] - Capire perché una prenotazione non è possibile
 
 **User Story**
 Come studente
@@ -127,6 +163,8 @@ La storia è considerata completata quando:
 - [ ] Se la fascia è occupata, il messaggio lo dice e mostra le fasce libere dello stesso spazio in quel giorno.
 - [ ] Se non ci sono fasce libere quel giorno, il messaggio lo indica esplicitamente.
 - [ ] Per ogni altro motivo di rifiuto (orario, capienza, durata, anticipo) il messaggio indica il limite da rispettare (es. "aperto dalle 08:00 alle 20:00").
+- [ ] Se lo studente ha già una prenotazione nella stessa fascia, il messaggio lo indica.
+- [ ] In una prenotazione di gruppo, se uno o più membri hanno già una prenotazione nella stessa fascia, il messaggio lo indica.
 - [ ] I dati inseriti nel modulo restano compilati dopo il rifiuto.
 
 **Story Point**
@@ -134,7 +172,7 @@ Stima: 3
 
 ---
 
-### [US-06] - Vedere le mie prenotazioni
+### [US-07] - Vedere le mie prenotazioni
 
 **User Story**
 Come studente
@@ -142,13 +180,14 @@ voglio vedere in un unico elenco le mie prenotazioni
 in modo da ritrovare le conferme senza cercarle tra messaggi diversi.
 
 **Descrizione**
-Lo studente apre la sezione "Le mie prenotazioni" e vede le prenotazioni future in ordine di data, con spazio, edificio, giorno e orario. Può consultare anche quelle passate e quelle cancellate.
+Lo studente apre la sezione "Le mie prenotazioni" e vede le prenotazioni future in ordine di data, con spazio, edificio, giorno e orario: sia quelle che ha creato sia quelle di gruppo di cui è membro. Può consultare anche quelle passate e quelle cancellate.
 
 **Criteri di accettazione**
 La storia è considerata completata quando:
 - [ ] Vengono mostrate le prenotazioni future dello studente in ordine cronologico, con spazio, edificio, giorno e orario.
+- [ ] Le prenotazioni di gruppo di cui lo studente è membro compaiono nell'elenco, indicate come prenotazioni di gruppo con l'organizzatore.
 - [ ] Le prenotazioni passate e quelle cancellate sono consultabili separatamente.
-- [ ] Lo studente non vede le prenotazioni di altri utenti.
+- [ ] Lo studente non vede le prenotazioni di cui non è organizzatore né membro.
 - [ ] Se non ci sono prenotazioni compare un messaggio con il collegamento alla ricerca degli spazi.
 
 **Story Point**
@@ -156,7 +195,7 @@ Stima: 2
 
 ---
 
-### [US-07] - Cancellare una mia prenotazione
+### [US-08] - Cancellare una mia prenotazione
 
 **User Story**
 Come studente
@@ -164,14 +203,15 @@ voglio cancellare una prenotazione che non mi serve più
 in modo da liberare lo spazio per chi ne ha bisogno.
 
 **Descrizione**
-Dall'elenco delle sue prenotazioni lo studente cancella una prenotazione futura, dopo una richiesta di conferma. Lo spazio torna subito disponibile per tutti.
+Dall'elenco delle sue prenotazioni lo studente cancella una prenotazione futura che ha creato lui, dopo una richiesta di conferma. Lo spazio torna subito disponibile per tutti. Per una prenotazione di gruppo, la cancellazione vale per tutti i membri.
 
 **Criteri di accettazione**
 La storia è considerata completata quando:
-- [ ] Dopo la conferma, la prenotazione risulta cancellata e non è più tra le future.
+- [ ] Dopo la conferma, la prenotazione risulta cancellata e non è più tra le future, né per l'organizzatore né per i membri.
 - [ ] Subito dopo la cancellazione, la fascia appare libera nella disponibilità dello spazio e un altro studente può prenotarla.
 - [ ] Non è possibile cancellare una prenotazione già iniziata o passata.
 - [ ] Uno studente non può cancellare la prenotazione di un altro utente.
+- [ ] Un membro di un gruppo che non è l'organizzatore non può cancellare la prenotazione, che resta valida.
 
 **Story Point**
 Stima: 3
@@ -180,7 +220,7 @@ Stima: 3
 
 ## Incremento 2: accesso e gestione degli spazi
 
-### [US-08] - Accedere con le proprie credenziali
+### [US-09] - Accedere con le proprie credenziali
 
 **User Story**
 Come utente del campus (studente o personale)
@@ -203,7 +243,7 @@ Stima: 5
 
 ---
 
-### [US-09] - Gestire gli spazi del campus
+### [US-10] - Gestire gli spazi del campus
 
 **User Story**
 Come personale del campus
@@ -225,7 +265,7 @@ Stima: 5
 
 ---
 
-### [US-10] - Dismettere uno spazio
+### [US-11] - Dismettere uno spazio
 
 **User Story**
 Come personale del campus
@@ -246,7 +286,7 @@ Stima: 3
 
 ---
 
-### [US-11] - Vedere le prenotazioni di uno spazio
+### [US-12] - Vedere le prenotazioni di uno spazio
 
 **User Story**
 Come personale del campus
@@ -267,7 +307,7 @@ Stima: 2
 
 ---
 
-### [US-12] - Trovare spazi liberi in un orario
+### [US-13] - Trovare spazi liberi in un orario
 
 **User Story**
 Come studente
@@ -291,7 +331,7 @@ Stima: 5
 
 ## Incremento 3: utilizzo effettivo degli spazi
 
-### [US-13] - Segnalare che sto usando lo spazio (check-in)
+### [US-14] - Segnalare che sto usando lo spazio (check-in)
 
 **User Story**
 Come studente
@@ -299,21 +339,22 @@ voglio confermare di essere arrivato nello spazio prenotato
 in modo che risulti che lo spazio è stato effettivamente usato.
 
 **Descrizione**
-All'inizio della prenotazione lo studente fa il check-in dalla sezione "Le mie prenotazioni". Il check-in è possibile solo in una finestra intorno all'orario di inizio.
+All'inizio della prenotazione lo studente fa il check-in dalla sezione "Le mie prenotazioni". Il check-in è possibile solo in una finestra intorno all'orario di inizio. In una prenotazione di gruppo può farlo l'organizzatore o qualsiasi membro, e basta un check-in per segnare la prenotazione come usata.
 
 **Criteri di accettazione**
 La storia è considerata completata quando:
 - [ ] Da 15 minuti prima a 15 minuti dopo l'inizio, lo studente può fare il check-in e la prenotazione risulta "usata".
 - [ ] Fuori da questa finestra il check-in non è possibile e viene spiegato perché.
+- [ ] In una prenotazione di gruppo, il check-in di un solo membro o dell'organizzatore segna la prenotazione come "usata" per tutto il gruppo.
 - [ ] Non è possibile fare due volte il check-in sulla stessa prenotazione.
-- [ ] Non è possibile fare il check-in su una prenotazione di un altro utente o cancellata.
+- [ ] Non è possibile fare il check-in su una prenotazione cancellata o di cui non si è organizzatore né membro.
 
 **Story Point**
 Stima: 3
 
 ---
 
-### [US-14] - Registrare una mancata presentazione
+### [US-15] - Registrare una mancata presentazione
 
 **User Story**
 Come personale del campus
@@ -334,7 +375,7 @@ Stima: 2
 
 ---
 
-### [US-15] - Capire come vengono usati gli spazi
+### [US-16] - Capire come vengono usati gli spazi
 
 **User Story**
 Come personale del campus
@@ -357,7 +398,7 @@ Stima: 8
 
 ---
 
-### [US-16] - Confrontare l'utilizzo tra aree del campus
+### [US-17] - Confrontare l'utilizzo tra aree del campus
 
 **User Story**
 Come personale del campus
@@ -386,20 +427,21 @@ Stima: 2
 | US-02 | Vedere il dettaglio di uno spazio | 1 | 2 |
 | US-03 | Vedere quando uno spazio è libero | 1 | 5 |
 | US-04 | Prenotare uno spazio | 1 | 8 |
-| US-05 | Capire perché una prenotazione non è possibile | 1 | 3 |
-| US-06 | Vedere le mie prenotazioni | 1 | 2 |
-| US-07 | Cancellare una mia prenotazione | 1 | 3 |
-| US-08 | Accedere con le proprie credenziali | 2 | 5 |
-| US-09 | Gestire gli spazi del campus | 2 | 5 |
-| US-10 | Dismettere uno spazio | 2 | 3 |
-| US-11 | Vedere le prenotazioni di uno spazio | 2 | 2 |
-| US-12 | Trovare spazi liberi in un orario | 2 | 5 |
-| US-13 | Segnalare che sto usando lo spazio (check-in) | 3 | 3 |
-| US-14 | Registrare una mancata presentazione | 3 | 2 |
-| US-15 | Capire come vengono usati gli spazi | 3 | 8 |
-| US-16 | Confrontare l'utilizzo tra aree del campus | 3 | 2 |
-| | **Totale** | | **61** |
+| US-05 | Prenotare uno spazio per un gruppo | 1 | 5 |
+| US-06 | Capire perché una prenotazione non è possibile | 1 | 3 |
+| US-07 | Vedere le mie prenotazioni | 1 | 2 |
+| US-08 | Cancellare una mia prenotazione | 1 | 3 |
+| US-09 | Accedere con le proprie credenziali | 2 | 5 |
+| US-10 | Gestire gli spazi del campus | 2 | 5 |
+| US-11 | Dismettere uno spazio | 2 | 3 |
+| US-12 | Vedere le prenotazioni di uno spazio | 2 | 2 |
+| US-13 | Trovare spazi liberi in un orario | 2 | 5 |
+| US-14 | Segnalare che sto usando lo spazio (check-in) | 3 | 3 |
+| US-15 | Registrare una mancata presentazione | 3 | 2 |
+| US-16 | Capire come vengono usati gli spazi | 3 | 8 |
+| US-17 | Confrontare l'utilizzo tra aree del campus | 3 | 2 |
+| | **Totale** | | **66** |
 
-Incremento 1: 26 SP · Incremento 2: 20 SP · Incremento 3: 15 SP.
+Incremento 1: 31 SP · Incremento 2: 20 SP · Incremento 3: 15 SP.
 
-**Nota per la revisione:** nell'incremento 1 gli studenti usano un utente di prova fisso, perché l'accesso vero arriva con US-08. Se Davide o il PO preferiscono avere l'accesso già nel primo incremento, basta spostare US-08 e togliere US-12 per mantenere un carico simile.
+**Nota per la revisione:** nell'incremento 1 gli studenti usano un utente di prova fisso, perché l'accesso vero arriva con US-09; i membri di un gruppo (US-05) si scelgono tra gli utenti sintetici già presenti. Se Davide o il PO preferiscono avere l'accesso già nel primo incremento, basta spostare US-09 e togliere US-13 per mantenere un carico simile.

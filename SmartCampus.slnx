@@ -17,9 +17,6 @@
   <Folder Name="/src/Services/Bookings/">
     <Project Path="src/Services/Bookings/SmartCampus.Bookings.Api/SmartCampus.Bookings.Api.csproj" />
   </Folder>
-  <Folder Name="/src/Services/Attendance/">
-    <Project Path="src/Services/Attendance/SmartCampus.Attendance.Api/SmartCampus.Attendance.Api.csproj" />
-  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SmartCampus.EndToEnd.Tests/SmartCampus.EndToEnd.Tests.csproj" />
   </Folder>
@@ -34,9 +31,5 @@
   <Folder Name="/tests/Bookings/">
     <Project Path="tests/Bookings/SmartCampus.Bookings.IntegrationTests/SmartCampus.Bookings.IntegrationTests.csproj" />
     <Project Path="tests/Bookings/SmartCampus.Bookings.UnitTests/SmartCampus.Bookings.UnitTests.csproj" />
-  </Folder>
-  <Folder Name="/tests/Attendance/">
-    <Project Path="tests/Attendance/SmartCampus.Attendance.IntegrationTests/SmartCampus.Attendance.IntegrationTests.csproj" />
-    <Project Path="tests/Attendance/SmartCampus.Attendance.UnitTests/SmartCampus.Attendance.UnitTests.csproj" />
   </Folder>
 </Solution>

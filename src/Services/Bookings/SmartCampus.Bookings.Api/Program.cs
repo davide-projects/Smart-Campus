@@ -1,6 +1,6 @@
 using SmartCampus.ServiceDefaults;
 
-// Servizio Bookings: chi userà quale spazio e quando. Prenotazioni senza conflitti e calcolo della disponibilità.
+// Servizio Bookings: chi userà quale spazio e quando, e se lo ha usato davvero. Prenotazioni singole e di gruppo senza conflitti, disponibilità, check-in, mancate presentazioni e report.
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();

@@ -50,7 +50,7 @@ feat/42-blocca-sovrapposizioni                              ← branch: tipo e t
 | **Task** | `task` | Developers, come **sub-issue** della storia | *Task* |
 | **Bug** | `bug` | Chiunque | *Bug* |
 
-Label aggiuntive per servizio: `svc:identity`, `svc:rooms`, `svc:bookings`, `svc:attendance`, `svc:gateway`, `frontend`, `infra`.
+Label aggiuntive per servizio: `svc:identity`, `svc:rooms`, `svc:bookings`, `svc:gateway`, `frontend`, `infra`.
 
 - Le storie descrivono **un bisogno** ("Come studente voglio…"), non una soluzione tecnica, e seguono **obbligatoriamente** il formato: `[ID] - Titolo`, *User Story* (Come / voglio / in modo da), *Descrizione*, *Criteri di accettazione*, *Story Point* (1/2/3/5/8/13). La bozza è in [docs/user-stories-bozza.md](docs/user-stories-bozza.md).
 - I task si creano **dentro la storia** con *Create sub-issue* (o *Add sub-issue* per una issue esistente): GitHub mostra l'avanzamento della storia (es. 3/5) e il Project vede la gerarchia.
@@ -91,7 +91,7 @@ Formato [Conventional Commits](https://www.conventionalcommits.org/) con riferim
 ```
 
 - **tipo:** `feat`, `fix`, `test`, `docs`, `chore`, `refactor`
-- **scope:** `identity`, `rooms`, `bookings`, `attendance`, `gateway`, `frontend`, `contracts`, `infra`, `ci`, `docs`
+- **scope:** `identity`, `rooms`, `bookings`, `gateway`, `frontend`, `contracts`, `infra`, `ci`, `docs`
 
 Esempi:
 
@@ -154,7 +154,7 @@ gh pr create --fill --body "Closes #42"
 ```bash
 gh label create story --color 1D76DB --description "User story"
 gh label create task --color 0E8A16 --description "Task tecnico, sub-issue di una storia"
-for s in identity rooms bookings attendance gateway; do gh label create "svc:$s" --color C5DEF5; done
+for s in identity rooms bookings gateway; do gh label create "svc:$s" --color C5DEF5; done
 gh label create frontend --color C5DEF5
 gh label create infra --color C5DEF5
 ```

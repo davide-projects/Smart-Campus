@@ -14,8 +14,7 @@ Prodotto per **trovare e prenotare gli spazi del campus senza impegni incompatib
 | Gateway (YARP) | `src/Gateway/` | 5000 | *A quale servizio va la richiesta?* | Unico ingresso pubblico, routing, CORS |
 | Identity | `src/Services/Identity/` | 5101 | *Chi sei e cosa puoi fare?* | Login, ruoli, emissione JWT |
 | Rooms | `src/Services/Rooms/` | 5102 | *Quali spazi esistono e come sono fatti?* | Edifici, aule, attrezzature, orari |
-| Bookings | `src/Services/Bookings/` | 5103 | *Chi userà quale spazio e quando?* | Prenotazioni senza conflitti, disponibilità |
-| Attendance | `src/Services/Attendance/` | 5104 | *Lo spazio è stato usato davvero?* | Check-in, mancate presentazioni, report |
+| Bookings | `src/Services/Bookings/` | 5103 | *Chi userà quale spazio e quando? Lo ha usato davvero?* | Prenotazioni singole e di gruppo senza conflitti, disponibilità, check-in, report |
 
 Ogni servizio ha **il proprio database SQL Server** e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale).
 
@@ -29,7 +28,7 @@ src/
     SmartCampus.ServiceDefaults/   health check, ProblemDetails, OpenAPI comuni
     SmartCampus.Contracts/         SOLO eventi scambiati tra servizi
   Gateway/
-  Services/{Identity,Rooms,Bookings,Attendance}/
+  Services/{Identity,Rooms,Bookings}/
 tests/
   {Servizio}/SmartCampus.{Servizio}.UnitTests/
   {Servizio}/SmartCampus.{Servizio}.IntegrationTests/

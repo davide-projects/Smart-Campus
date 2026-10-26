@@ -24,7 +24,6 @@ body:
         - identity
         - rooms
         - bookings
-        - attendance
         - gateway
         - frontend
         - contracts

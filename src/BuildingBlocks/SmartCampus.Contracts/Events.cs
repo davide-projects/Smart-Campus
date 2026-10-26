@@ -7,7 +7,3 @@ namespace SmartCampus.Contracts;
 public record RoomCreated(Guid RoomId, string Name, int Capacity, bool IsBookable);
 public record RoomUpdated(Guid RoomId, string Name, int Capacity, bool IsBookable);
 public record RoomDeactivated(Guid RoomId);
-
-// Pubblicati da Bookings, consumati da Attendance.
-public record ReservationConfirmed(Guid ReservationId, Guid RoomId, Guid UserId, DateTimeOffset Start, DateTimeOffset End);
-public record ReservationCancelled(Guid ReservationId, Guid RoomId, DateTimeOffset CancelledAt);
