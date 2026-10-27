@@ -121,7 +121,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | `Building` | Id, Name, Address/Code | |
 | `Room` | Id, BuildingId, Name, Type (`Classroom`/`Lab`/`StudyRoom`), Capacity, Floor, IsBookable, IsActive | `IsActive=false` = dismesso, non cancellato fisicamente |
 | `Equipment` | Id, Name | Relazione N:M con `Room` |
-| `OpeningHours` | RoomId, DayOfWeek, OpensAt, ClosesAt | Più fasce per giorno ammesse? *(domanda PO)* |
+| `OpeningHours` | RoomId, DayOfWeek, OpensAt, ClosesAt | Per il primo incremento è prevista una sola fascia per spazio e giorno; verificare con il PO se servono più fasce. |
 
 **API previste**
 | Metodo | Route | Ruolo | Scopo |

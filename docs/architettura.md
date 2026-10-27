@@ -18,7 +18,10 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 
 ### Rooms
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
-- **Dati:** `Building`, `Room` (`Type`, `Capacity`, `IsBookable`), `Equipment`, `OpeningHours`.
+- **Dati:** `Building`, `Room` (`Type`, `Capacity`, `Floor`, `IsBookable`, `IsActive`), `Equipment`, `OpeningHours`.
+- **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=` restituisce solo gli spazi attivi. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
+- **Orari:** nel primo incremento è prevista una sola fascia per spazio e giorno; la scelta è da verificare con il PO se emergono esigenze di più fasce.
+- **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development.
 - **Pubblica:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`.
 
 ### Bookings
