@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { RoomDetail } from './components/shared/room-detail/room-detail';
 
 export const routes: Routes = [
   {
@@ -11,5 +12,10 @@ export const routes: Routes = [
     title: 'Cerca uno spazio',
     loadComponent: () =>
       import('./components/room-search/room-search').then((m) => m.RoomSearch),
+  },
+  {
+    path: 'rooms/:id',
+    title: 'Dettaglio spazio',
+    component: RoomDetail,
   },
 ];

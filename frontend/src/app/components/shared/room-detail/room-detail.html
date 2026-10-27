@@ -1,1 +1,140 @@
-<p>room-detail works!</p>
+@if (isLoading()) {
+<div class="loading-container">
+  <mat-spinner diameter="48"></mat-spinner>
+  <p>Caricamento dettagli dello spazio...</p>
+</div>
+} @else if (isNotFound()) {
+<mat-card class="not-found-card">
+  <mat-card-header>
+    <mat-icon mat-card-avatar color="warn">error_outline</mat-icon>
+    <mat-card-title>Spazio non trovato</mat-card-title>
+    <mat-card-subtitle>Lo spazio cercato non esiste o non è più attivo</mat-card-subtitle>
+  </mat-card-header>
+  <a mat-flat-button routerLink="/rooms">
+    <mat-icon>arrow_back</mat-icon>
+    Torna alla lista degli spazi
+  </a>
+</mat-card>
+
+}@else if (room(); as r) {
+<div class="room-detail-container">
+  <mat-card class="room-card">
+    <mat-card-header>
+      <mat-card-title class="room-title">
+        {{ r.name }}
+      </mat-card-title>
+      <mat-card-subtitle>
+        {{ r.buildingName }} (Codice: {{ r.buildingCode }})
+      </mat-card-subtitle>
+
+      <div class="status-badge-container">
+        @if (r.isBookable) {
+        <mat-chip class="chip-bookable" highlighted>
+          <mat-icon>check_circle</mat-icon>
+          Prenotabile
+        </mat-chip>
+        } @else {
+        <mat-chip class="chip-not-bookable" highlighted>
+          <mat-icon>block</mat-icon>
+          Non prenotabile
+        </mat-chip>
+        }
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="info-grid">
+        <div class="info-item">
+          <mat-icon>category</mat-icon>
+          <div>
+            <span class="info-label">Tipo</span>
+            <span class="info-value">{{ getTypeLabel(r.type) }}</span>
+          </div>
+        </div>
+
+        <div class="info-item">
+          <mat-icon>layers</mat-icon>
+          <div>
+            <span class="info-label">Piano</span>
+            <span class="info-value">{{ r.floor === 0 ? 'Terra (0)' : r.floor }}</span>
+          </div>
+        </div>
+
+        <div class="info-item">
+          <mat-icon>groups</mat-icon>
+          <div>
+            <span class="info-label">Capienza</span>
+            <span class="info-value">{{ r.capacity }} posti</span>
+          </div>
+        </div>
+
+        <div class="info-item">
+          <mat-icon>domain</mat-icon>
+          <div>
+            <span class="info-label">Edificio</span>
+            <span class="info-value">{{ r.buildingName }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="equipment-section">
+        <h3>Attrezzature disponibili</h3>
+        <mat-chip-set>
+          @for (item of r.equipment; track item.id) {
+          <mat-chip>
+            <mat-icon>devices</mat-icon>
+            {{ item.name }}
+          </mat-chip>
+          } @empty {
+          <p class="empty-text">Nessuna attrezzatura registrata per questo spazio.</p>
+          }
+        </mat-chip-set>
+      </div>
+
+      <div class="hours-section">
+        <h3>Orari di apertura</h3>
+        <ul class="hours-list">
+          @for (h of r.openingHours; track h.dayOfWeek) {
+          <li class="hours-row" [class.is-closed]="h.isClosed">
+            <span class="day-name">{{ getDayName(h.dayOfWeek) }}</span>
+            @if (h.isClosed) {
+            <span class="hours-time closed-label">Chiuso</span>
+            } @else {
+            <span class="hours-time">
+              {{ h.opensAt?.slice(0, 5) }} – {{ h.closesAt?.slice(0, 5) }}
+            </span>
+            }
+          </li>
+          }
+        </ul>
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions class="card-actions">
+      <a mat-stroked-button routerLink="/rooms">
+        <mat-icon>arrow_back</mat-icon>
+        Torna all'elenco
+      </a>
+
+      <div class="booking-actions">
+        <a mat-stroked-button [routerLink]="['/rooms', r.id, 'availability']">
+          <mat-icon>event_available</mat-icon>
+          Vedi disponibilità
+        </a>
+
+        @if (r.isBookable) {
+        <a mat-flat-button [routerLink]="['/rooms', r.id, 'book']">
+          <mat-icon>bookmark_add</mat-icon>
+          Prenota spazio
+        </a>
+        } @else {
+        <button mat-flat-button disabled title="Questo spazio non è prenotabile">
+          <mat-icon>block</mat-icon>
+          Non prenotabile
+        </button>
+        }
+      </div>
+    </mat-card-actions>
+  </mat-card>
+</div>
+}

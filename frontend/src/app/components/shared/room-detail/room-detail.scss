@@ -1,0 +1,174 @@
+:host {
+  display: block;
+  padding: 1.5rem;
+}
+
+.room-detail-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+// Stato di caricamento
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 1rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// Stato spazio non trovato
+.not-found-card {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 1rem;
+  border-left: 4px solid var(--mat-sys-error, #ba1a1a);
+}
+
+// Header e Badge di prenotabilità
+.room-card {
+  mat-card-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+  }
+
+  .status-badge-container {
+    margin-top: 0.5rem;
+
+    mat-chip {
+      display: inline-flex;
+      align-items: center;
+
+      mat-icon {
+        margin-right: 0.4rem;
+        font-size: 1.125rem;
+        width: 1.125rem;
+        height: 1.125rem;
+        transform: translateY(3px); // Prova 1px (o 2px se la vuoi più giù, oppure -1px se la vuoi più su)
+      }
+    }
+
+    .chip-bookable {
+      --mat-chip-elevated-container-color: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .chip-not-bookable {
+      --mat-chip-elevated-container-color: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+    }
+  }
+}
+
+// Griglia con Tipo, Piano, Capienza, Edificio
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.25rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    mat-icon {
+      color: var(--mat-sys-primary);
+    }
+
+    .info-label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--mat-sys-on-surface-variant);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .info-value {
+      display: block;
+      font-weight: 500;
+      font-size: 1rem;
+    }
+  }
+}
+
+// Sezione Attrezzature
+.equipment-section {
+  margin-top: 1.5rem;
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+    color: var(--mat-sys-on-surface);
+  }
+
+  .empty-text {
+    font-style: italic;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.875rem;
+  }
+}
+
+// Sezione Orari settimanali
+.hours-section {
+  margin-top: 1.5rem;
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+
+  .hours-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .hours-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--mat-sys-outline-variant, #e0e0e0);
+    font-size: 0.875rem;
+
+    .day-name {
+      font-weight: 500;
+    }
+
+    &.is-closed {
+      color: var(--mat-sys-on-surface-variant);
+
+      .closed-label {
+        color: var(--mat-sys-error, #ba1a1a);
+        font-weight: 500;
+      }
+    }
+  }
+}
+
+// Piè di pagina con pulsanti di azione
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+
+  .booking-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}
