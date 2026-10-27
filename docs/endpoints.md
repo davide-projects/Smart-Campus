@@ -8,7 +8,8 @@ Questo documento è l'elenco condiviso degli endpoint HTTP di SmartCampus. Aggio
 - I servizi sono elencati in ordine alfabetico; dentro ogni servizio le route sono ordinate per metodo e percorso.
 - `{id}` indica un parametro nel percorso. I parametri dopo `?` sono query string.
 - `—` significa che non sono previsti parametri o che il dettaglio non è ancora definito.
-- Le route applicative passano dal Gateway. Gli endpoint di salute sono esposti dal singolo servizio e non fanno parte del routing `/api` del Gateway.
+- Le route applicative passano dal Gateway, che valida il token e applica le regole di accesso (vedi [gateway.md](gateway.md)). Gli endpoint di salute sono esposti dal singolo servizio e non fanno parte del routing `/api` del Gateway.
+- **Accesso**: `anonimo` = nessun token; `autenticato` = serve `Authorization: Bearer <jwt>` di un utente `Student` o `Staff` (senza token o con token non valido la risposta è `401`); `Staff` = serve un token con ruolo `Staff` (con un ruolo diverso la risposta è `403`).
 
 ## Endpoint implementati
 
@@ -16,26 +17,41 @@ Questo documento è l'elenco condiviso degli endpoint HTTP di SmartCampus. Aggio
 
 Base pubblica: `/api/bookings`
 
-| Metodo | Percorso | Parametri | Descrizione |
-|---|---|---|---|
-| `GET` | `/api/bookings/` | — | Endpoint informativo; conferma che il servizio Bookings risponde. |
+| Metodo | Percorso | Accesso | Parametri | Descrizione |
+|---|---|---|---|---|
+| `GET` | `/api/bookings/` | autenticato | — | Endpoint informativo; conferma che il servizio Bookings risponde. |
 
 ### Identity
 
 Base pubblica: `/api/identity`
 
-| Metodo | Percorso | Parametri | Descrizione |
-|---|---|---|---|
-| `GET` | `/api/identity/` | — | Endpoint informativo; conferma che il servizio Identity risponde. |
+Il contratto del token (claim, durata, configurazione) e gli utenti sintetici di sviluppo sono descritti in [identity.md](identity.md).
+
+| Metodo | Percorso | Accesso | Parametri | Descrizione |
+|---|---|---|---|---|
+| `GET` | `/api/identity/` | autenticato | — | Endpoint informativo; conferma che il servizio Identity risponde. |
+| `GET` | `/api/identity/me` | autenticato | Intestazione `Authorization: Bearer <jwt>` | Restituisce il profilo dell'utente autenticato (`id`, `username`, `displayName`, `role`), letto dal database. Risponde `401` se il token è assente, scaduto o non valido. |
+| `POST` | `/api/identity/login` | anonimo | Body JSON: `username`, `password` | Verifica le credenziali e restituisce il token JWT (`accessToken`, `tokenType`, `expiresAt`) insieme al profilo dell'utente. Risponde `400` se mancano i campi e `401` con un messaggio generico se le credenziali non sono corrette. |
+
+Esempio di login:
+
+```text
+POST http://localhost:5000/api/identity/login
+Content-Type: application/json
+
+{ "username": "student1", "password": "<password di sviluppo>" }
+```
 
 ### Rooms
 
 Base pubblica: `/api/rooms`
 
-| Metodo | Percorso | Parametri | Descrizione |
-|---|---|---|---|
-| `GET` | `/api/rooms/` | Query opzionali: `type`, `minCapacity`, `buildingId` | Cerca gli spazi attivi; i filtri possono essere combinati. |
-| `GET` | `/api/rooms/{id}` | `id`: GUID dello spazio | Restituisce il dettaglio di uno spazio attivo, incluse attrezzature e orari; risponde `404` se non esiste o è dismesso. |
+| Metodo | Percorso | Accesso | Parametri | Descrizione |
+|---|---|---|---|---|
+| `GET` | `/api/rooms/` | anonimo | Query opzionali: `type`, `minCapacity`, `buildingId` | Cerca gli spazi attivi; i filtri possono essere combinati. |
+| `GET` | `/api/rooms/{id}` | anonimo | `id`: GUID dello spazio | Restituisce il dettaglio di uno spazio attivo, incluse attrezzature e orari; risponde `404` se non esiste o è dismesso. |
+
+Il catalogo è pubblico. Il Gateway riserva già al ruolo `Staff` le chiamate `POST`, `PUT`, `PATCH` e `DELETE` su `/api/rooms/**`, pronte per la gestione degli spazi (US-10): oggi non esiste nessuna di queste route.
 
 Esempio di ricerca filtrata:
 
@@ -50,7 +66,7 @@ Questi endpoint sono esposti direttamente dai servizi per controlli di disponibi
 | Metodo | Percorso | Descrizione |
 |---|---|---|
 | `GET` | `/health/live` | Indica se il processo del servizio è attivo. |
-| `GET` | `/health/ready` | Indica se il servizio è pronto; per Rooms verifica anche il database. |
+| `GET` | `/health/ready` | Indica se il servizio è pronto; per Rooms e Identity verifica anche il database. |
 
 ## Endpoint pianificati
 
@@ -61,11 +77,11 @@ Le API non ancora implementate non sono replicate qui: il riferimento completo p
 1. Inserisci la route nella tabella **Endpoint implementati** del servizio corretto, mantenendo l'ordine per metodo e percorso.
 2. Indica il percorso pubblico completo, inclusa la base del servizio (`/api/rooms`, `/api/bookings` o `/api/identity`), i parametri e una descrizione breve del risultato.
 3. Se la route è ancora una proposta, aggiornala nel [documento handoff](handoff-architettura.md#6-dettaglio-per-servizio-riferimento-per-scrivere-storie-e-task); non duplicarla qui.
-4. Specifica qui eventuali requisiti di autenticazione/autorizzazione, codici di risposta non ovvi e link alla documentazione del contratto o ai test, quando applicabili.
+4. Indica nella colonna **Accesso** chi può chiamarla, ed esplicita la stessa regola nel campo `AuthorizationPolicy` della route in `appsettings.json` del Gateway (vedi [gateway.md](gateway.md)): una route senza policy fa fallire i test. Aggiungi codici di risposta non ovvi e link alla documentazione del contratto o ai test, quando applicabili.
 5. Aggiorna il catalogo nella stessa modifica in cui aggiungi o cambi la route.
 
 Riga da copiare e compilare:
 
 ```markdown
-| `GET` | `/api/<service>/<path>` | Query: `name`; path: `{id}` | Descrizione del risultato; autenticazione/ruolo richiesto, se previsto. |
+| `GET` | `/api/<service>/<path>` | anonimo / autenticato / Staff | Query: `name`; path: `{id}` | Descrizione del risultato. |
 ```
