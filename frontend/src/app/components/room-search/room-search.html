@@ -30,7 +30,7 @@
             matSliderThumb
             formControlName="minCapacity"
             aria-labelledby="capacity-label"
-            (change)="search()"
+            (change)="capacityChanged()"
           />
         </mat-slider>
         <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>

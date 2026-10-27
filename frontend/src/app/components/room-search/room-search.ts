@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
-import { Subject, catchError, map, of, switchMap, tap } from 'rxjs';
+import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
 import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
 
@@ -15,6 +15,8 @@ interface BuildingOption {
   id: string;
   name: string;
 }
+
+export const CAPACITY_DEBOUNCE_MS = 300;
 
 type SearchResult = { rooms: RoomSummary[] } | { error: true };
 
@@ -36,6 +38,7 @@ export class RoomSearch {
   private readonly roomsService = inject(RoomsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly searches = new Subject<RoomFilter>();
+  private readonly capacityChanges = new Subject<void>();
 
   protected readonly typeLabel = roomTypeLabel;
 
@@ -88,10 +91,20 @@ export class RoomSearch {
         }
       });
 
+    // Da tastiera ogni freccia cambia il valore: si cerca solo quando lo slider
+    // resta fermo per 300 ms.
+    this.capacityChanges
+      .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe(() => this.search());
+
     this.searches.next({});
   }
 
-  // Parte quando cambia un filtro (lo slider al rilascio) e con «Cerca».
+  protected capacityChanged(): void {
+    this.capacityChanges.next();
+  }
+
+  // Parte quando cambia un menu, quando si ferma lo slider e con «Cerca».
   protected search(): void {
     const { type, minCapacity, buildingId } = this.filters.getRawValue();
     this.searches.next({ type, minCapacity: minCapacity > 0 ? minCapacity : null, buildingId });
@@ -106,9 +119,10 @@ export class RoomSearch {
     this.searches.next({});
   }
 
-  // Tipi, edifici e capienza massima dei filtri si ricavano da tutti gli spazi attivi, così un tipo o un edificio
-  // nuovo compare senza modificare il frontend. È una richiesta separata dalla ricerca:
-  // premere «Cerca» durante il primo caricamento non la annulla.
+  // Tipi, edifici e capienza massima dei filtri si ricavano da tutti gli spazi attivi,
+  // così un tipo o un edificio nuovo compare senza modificare il frontend.
+  // È una richiesta separata dalla ricerca: premere «Cerca» durante il primo caricamento
+  // non la annulla.
   private loadFilterOptions(): void {
     this.roomsService
       .search()
@@ -125,7 +139,10 @@ export class RoomSearch {
 }
 
 function capacityLabel(minCapacity: number): string {
-  return minCapacity > 0 ? `Almeno ${minCapacity} posti` : 'Qualsiasi';
+  if (minCapacity <= 0) {
+    return 'Qualsiasi';
+  }
+  return minCapacity === 1 ? 'Almeno 1 posto' : `Almeno ${minCapacity} posti`;
 }
 
 function typesOf(rooms: RoomSummary[]): RoomType[] {

@@ -7,17 +7,29 @@ import { MatSliderHarness } from '@angular/material/slider/testing';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { RoomFilter, RoomSummary } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
-import { RoomSearch } from './room-search';
+import { CAPACITY_DEBOUNCE_MS, RoomSearch } from './room-search';
 
 // Dati sintetici di prova.
 const ROOMS: RoomSummary[] = [
   {
-    id: 'r1', name: 'Aula A1', type: 'Classroom', capacity: 40, floor: 0,
-    isBookable: true, buildingId: 'b-a', buildingName: 'Edificio A',
+    id: 'r1',
+    name: 'Aula A1',
+    type: 'Classroom',
+    capacity: 40,
+    floor: 0,
+    isBookable: true,
+    buildingId: 'b-a',
+    buildingName: 'Edificio A',
   },
   {
-    id: 'r2', name: 'Sala studio B', type: 'StudyRoom', capacity: 20, floor: 1,
-    isBookable: false, buildingId: 'b-b', buildingName: 'Edificio B',
+    id: 'r2',
+    name: 'Sala studio B',
+    type: 'StudyRoom',
+    capacity: 20,
+    floor: 1,
+    isBookable: false,
+    buildingId: 'b-b',
+    buildingName: 'Edificio B',
   },
 ];
 
@@ -47,9 +59,15 @@ describe('RoomSearch', () => {
     return loader.getHarness(MatSelectHarness.with({ selector: `[formControlName="${control}"]` }));
   }
 
-  async function setMinCapacity(value: number): Promise<void> {
+  async function moveSlider(value: number): Promise<void> {
     const slider = await loader.getHarness(MatSliderHarness);
     await (await slider.getEndThumb()).setValue(value);
+  }
+
+  // Sposta lo slider e aspetta che la ricerca parta.
+  async function setMinCapacity(value: number): Promise<void> {
+    await moveSlider(value);
+    await new Promise((resolve) => setTimeout(resolve, CAPACITY_DEBOUNCE_MS + 50));
     await fixture.whenStable();
   }
 
@@ -98,7 +116,11 @@ describe('RoomSearch', () => {
     await render();
 
     expect(await optionTexts('type')).toEqual(['Tutti i tipi', 'Aula', 'Sala studio']);
-    expect(await optionTexts('buildingId')).toEqual(['Tutti gli edifici', 'Edificio A', 'Edificio B']);
+    expect(await optionTexts('buildingId')).toEqual([
+      'Tutti gli edifici',
+      'Edificio A',
+      'Edificio B',
+    ]);
   });
 
   it('shows the backend value for a new type without a label', async () => {
@@ -114,13 +136,25 @@ describe('RoomSearch', () => {
     search.mockReturnValue(of([ROOMS[1]]));
 
     await (await select('type')).clickOptions({ text: 'Sala studio' });
-    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: null, buildingId: null });
+    expect(search).toHaveBeenLastCalledWith({
+      type: 'StudyRoom',
+      minCapacity: null,
+      buildingId: null,
+    });
 
     await setMinCapacity(15);
-    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: 15, buildingId: null });
+    expect(search).toHaveBeenLastCalledWith({
+      type: 'StudyRoom',
+      minCapacity: 15,
+      buildingId: null,
+    });
 
     await (await select('buildingId')).clickOptions({ text: 'Edificio B' });
-    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: 15, buildingId: 'b-b' });
+    expect(search).toHaveBeenLastCalledWith({
+      type: 'StudyRoom',
+      minCapacity: 15,
+      buildingId: 'b-b',
+    });
     expect(cardTitles()).toEqual(['Sala studio B']);
   });
 
@@ -131,7 +165,11 @@ describe('RoomSearch', () => {
 
     await click('Cerca');
 
-    expect(search).toHaveBeenCalledExactlyOnceWith({ type: null, minCapacity: 15, buildingId: null });
+    expect(search).toHaveBeenCalledExactlyOnceWith({
+      type: null,
+      minCapacity: 15,
+      buildingId: null,
+    });
   });
 
   it('keeps the filter options when Cerca is pressed during the first load', async () => {
@@ -145,7 +183,11 @@ describe('RoomSearch', () => {
 
     expect(firstSearch.observed).toBe(false);
     expect(cardTitles()).toEqual(['Aula A1', 'Sala studio B']);
-    expect(await optionTexts('buildingId')).toEqual(['Tutti gli edifici', 'Edificio A', 'Edificio B']);
+    expect(await optionTexts('buildingId')).toEqual([
+      'Tutti gli edifici',
+      'Edificio A',
+      'Edificio B',
+    ]);
   });
 
   it('limits the capacity slider from 0 to the largest room', async () => {
@@ -169,13 +211,41 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenLastCalledWith({ type: null, minCapacity: null, buildingId: null });
   });
 
+  it('uses the singular for one seat', async () => {
+    await render();
+
+    await setMinCapacity(1);
+
+    expect(capacityText()).toBe('Almeno 1 posto');
+  });
+
+  it('searches once when the slider moves several times in a row', async () => {
+    await render();
+    search.mockClear();
+
+    await moveSlider(10);
+    await moveSlider(11);
+    await moveSlider(12);
+    expect(search).not.toHaveBeenCalled();
+
+    await setMinCapacity(13);
+
+    expect(search).toHaveBeenCalledExactlyOnceWith({
+      type: null,
+      minCapacity: 13,
+      buildingId: null,
+    });
+  });
+
   it('puts the slider back to 0 when the filters are reset', async () => {
     await render();
     await setMinCapacity(25);
 
     await click('Azzera filtri');
 
-    expect(await (await (await loader.getHarness(MatSliderHarness)).getEndThumb()).getValue()).toBe(0);
+    expect(await (await (await loader.getHarness(MatSliderHarness)).getEndThumb()).getValue()).toBe(
+      0,
+    );
     expect(capacityText()).toBe('Qualsiasi');
     expect(search).toHaveBeenLastCalledWith({});
   });
