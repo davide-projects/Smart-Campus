@@ -1,0 +1,23 @@
+<mat-toolbar class="navbar">
+  <span class="brand">SmartCampus</span>
+
+  <nav class="links" aria-label="Navigazione principale">
+    @for (link of links; track link.path) {
+      <a matButton [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+        {{ link.label }}
+      </a>
+    }
+  </nav>
+
+  <!-- Su mobile le voci stanno in un menu a scomparsa. -->
+  <button matIconButton class="menu-toggle" [matMenuTriggerFor]="mobileMenu" aria-label="Apri il menu">
+    <mat-icon fontSet="material-symbols-outlined">menu</mat-icon>
+  </button>
+  <mat-menu #mobileMenu="matMenu">
+    @for (link of links; track link.path) {
+      <a mat-menu-item [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+        {{ link.label }}
+      </a>
+    }
+  </mat-menu>
+</mat-toolbar>

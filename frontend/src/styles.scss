@@ -1,1 +1,31 @@
-/* You can add global styles to this file, and also import other style files */
+// Tema di Angular Material: mat.theme() definisce le variabili CSS usate dai componenti Material
+// secondo le specifiche di Material 3 (https://material.angular.dev/guide/theming).
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+body {
+  // Tema chiaro di default: "dark" per quello scuro, "light dark" per seguire il sistema.
+  color-scheme: light;
+
+  // Sfondo, carattere e colore del testo dalle variabili di sistema di Material.
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+
+  // Toglie il margine predefinito del browser.
+  margin: 0;
+  height: 100%;
+}
