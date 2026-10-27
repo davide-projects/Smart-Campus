@@ -2,12 +2,14 @@ import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
+import { MatButtonToggleHarness } from '@angular/material/button-toggle/testing';
 import { MatSelectHarness } from '@angular/material/select/testing';
 import { MatSliderHarness } from '@angular/material/slider/testing';
+import { MatTableHarness } from '@angular/material/table/testing';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { RoomFilter, RoomSummary } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
-import { CAPACITY_DEBOUNCE_MS, RoomSearch } from './room-search';
+import { CAPACITY_DEBOUNCE_MS, RoomSearch, VIEW_STORAGE_KEY } from './room-search';
 
 // Dati sintetici di prova.
 const ROOMS: RoomSummary[] = [
@@ -88,6 +90,20 @@ describe('RoomSearch', () => {
     await buttons[0].click();
     await fixture.whenStable();
   }
+
+  async function chooseView(text: 'Card' | 'Griglia'): Promise<void> {
+    await (
+      await loader.getHarness(MatButtonToggleHarness.with({ text: new RegExp(text) }))
+    ).check();
+    await fixture.whenStable();
+  }
+
+  async function tableRows(): Promise<Record<string, string>[]> {
+    const table = await loader.getHarness(MatTableHarness);
+    return Promise.all((await table.getRows()).map((row) => row.getCellTextByColumnName()));
+  }
+
+  afterEach(() => sessionStorage.clear());
 
   beforeEach(() => {
     search = vi.fn(() => of(ROOMS));
@@ -248,6 +264,67 @@ describe('RoomSearch', () => {
     );
     expect(capacityText()).toBe('Qualsiasi');
     expect(search).toHaveBeenLastCalledWith({});
+  });
+
+  it('shows the same rooms in the table, one row per room', async () => {
+    await render();
+
+    await chooseView('Griglia');
+
+    expect(element.querySelector('mat-card')).toBeNull();
+    expect(await tableRows()).toEqual([
+      {
+        name: 'Aula A1',
+        type: 'Aula',
+        building: 'Edificio A',
+        capacity: '40 posti',
+        bookable: 'Sì',
+      },
+      {
+        name: 'Sala studio B',
+        type: 'Sala studio',
+        building: 'Edificio B',
+        capacity: '20 posti',
+        bookable: 'No',
+      },
+    ]);
+
+    await chooseView('Card');
+
+    expect(cardTitles()).toEqual(['Aula A1', 'Sala studio B']);
+  });
+
+  it('keeps the chosen view when the filters change', async () => {
+    await render();
+    await chooseView('Griglia');
+    search.mockReturnValue(of([ROOMS[0]]));
+
+    await (await select('type')).clickOptions({ text: 'Aula' });
+
+    expect((await tableRows()).map((row) => row['name'])).toEqual(['Aula A1']);
+  });
+
+  it('remembers the chosen view when the page is opened again', async () => {
+    await render();
+    await chooseView('Griglia');
+    fixture.destroy();
+
+    fixture = TestBed.createComponent(RoomSearch);
+    element = fixture.nativeElement;
+    loader = TestbedHarnessEnvironment.loader(fixture);
+    await fixture.whenStable();
+
+    expect(sessionStorage.getItem(VIEW_STORAGE_KEY)).toBe('table');
+    expect(await loader.hasHarness(MatTableHarness)).toBe(true);
+  });
+
+  it('shows the cards by default', async () => {
+    await render();
+
+    expect(
+      await (await loader.getHarness(MatButtonToggleHarness.with({ text: /Card/ }))).isChecked(),
+    ).toBe(true);
+    expect(await loader.hasHarness(MatTableHarness)).toBe(false);
   });
 
   it('shows the message on zero results and lets the user reset the filters', async () => {
