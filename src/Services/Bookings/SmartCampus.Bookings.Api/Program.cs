@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
+using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.ServiceDefaults;
 using MassTransit;
 using SmartCampus.Bookings.Api.Consumers;
@@ -72,6 +73,8 @@ var api = app.MapGroup("/api/bookings");
 
 api.MapGet("/", () => Results.Ok(new { service = "bookings", status = "ok" }))
     .WithName("InfoBookings");
+
+api.MapAvailabilityEndpoints();
 
 app.Run();
 
