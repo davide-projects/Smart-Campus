@@ -36,6 +36,11 @@ Base pubblica: `/api/rooms`
 |---|---|---|---|
 | `GET` | `/api/rooms/` | Query opzionali: `type`, `minCapacity`, `buildingId` | Cerca gli spazi attivi; i filtri possono essere combinati. |
 | `GET` | `/api/rooms/{id}` | `id`: GUID dello spazio | Restituisce il dettaglio di uno spazio attivo, incluse attrezzature e orari; risponde `404` se non esiste o è dismesso. |
+| `POST` | `/api/rooms/` | Body: `RoomWriteRequest` | Crea uno spazio attivo e pubblica `RoomCreated` tramite outbox. |
+| `PUT` | `/api/rooms/{id}` | `id`: GUID; body: `RoomWriteRequest` | Aggiorna i dati e gli orari, quindi pubblica `RoomUpdated` tramite outbox. |
+| `POST` | `/api/rooms/{id}/deactivate` | `id`: GUID dello spazio | Dismette lo spazio e pubblica `RoomDeactivated` tramite outbox. |
+
+Le route di scrittura non hanno ancora un controllo di autenticazione/autorizzazione: sono utilizzabili solo in ambiente di sviluppo o interno fino all'integrazione dei ruoli Staff.
 
 Esempio di ricerca filtrata:
 

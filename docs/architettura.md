@@ -20,9 +20,9 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
 - **Dati:** `Building`, `Room` (`Type`, `Capacity`, `Floor`, `IsBookable`, `IsActive`), `Equipment`, `OpeningHours`.
 - **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=` restituisce solo gli spazi attivi. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
-- **Orari:** nel primo incremento è prevista una sola fascia per spazio e giorno; la scelta è da verificare con il PO se emergono esigenze di più fasce.
-- **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development.
-- **Pubblica:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`.
+- **Orari:** gli eventi `RoomCreated` e `RoomUpdated` includono uno snapshot con una fascia per giorno; i giorni chiusi sono assenti. Le chiusure straordinarie non rientrano nel primo incremento.
+- **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. All'avvio Rooms ne pubblica gli eventi una sola volta tramite outbox.
+- **Pubblica:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`, usando l'EF Core Bus Outbox per accodare gli eventi nella stessa transazione dei dati.
 
 ### Bookings
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.

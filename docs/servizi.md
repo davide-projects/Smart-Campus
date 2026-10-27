@@ -82,9 +82,9 @@ Ci sono due modi:
 |---|---|---|---|---|
 | `RoomCreated`, `RoomUpdated`, `RoomDeactivated` | spazio creato / modificato / dismesso | Rooms | Bookings | Aggiornare la copia degli spazi prenotabili |
 
-I messaggi sono definiti in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`.
+I messaggi sono definiti in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`. `RoomCreated` e `RoomUpdated` includono la lista degli orari: una fascia per giorno, con i giorni chiusi omessi. Rooms usa l'outbox EF Core, quindi un messaggio accodato durante una modifica resta in attesa sul database se RabbitMQ non è disponibile e viene consegnato quando il broker torna raggiungibile.
 
-**Conseguenza da conoscere:** i messaggi arrivano dopo un istante, non immediatamente. Se il personale cambia la capienza di un'aula, Bookings la conosce dopo qualche frazione di secondo. È un limite noto e accettato (*consistenza eventuale*).
+**Conseguenza da conoscere:** i messaggi arrivano dopo un istante, non immediatamente.
 
 ## Le altre cartelle
 
