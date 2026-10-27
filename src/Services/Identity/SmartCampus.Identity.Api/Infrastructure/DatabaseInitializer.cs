@@ -13,16 +13,7 @@ public sealed class DatabaseInitializer(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityContext>();
 
-        if (db.Database.GetMigrations().Any())
-        {
-            await db.Database.MigrateAsync(cancellationToken);
-        }
-        else
-        {
-            // Provvisorio: finché non è stata generata la migrazione iniziale (vedi docs/identity.md).
-            logger.LogWarning("Nessuna migrazione trovata: il database viene creato direttamente dal modello.");
-            await db.Database.EnsureCreatedAsync(cancellationToken);
-        }
+        await db.Database.MigrateAsync(cancellationToken);
 
         var seedPassword = configuration["Seed:DefaultPassword"];
         if (string.IsNullOrWhiteSpace(seedPassword))

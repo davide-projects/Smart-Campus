@@ -19,6 +19,23 @@ public class IdentityApiTests(IdentityApiFactory factory) : IClassFixture<Identi
 {
     private readonly HttpClient _client = factory.CreateClient();
 
+    [Fact]
+    public async Task HealthLive_Returns200()
+    {
+        var response = await _client.GetAsync("/health/live");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HealthReady_WithDatabaseAvailable_Returns200()
+    {
+        var response = await _client.GetAsync("/health/ready");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+
     // ---- Seed ----
 
     [Fact]

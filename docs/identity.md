@@ -54,15 +54,17 @@ Il Gateway e gli altri servizi devono usare **stessi issuer, audience e chiave d
 | `ConnectionStrings:Database` | user-secrets / variabile d'ambiente | Stringa di connessione a `SmartCampus_Identity` |
 | `Jwt:SigningKey` | user-secrets / variabile d'ambiente `Jwt__SigningKey` | **Segreto**, almeno 32 byte. Se manca o è corta, il servizio non parte e dice perché |
 | `Jwt:Issuer`, `Jwt:Audience`, `Jwt:ExpirationMinutes` | `appsettings.json` | Non sono segreti |
-| `Seed:DefaultPassword` | `appsettings.Development.json` (solo sviluppo) o variabile `Seed__DefaultPassword` | Se vuota, gli utenti sintetici non vengono caricati |
+| `Seed:DefaultPassword` | user-secrets / variabile d'ambiente `Seed__DefaultPassword` | Password di sviluppo degli utenti sintetici. Se vuota, gli utenti non vengono caricati |
+
+**Sviluppo con Identity in locale.** Lo `UserSecretsId` è già nel progetto, quindi non serve `dotnet user-secrets init`:
 
 ```bash
-dotnet user-secrets init --project src/Services/Identity/SmartCampus.Identity.Api
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Identity" --project src/Services/Identity/SmartCampus.Identity.Api
 dotnet user-secrets set "Jwt:SigningKey" "<una stringa casuale di almeno 32 caratteri>" --project src/Services/Identity/SmartCampus.Identity.Api
+dotnet user-secrets set "Seed:DefaultPassword" "<password di sviluppo>" --project src/Services/Identity/SmartCampus.Identity.Api
 ```
 
-Per Docker, aggiungere `Jwt__SigningKey` (e `Seed__DefaultPassword`) al `.env` e al servizio `identity` in `docker-compose.yml`; la chiave va aggiunta anche a `.env.example` come segnaposto, mai con il valore reale.
+**Docker.** `JWT_SIGNING_KEY` e `SEED_DEFAULT_PASSWORD` si impostano nel `.env` (il modello è `.env.example`); `docker-compose.yml` le passa al servizio `identity` come `Jwt__SigningKey` e `Seed__DefaultPassword`. Se mancano, `docker compose` si ferma con un messaggio che lo spiega.
 
 ## Utenti sintetici
 
@@ -82,14 +84,14 @@ Le password sono salvate solo come hash (PBKDF2 con sale casuale, hasher standar
 
 ## Migrazioni
 
-Finché non esiste una migrazione, all'avvio il database viene creato direttamente dal modello (con un avviso nel log). Per generare la migrazione iniziale:
+La migrazione `InitialCreate` è inclusa e viene applicata all'avvio del servizio con `Migrate()`. Per aggiungerne una nuova, con il tool locale del repository:
 
 ```bash
-dotnet tool install --global dotnet-ef   # una tantum
-dotnet ef migrations add InitialCreate --project src/Services/Identity/SmartCampus.Identity.Api
+dotnet tool restore
+dotnet ef migrations add <Nome> --project src/Services/Identity/SmartCampus.Identity.Api
 ```
 
-Dopo la generazione, all'avvio viene applicata con `Migrate()`. Se il database di sviluppo era stato creato senza migrazioni, va ricreato (in Docker: `docker compose down -v`).
+Un database di sviluppo creato con una versione precedente, senza migrazioni, va ricreato: altrimenti `Migrate()` si ferma con "There is already an object named 'Users'". Basta eliminare il solo database `SmartCampus_Identity` (in Docker, in alternativa, `docker compose down -v` cancella tutti i volumi).
 
 ## Limiti noti
 

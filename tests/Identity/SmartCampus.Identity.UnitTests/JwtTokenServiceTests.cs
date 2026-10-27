@@ -1,7 +1,6 @@
 using System.Text;
 
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -25,7 +24,7 @@ public class JwtTokenServiceTests
     };
 
     private JwtTokenService CreateService() =>
-        new(Options.Create(_options), new FakeTimeProvider(Now));
+        new(Options.Create(_options), new FixedTimeProvider(Now));
 
     [Theory]
     [InlineData(UserRole.Student, "Student")]
@@ -89,5 +88,11 @@ public class JwtTokenServiceTests
 
         Assert.True(withRightKey.IsValid);
         Assert.False(withOtherKey.IsValid);
+    }
+
+    // Orologio fisso: rende prevedibile la scadenza del token senza dipendenze aggiuntive.
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }
