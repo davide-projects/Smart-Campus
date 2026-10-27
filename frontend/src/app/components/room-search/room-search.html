@@ -1,0 +1,72 @@
+<section class="room-search">
+  <h2>Cerca uno spazio</h2>
+
+  <form class="filters" [formGroup]="filters" (ngSubmit)="search()">
+    <mat-form-field appearance="outline">
+      <mat-label>Tipo</mat-label>
+      <mat-select formControlName="type">
+        <mat-option [value]="null">Tutti i tipi</mat-option>
+        @for (type of types; track type) {
+          <mat-option [value]="type">{{ typeLabels[type] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Capienza minima</mat-label>
+      <input matInput type="number" min="1" step="1" inputmode="numeric" formControlName="minCapacity" />
+      @if (filters.controls.minCapacity.invalid) {
+        <mat-error>Inserisci un numero intero maggiore di zero.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Edificio</mat-label>
+      <mat-select formControlName="buildingId">
+        <mat-option [value]="null">Tutti gli edifici</mat-option>
+        @for (building of buildings(); track building.id) {
+          <mat-option [value]="building.id">{{ building.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div class="actions">
+      <button matButton="filled" type="submit">Cerca</button>
+      <button matButton type="button" (click)="resetFilters()">Azzera filtri</button>
+    </div>
+  </form>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Caricamento degli spazi" />
+  }
+
+  @if (loadFailed()) {
+    <p class="message" role="alert">Non è stato possibile caricare gli spazi. Riprova più tardi.</p>
+  } @else if (!loading() && rooms().length === 0) {
+    <div class="message" role="status">
+      <p>Nessuno spazio corrisponde ai filtri selezionati.</p>
+      <button matButton="outlined" type="button" (click)="resetFilters()">Azzera filtri</button>
+    </div>
+  } @else {
+    <ul class="results" aria-label="Spazi trovati">
+      @for (room of rooms(); track room.id) {
+        <li>
+          <mat-card appearance="outlined">
+            <mat-card-header>
+              <mat-card-title>{{ room.name }}</mat-card-title>
+              <mat-card-subtitle>{{ typeLabels[room.type] }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <dl>
+                <dt>Edificio</dt>
+                <dd>{{ room.buildingName }}</dd>
+                <dt>Capienza</dt>
+                <dd>{{ room.capacity }} posti</dd>
+              </dl>
+            </mat-card-content>
+          </mat-card>
+        </li>
+      }
+    </ul>
+  }
+</section>
