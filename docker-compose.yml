@@ -12,6 +12,12 @@ services:
       - "1433:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   rabbitmq:
     image: rabbitmq:4-management
@@ -26,19 +32,29 @@ services:
     build: { context: ., dockerfile: src/Services/Identity/SmartCampus.Identity.Api/Dockerfile }
     environment:
       ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Identity"
-    depends_on: [sqlserver]
+    depends_on:
+      sqlserver:
+        condition: service_healthy
 
   rooms:
     build: { context: ., dockerfile: src/Services/Rooms/SmartCampus.Rooms.Api/Dockerfile }
     environment:
       ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Rooms"
-    depends_on: [sqlserver, rabbitmq]
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
 
   bookings:
     build: { context: ., dockerfile: src/Services/Bookings/SmartCampus.Bookings.Api/Dockerfile }
     environment:
       ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Bookings"
-    depends_on: [sqlserver, rabbitmq]
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
 
   gateway:
     build: { context: ., dockerfile: src/Gateway/SmartCampus.Gateway/Dockerfile }
