@@ -2,6 +2,7 @@ using MassTransit.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
+using MassTransit;
 using SmartCampus.Contracts;
 
 namespace SmartCampus.Bookings.IntegrationTests;
@@ -19,10 +20,10 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture) : IClass
 
         // Act
         await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true));
-        Assert.True(await harness.Consumed.Any<RoomCreated>(x => x.Context.Message.RoomId == roomId));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
 
         await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1", 40, IsBookable: true, IsActive: true));
-        Assert.True(await harness.Consumed.Any<RoomUpdated>(x => x.Context.Message.RoomId == roomId));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomUpdated>(x => x.Context.Message.RoomId == roomId).Any());
 
         // Assert
         var room = await FindRoomAsync(roomId);
@@ -51,6 +52,41 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture) : IClass
         var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
         var count = await db.BookableRooms.CountAsync(room => room.RoomId == roomId);
         Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task RoomDeactivated_ForKnownRoom_MarksItInactive()
+    {
+        // Arrange: lo spazio esiste nella copia locale
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula C1", 20, IsBookable: true));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        // Act
+        await harness.Bus.Publish(new RoomDeactivated(roomId));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomDeactivated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        // Assert
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.False(room.IsActive);
+    }
+
+    [Fact]
+    public async Task RoomDeactivated_ForUnknownRoom_IsIgnoredWithoutErrors()
+    {
+        // Arrange: nessuno spazio con questo Id
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+
+        // Act
+        await harness.Bus.Publish(new RoomDeactivated(roomId));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomDeactivated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        // Assert: nessuna riga creata e nessun errore (MassTransit pubblica un Fault quando un consumer fallisce)
+        Assert.Null(await FindRoomAsync(roomId));
+        Assert.False(await harness.Published.Any<Fault<RoomDeactivated>>(x => x.Context.Message.Message.RoomId == roomId));
     }
 
     // Legge la copia locale con un DbContext nuovo, così vede i dati realmente salvati nel database.

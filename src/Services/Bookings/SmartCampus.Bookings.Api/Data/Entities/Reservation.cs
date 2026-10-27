@@ -15,6 +15,6 @@ public class Reservation
     public ReservationStatus Status { get; set; } = ReservationStatus.Confirmed;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? CancelledAt { get; set; }
-    public byte[] RowVersion { get; set; } = []; //tool di SQLServer per impedire la sovrascrizione
+    public byte[] RowVersion { get; set; } = []; // Versione della riga gestita da SQL Server: impedisce di sovrascrivere modifiche altrui.
     public ICollection<ReservationMember> Members { get; set; } = [];
 }

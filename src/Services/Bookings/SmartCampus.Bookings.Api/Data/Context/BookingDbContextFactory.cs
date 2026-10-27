@@ -8,10 +8,7 @@ namespace SmartCampus.Bookings.Api.Data.Context;
 public sealed class BookingDbContextFactory : IDesignTimeDbContextFactory<BookingDbContext>
 {
     private const string DesignTimeConnectionString =
-        "Server=localhost,1433;User Id=sa;" +
-        "Password=DevelopmentOnly_123!;" +
-        "TrustServerCertificate=True;" +
-        "Database=SmartCampus_Bookings";
+        "Server=localhost,1433;Database=SmartCampus_Bookings;Integrated Security=True;TrustServerCertificate=True";
 
     public BookingDbContext CreateDbContext(string[] args)
     {

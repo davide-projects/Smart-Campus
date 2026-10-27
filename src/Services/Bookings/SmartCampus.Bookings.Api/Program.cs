@@ -23,8 +23,9 @@ builder.Services.AddHealthChecks()
 // Messaggistica: in locale RabbitMQ, in cloud si sostituirà con Azure Service Bus cambiando solo il trasporto.
 builder.Services.AddMassTransit(bus =>
 {
-    // Registra i consumer: MassTransit crea una coda per ognuno e ci collega gli eventi che gestisce.
-    bus.AddConsumer<RoomEventsConsumer>();
+// Un messaggio alla volta: gli eventi dello stesso spazio vengono applicati nell'ordine di arrivo.
+    bus.AddConsumer<RoomEventsConsumer>()
+        .Endpoint(endpoint => endpoint.ConcurrentMessageLimit = 1);
 
     // Nomi delle code leggibili, es. "room-events" per RoomEventsConsumer.
     bus.SetKebabCaseEndpointNameFormatter();

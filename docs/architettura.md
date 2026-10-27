@@ -22,7 +22,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=` restituisce solo gli spazi attivi. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
 - **Orari:** nel primo incremento è prevista una sola fascia per spazio e giorno; la scelta è da verificare con il PO se emergono esigenze di più fasce.
 - **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development.
-- **Pubblica:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`.
+- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`).
 
 ### Bookings
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.
@@ -44,7 +44,8 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Prova:** test di integrazione con richieste parallele sullo stesso slot contro SQL Server reale (Testcontainers): ne deve riuscire esattamente una.
 - **Check-in:** consentito all'organizzatore e ai membri; basta un check-in per segnare la prenotazione come usata.
 - **Regola di interpretazione dei report:** distinguono *prenotato e usato*, *prenotato e non usato*, *nessuna informazione*. L'assenza di dati non indica che lo spazio fosse libero.
-- **Consuma:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`.
+- **Consuma:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated` con un consumer idempotente (upsert su `BookableRoom`), un messaggio alla volta (`ConcurrentMessageLimit = 1`) per rispettare l'ordine di arrivo.
+- **Limite noto:** l'ordine è garantito solo tra messaggi elaborati normalmente; un messaggio fallito e rielaborato più tardi potrebbe applicare uno stato vecchio. Per escluderlo servirebbe una versione o un `OccurredAt` negli eventi.
 
 ### API Gateway
 Routing `/api/{service}/**`, validazione JWT, CORS. Nessuna logica di dominio.

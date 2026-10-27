@@ -9,7 +9,7 @@ internal sealed class BookableRoomConfiguration : IEntityTypeConfiguration<Booka
     public void Configure(EntityTypeBuilder<BookableRoom> builder)
     {
         builder.ToTable("BookableRooms");
-        
+
         builder.HasKey(room => room.RoomId);
 
         builder.Property(room => room.RoomId)
