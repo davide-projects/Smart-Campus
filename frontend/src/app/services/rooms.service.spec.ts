@@ -17,7 +17,7 @@ describe('RoomsService', () => {
 
   afterEach(() => http.verify());
 
-  it('senza filtri chiama /api/rooms senza parametri', () => {
+  it('calls /api/rooms without parameters when there are no filters', () => {
     service.search().subscribe();
 
     const request = http.expectOne('/api/rooms');
@@ -25,7 +25,7 @@ describe('RoomsService', () => {
     request.flush([]);
   });
 
-  it('invia solo i filtri valorizzati', () => {
+  it('sends only the filters that have a value', () => {
     service.search({ type: 'StudyRoom', minCapacity: 30, buildingId: null }).subscribe();
 
     const request = http.expectOne((req) => req.url === '/api/rooms');

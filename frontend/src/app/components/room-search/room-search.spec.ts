@@ -44,7 +44,7 @@ describe('RoomSearch', () => {
     search = vi.fn(() => of(ROOMS));
   });
 
-  it('all\'apertura mostra tutti gli spazi con nome, tipo, edificio e capienza', async () => {
+  it('shows all rooms with name, type, building and capacity on load', async () => {
     await render();
 
     expect(search).toHaveBeenCalledWith({});
@@ -55,7 +55,7 @@ describe('RoomSearch', () => {
     expect(card).toContain('40 posti');
   });
 
-  it('ricava tipi ed edifici dei filtri dalla ricerca senza filtri', async () => {
+  it('derives the filter types and buildings from the unfiltered search', async () => {
     await render();
 
     const component = fixture.componentInstance as unknown as RoomSearchInternals;
@@ -66,7 +66,7 @@ describe('RoomSearch', () => {
     ]);
   });
 
-  it('un tipo nuovo senza etichetta compare con il valore del backend', async () => {
+  it('shows the backend value for a new type without a label', async () => {
     search.mockReturnValue(of([{ ...ROOMS[0], id: 'r3', name: 'Aula Magna', type: 'Auditorium' }]));
     await render();
 
@@ -75,7 +75,7 @@ describe('RoomSearch', () => {
     expect(element.querySelector('mat-card-subtitle')!.textContent!.trim()).toBe('Auditorium');
   });
 
-  it('premendo Cerca invia tutti i filtri impostati', async () => {
+  it('sends all the selected filters when Cerca is pressed', async () => {
     await render();
     const component = fixture.componentInstance as unknown as RoomSearchInternals;
     search.mockReturnValue(of([ROOMS[1]]));
@@ -88,7 +88,7 @@ describe('RoomSearch', () => {
     expect(cardTitles()).toEqual(['Sala studio B']);
   });
 
-  it('non cerca se la capienza minima non è valida', async () => {
+  it('does not search when the minimum capacity is invalid', async () => {
     await render();
     const component = fixture.componentInstance as unknown as RoomSearchInternals;
 
@@ -100,7 +100,7 @@ describe('RoomSearch', () => {
     expect(element.textContent).toContain('Inserisci un numero intero maggiore di zero.');
   });
 
-  it('con zero risultati mostra il messaggio e permette di azzerare i filtri', async () => {
+  it('shows the message on zero results and lets the user reset the filters', async () => {
     search.mockReturnValue(of([]));
     await render();
 
@@ -115,7 +115,7 @@ describe('RoomSearch', () => {
     expect(cardTitles()).toEqual(['Aula A1', 'Sala studio B']);
   });
 
-  it('se il servizio non risponde mostra un messaggio di errore', async () => {
+  it('shows an error message when the service does not respond', async () => {
     search.mockReturnValue(throwError(() => new Error('rete')));
     await render();
 
