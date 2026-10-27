@@ -9,7 +9,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { Subject, catchError, map, of, switchMap, tap } from 'rxjs';
 import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
-import { RoomsService } from '../shared/rooms.service';
+import { RoomsService } from '../../services/rooms.service';
 
 interface BuildingOption {
   id: string;

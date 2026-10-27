@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 import { RoomFilter, RoomSummary } from '../../models/room.model';
-import { RoomsService } from '../shared/rooms.service';
+import { RoomsService } from '../../services/rooms.service';
 import { RoomSearch } from './room-search';
 
 // Dati sintetici di prova.

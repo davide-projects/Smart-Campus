@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { RoomFilter, RoomSummary } from '../../models/room.model';
+import { RoomFilter, RoomSummary } from '../models/room.model';
 
 // Accesso al servizio Rooms attraverso il gateway.
 @Injectable({ providedIn: 'root' })
