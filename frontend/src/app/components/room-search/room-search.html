@@ -12,6 +12,16 @@
       </mat-select>
     </mat-form-field>
 
+    <mat-form-field appearance="outline">
+      <mat-label>Edificio</mat-label>
+      <mat-select formControlName="buildingId" (selectionChange)="search()">
+        <mat-option [value]="null">Tutti gli edifici</mat-option>
+        @for (building of buildings(); track building.id) {
+          <mat-option [value]="building.id">{{ building.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
     <div class="capacity">
       <span class="capacity-label" id="capacity-label">Capienza minima</span>
       <div class="capacity-control">
@@ -26,16 +36,6 @@
         <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
       </div>
     </div>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Edificio</mat-label>
-      <mat-select formControlName="buildingId" (selectionChange)="search()">
-        <mat-option [value]="null">Tutti gli edifici</mat-option>
-        @for (building of buildings(); track building.id) {
-          <mat-option [value]="building.id">{{ building.name }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
 
     <div class="actions">
       <button matButton="filled" type="submit">Cerca</button>
