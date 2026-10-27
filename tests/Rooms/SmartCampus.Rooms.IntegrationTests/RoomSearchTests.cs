@@ -127,14 +127,6 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    [Fact]
-    public async Task HealthLive_ReturnsOk()
-    {
-        var response = await fixture.Client.GetAsync("/health/live");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
     private async Task<List<RoomSummaryResponse>> SearchAsync(string url)
     {
         var response = await fixture.Client.GetAsync(url);

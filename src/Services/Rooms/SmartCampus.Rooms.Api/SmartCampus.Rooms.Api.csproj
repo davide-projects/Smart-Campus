@@ -14,7 +14,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.14" />
-    <!-- Pins the vulnerable transitive SqlClient dependency to the patched .NET 10 package. -->
+    <!-- Blocca la dipendenza transitiva di SqlClient alla versione .NET 10 corretta. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 

@@ -54,24 +54,13 @@ Questi endpoint sono esposti direttamente dai servizi per controlli di disponibi
 
 ## Endpoint pianificati
 
-Le route seguenti compaiono nel documento di handoff ma non sono ancora implementate. Spostale nel catalogo degli endpoint implementati solo dopo aver aggiunto le route e i relativi test.
-
-| Servizio | Metodo | Percorso proposto | Scopo |
-|---|---|---|---|
-| Bookings | `GET` | `/api/bookings/availability?roomId={roomId}&date={date}` | Cercare le fasce libere di uno spazio. |
-| Bookings | `POST` | `/api/bookings` | Creare una prenotazione singola o di gruppo. |
-| Bookings | `GET` | `/api/bookings/mine` | Elencare le prenotazioni dell'utente autenticato. |
-| Identity | `POST` | `/api/identity/login` | Autenticare l'utente e restituire un JWT. |
-| Identity | `GET` | `/api/identity/me` | Restituire profilo e ruolo dell'utente autenticato. |
-| Rooms | `POST` | `/api/rooms` | Creare uno spazio. |
-| Rooms | `PUT` | `/api/rooms/{id}` | Modificare uno spazio. |
-| Rooms | `POST` | `/api/rooms/{id}/deactivate` | Dismettere uno spazio. |
+Le API non ancora implementate non sono replicate qui: il riferimento completo per le proposte è la sezione **6, Dettaglio per servizio**, del [documento handoff](handoff-architettura.md#6-dettaglio-per-servizio-riferimento-per-scrivere-storie-e-task), in particolare le sezioni 6.1–6.3 per Rooms, Bookings e Identity. Include anche endpoint di disponibilità, cancellazione, check-in, no-show, report e gestione delle anagrafiche. Quando una route viene implementata e testata, aggiungila alla tabella del servizio in **Endpoint implementati** qui sopra e aggiornane lo stato nell'handoff, se necessario. In questo modo il catalogo resta focalizzato sulle route reali senza duplicare e far divergere l'intero backlog API.
 
 ## Aggiungere un endpoint
 
 1. Inserisci la route nella tabella **Endpoint implementati** del servizio corretto, mantenendo l'ordine per metodo e percorso.
 2. Indica il percorso pubblico completo, inclusa la base del servizio (`/api/rooms`, `/api/bookings` o `/api/identity`), i parametri e una descrizione breve del risultato.
-3. Se la route non è ancora implementata, aggiungila invece a **Endpoint pianificati** e marcala come proposta.
+3. Se la route è ancora una proposta, aggiornala nel [documento handoff](handoff-architettura.md#6-dettaglio-per-servizio-riferimento-per-scrivere-storie-e-task); non duplicarla qui.
 4. Specifica qui eventuali requisiti di autenticazione/autorizzazione, codici di risposta non ovvi e link alla documentazione del contratto o ai test, quando applicabili.
 5. Aggiorna il catalogo nella stessa modifica in cui aggiungi o cambi la route.
 

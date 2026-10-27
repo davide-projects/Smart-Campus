@@ -3,7 +3,7 @@ using SmartCampus.Rooms.Features.Rooms;
 
 namespace SmartCampus.Rooms.UnitTests;
 
-
+// Regole della ricerca pubblica, verificate su una lista in memoria: niente database, niente HTTP.
 public sealed class RoomSearchTests
 {
     private static readonly Guid BuildingAId = Guid.Parse("11111111-1111-1111-1111-111111111111");
