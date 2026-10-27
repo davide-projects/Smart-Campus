@@ -82,7 +82,7 @@ Ci sono due modi:
 |---|---|---|---|---|
 | `RoomCreated`, `RoomUpdated`, `RoomDeactivated` | spazio creato / modificato / dismesso | Rooms | Bookings | Aggiornare la copia degli spazi prenotabili |
 
-I messaggi sono definiti in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`.
+I messaggi sono definiti in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`. `RoomCreated` contiene id, nome, capienza e se lo spazio è prenotabile; `RoomUpdated` contiene gli stessi dati più `IsActive`, così uno spazio dismesso può anche essere riattivato; `RoomDeactivated` contiene solo l'id. Bookings elabora questi messaggi **uno alla volta**, nell'ordine di arrivo, per non applicare una modifica vecchia dopo una più recente.
 
 **Conseguenza da conoscere:** i messaggi arrivano dopo un istante, non immediatamente. Se il personale cambia la capienza di un'aula, Bookings la conosce dopo qualche frazione di secondo. È un limite noto e accettato (*consistenza eventuale*).
 

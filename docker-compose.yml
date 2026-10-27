@@ -53,6 +53,9 @@ services:
     build: { context: ., dockerfile: src/Services/Bookings/SmartCampus.Bookings.Api/Dockerfile }
     environment:
       ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Bookings"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD}
     depends_on:
       sqlserver:
         condition: service_healthy
