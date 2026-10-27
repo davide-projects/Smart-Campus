@@ -1,0 +1,25 @@
+.login {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 16px;
+
+  h1 {
+    font: var(--mat-sys-headline-small);
+  }
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: var(--mat-sys-surface-container-highest);
+}
+
+.error {
+  margin: 0 0 16px;
+  color: var(--mat-sys-error);
+}
