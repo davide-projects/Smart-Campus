@@ -34,15 +34,15 @@ Il gruppo è in grado di produrre una prima versione di Product Backlog ordinabi
 ### Stato del repository
 | Elemento | Stato |
 |---|---|
-| Solution .NET 10, 4 servizi + gateway YARP | ✅ scheletro, compila, solo endpoint informativo `GET /api/{service}/` |
+| Solution .NET 10, 4 servizi + gateway YARP | ✅ servizi in sviluppo; Rooms e Identity espongono API applicative |
 | Health check `/health/live`, `/health/ready` | ✅ |
-| Contratti eventi (`SmartCampus.Contracts`) | ✅ definiti; Rooms pubblica gli eventi di ciclo di vita con gli orari, consumer degli altri servizi da completare |
-| Frontend Angular 22 con proxy verso il gateway | ✅ shell vuota |
+| Contratti eventi (`SmartCampus.Contracts`) | ✅ Rooms pubblica gli eventi di ciclo di vita con gli orari; Bookings aggiorna la copia locale |
+| Frontend Angular 22 con proxy verso il gateway | ✅ shell con ricerca degli spazi |
 | docker-compose (SQL Server, RabbitMQ, servizi, web) | ✅ configurazione valida; build immagini da verificare con Docker attivo |
-| CI GitHub Actions | ✅ definita, mai eseguita |
-| Database, EF Core, migrazioni, seed | ✅ Rooms completato; altri servizi da completare |
-| Autenticazione JWT | ❌ da fare |
-| Messaggistica (MassTransit + outbox) | ✅ configurata in Rooms con RabbitMQ e outbox EF Core; consumer da completare |
+| CI GitHub Actions | ✅ eseguita e verde sul commit precedente alla rebase; da rieseguire sul branch aggiornato |
+| Database, EF Core, migrazioni, seed | ✅ Identity, Rooms e Bookings hanno persistenza e migrazioni |
+| Autenticazione JWT | ✅ Identity emette i token e Gateway li valida; le API di scrittura Rooms devono applicare il ruolo Staff |
+| Messaggistica (MassTransit + outbox) | ✅ versione 8.5.12 condivisa; Rooms usa RabbitMQ e outbox EF Core; Bookings consuma gli eventi |
 | Test di concorrenza prenotazioni | ❌ da fare (prova chiave del progetto) |
 
 ### Vincoli che le storie devono rispettare

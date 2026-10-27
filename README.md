@@ -76,15 +76,21 @@ dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Bookings" --project src/Services/Bookings/SmartCampus.Bookings.Api
 ```
 
-Bookings riceve anche gli eventi di Rooms tramite RabbitMQ. Per avviarlo con `dotnet run` imposta le credenziali di RabbitMQ negli user-secrets, con gli stessi valori di `RABBITMQ_USER` e `RABBITMQ_PASSWORD` del file `.env`:
+Rooms pubblica gli eventi e Bookings li consuma tramite RabbitMQ. Per avviare entrambi con `dotnet run`, imposta gli user-secrets di ciascun progetto con gli stessi valori di `RABBITMQ_USER` e `RABBITMQ_PASSWORD` presenti in `.env`:
 
 ```bash
+dotnet user-secrets set "RabbitMq:Host" "localhost" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "RabbitMq:Port" "5672" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "RabbitMq:VirtualHost" "/" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "RabbitMq:Username" "<utente>" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "RabbitMq:Password" "<password>" --project src/Services/Rooms/SmartCampus.Rooms.Api
+
 dotnet user-secrets set "RabbitMq:Host" "localhost" --project src/Services/Bookings/SmartCampus.Bookings.Api
 dotnet user-secrets set "RabbitMq:Username" "<utente>" --project src/Services/Bookings/SmartCampus.Bookings.Api
 dotnet user-secrets set "RabbitMq:Password" "<password>" --project src/Services/Bookings/SmartCampus.Bookings.Api
 ```
 
-Senza queste impostazioni il servizio prova a collegarsi con `guest`/`guest` e la connessione a RabbitMQ fallisce. In Docker Compose le stesse impostazioni sono già passate come variabili d'ambiente (`RabbitMq__Host`, `RabbitMq__Username`, `RabbitMq__Password`).
+Senza queste impostazioni i servizi provano a collegarsi con `guest`/`guest`, ma il container RabbitMQ usa l'utente configurato da `RABBITMQ_USER`; la connessione locale fallisce. In Docker Compose host e credenziali sono già passati ai servizi tramite variabili d'ambiente (`RabbitMq__Host`, `RabbitMq__Port`, `RabbitMq__VirtualHost`, `RabbitMq__Username`, `RabbitMq__Password`).
 
 Gli user-secrets sono separati per progetto: se lavori su più servizi, esegui i comandi per ognuno. In Docker Compose gli host dei database sono `sqlserver` e le tre connection string con database distinti sono già configurate in `docker-compose.yml`; per avviare lo stack completo imposta in `.env` le credenziali locali richieste da `.env.example`. La password `MSSQL_SA_PASSWORD` deve avere almeno 8 caratteri e includere almeno 3 categorie tra lettere maiuscole, minuscole, numeri e simboli, altrimenti SQL Server si arresta durante l'inizializzazione. Compose controlla che SQL Server accetti una query prima di avviare Identity, Rooms e Bookings.
 

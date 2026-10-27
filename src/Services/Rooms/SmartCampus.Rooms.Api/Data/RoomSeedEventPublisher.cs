@@ -60,8 +60,10 @@ internal sealed class RoomSeedEventPublisher(
         room.Id,
         room.Name,
         room.Capacity,
-        room.IsBookable,
-        ToOpeningHours(room));
+        room.IsBookable)
+    {
+        OpeningHours = ToOpeningHours(room)
+    };
 
     internal static IReadOnlyList<RoomOpeningHours> ToOpeningHours(Room room) => room.OpeningHours
         .OrderBy(hours => hours.DayOfWeek)

@@ -27,6 +27,7 @@ public static class RoomEndpoints
             .WithName("CreateRoom")
             .WithTags("Rooms")
             .Produces(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
         api.MapPut("/{id:guid}", UpdateAsync)
@@ -34,6 +35,7 @@ public static class RoomEndpoints
             .WithTags("Rooms")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
         api.MapPost("/{id:guid}/deactivate", DeactivateAsync)
@@ -65,11 +67,21 @@ public static class RoomEndpoints
             });
         }
 
+        var roomName = request.Name.Trim();
+        if (await db.Rooms.AnyAsync(room => room.BuildingId == request.BuildingId && room.Name == roomName, cancellationToken))
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Title = "Nome spazio già utilizzato",
+                Detail = "Esiste già uno spazio con questo nome nell'edificio indicato."
+            });
+        }
+
         var room = new Room
         {
             Id = Guid.NewGuid(),
             BuildingId = request.BuildingId,
-            Name = request.Name.Trim(),
+            Name = roomName,
             Type = request.Type,
             Capacity = request.Capacity,
             Floor = request.Floor,
@@ -118,8 +130,20 @@ public static class RoomEndpoints
             });
         }
 
+        var roomName = request.Name.Trim();
+        if (await db.Rooms.AnyAsync(existing =>
+                existing.Id != id && existing.BuildingId == request.BuildingId && existing.Name == roomName,
+                cancellationToken))
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Title = "Nome spazio già utilizzato",
+                Detail = "Esiste già uno spazio con questo nome nell'edificio indicato."
+            });
+        }
+
         room.BuildingId = request.BuildingId;
-        room.Name = request.Name.Trim();
+        room.Name = roomName;
         room.Type = request.Type;
         room.Capacity = request.Capacity;
         room.Floor = request.Floor;
@@ -152,12 +176,16 @@ public static class RoomEndpoints
             });
         }
 
-        await publishEndpoint.Publish(new RoomUpdated(
+        var roomUpdated = new RoomUpdated(
             room.Id,
             room.Name,
             room.Capacity,
             room.IsBookable,
-            RoomSeedEventPublisher.ToOpeningHours(room)), cancellationToken);
+            room.IsActive)
+        {
+            OpeningHours = RoomSeedEventPublisher.ToOpeningHours(room)
+        };
+        await publishEndpoint.Publish(roomUpdated, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.NoContent();

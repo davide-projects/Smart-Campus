@@ -147,6 +147,10 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
 
                     b.HasKey("SequenceNumber");
 
+                    b.HasIndex("EnqueueTime");
+
+                    b.HasIndex("ExpirationTime");
+
                     b.HasIndex("OutboxId", "SequenceNumber")
                         .IsUnique()
                         .HasFilter("[OutboxId] IS NOT NULL");
@@ -163,10 +167,6 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                     b.Property<Guid>("OutboxId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("BusName")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
@@ -187,7 +187,7 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
 
                     b.HasKey("OutboxId");
 
-                    b.HasIndex("BusName", "Created");
+                    b.HasIndex("Created");
 
                     b.ToTable("OutboxState");
                 });

@@ -69,8 +69,8 @@ SPA Angular che comunica solo con il gateway.
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
 | Database per servizio | 3 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`) |
-| Messaggistica | MassTransit: RabbitMQ in locale, Azure Service Bus in cloud |
-| Eventi affidabili | Outbox pattern (MassTransit + EF Core) |
+| Messaggistica | MassTransit 8.5.12 in Rooms e Bookings: versione unica scelta per mantenere l'allineamento e usare la licenza open source; RabbitMQ in locale, Azure Service Bus in cloud |
+| Eventi affidabili | Outbox pattern (MassTransit + EF Core) in Rooms |
 | Health check | `/health/live`, `/health/ready` |
 
 ## Corrispondenza con Azure (progettata, non eseguita)

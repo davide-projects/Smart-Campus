@@ -84,7 +84,7 @@ Ci sono due modi:
 
 I messaggi sono definiti in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`. `RoomCreated` contiene id, nome, capienza, prenotabilità e orari di apertura; `RoomUpdated` contiene gli stessi dati più `IsActive`, così uno spazio dismesso può anche essere riattivato; `RoomDeactivated` contiene solo l'id. Rooms usa l'outbox EF Core: un messaggio accodato insieme alla modifica dei dati resta in attesa nel database se RabbitMQ non è disponibile e viene consegnato quando il broker torna raggiungibile. Bookings elabora i messaggi uno alla volta e aggiorna la propria copia degli spazi, inclusi gli orari.
 
-**Conseguenza da conoscere:** la sincronizzazione non è immediata: quando Rooms cambia la capienza o gli orari, Bookings può continuare a usare i dati precedenti per un breve intervallo. Questa consistenza eventuale è accettata; l'outbox garantisce che l'aggiornamento non venga perso quando il broker non è disponibile.
+**Conseguenza da conoscere:** la sincronizzazione non è immediata: quando Rooms cambia la capienza o gli orari, Bookings può continuare a usare i dati precedenti per un breve intervallo. Per esempio, una prenotazione potrebbe ancora essere validata sulla capienza precedente finché l'evento non viene elaborato. Questa consistenza eventuale è accettata; l'outbox garantisce che l'aggiornamento non venga perso quando il broker non è disponibile.
 
 ## Le altre cartelle
 

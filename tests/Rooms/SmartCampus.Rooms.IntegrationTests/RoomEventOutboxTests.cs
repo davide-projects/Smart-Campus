@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Threading.Channels;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +29,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
         receiverServices.AddSingleton(deactivatedEvents);
         receiverServices.AddMassTransit(configure =>
         {
-            configure.AddConsumer<RoomEventsConsumer>();
+            configure.AddConsumer<CapturingRoomEventsConsumer>();
             configure.UsingRabbitMq((context, rabbitMq) =>
             {
                 rabbitMq.Host(
@@ -42,7 +43,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
                     });
 
                 rabbitMq.ReceiveEndpoint($"rooms-events-{Guid.NewGuid():N}", endpoint =>
-                    endpoint.ConfigureConsumer<RoomEventsConsumer>(context));
+                    endpoint.ConfigureConsumer<CapturingRoomEventsConsumer>(context));
             });
         });
 
@@ -77,6 +78,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             Assert.Equal(createdBody.Id, createdEvent.RoomId);
             Assert.Equal("Integration room", createdEvent.Name);
             Assert.Equal(20, createdEvent.Capacity);
+            Assert.True(createdEvent.IsBookable);
             Assert.Equal(new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0)),
                 Assert.Single(createdEvent.OpeningHours));
 
@@ -99,6 +101,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             Assert.Equal(createdEvent.RoomId, updatedEvent.RoomId);
             Assert.Equal("Updated integration room", updatedEvent.Name);
             Assert.Equal(24, updatedEvent.Capacity);
+            Assert.True(updatedEvent.IsActive);
             Assert.Equal(DayOfWeek.Tuesday, Assert.Single(updatedEvent.OpeningHours).DayOfWeek);
 
             var deactivateResponse = await fixture.Client.PostAsync(
@@ -116,6 +119,40 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
         {
             await receiverBus.StopAsync();
         }
+    }
+
+    [Fact]
+    public async Task CreateRoom_WithNameAlreadyUsedInBuilding_ReturnsConflict()
+    {
+        var response = await fixture.Client.PostAsJsonAsync(
+            "/api/rooms/",
+            new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, []));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal("Nome spazio già utilizzato", problem.Title);
+    }
+
+    [Fact]
+    public async Task UpdateRoom_WithNameAlreadyUsedInBuilding_ReturnsConflictWithoutChangingRoom()
+    {
+        var createResponse = await fixture.Client.PostAsJsonAsync(
+            "/api/rooms/",
+            new RoomWriteRequest(BuildingAId, "Room for duplicate test", RoomType.Classroom, 20, 1, true, []));
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var createdBody = await createResponse.Content.ReadFromJsonAsync<CreatedRoomResponse>();
+        Assert.NotNull(createdBody);
+
+        var updateResponse = await fixture.Client.PutAsJsonAsync(
+            $"/api/rooms/{createdBody.Id}",
+            new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, []));
+
+        Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
+        var detailResponse = await fixture.Client.GetAsync($"/api/rooms/{createdBody.Id}");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+        using var detail = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
+        Assert.Equal("Room for duplicate test", detail.RootElement.GetProperty("name").GetString());
     }
 
     private static async Task<TMessage> ReadEventForRoomAsync<TMessage>(
@@ -136,7 +173,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
     private sealed record CreatedRoomResponse(Guid Id);
 }
 
-internal sealed class RoomEventsConsumer(
+internal sealed class CapturingRoomEventsConsumer(
     Channel<RoomCreated> createdEvents,
     Channel<RoomUpdated> updatedEvents,
     Channel<RoomDeactivated> deactivatedEvents) :
