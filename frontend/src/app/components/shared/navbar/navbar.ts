@@ -1,5 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -33,8 +35,18 @@ export function visibleLinks(links: NavLink[], user: UserProfile | null): NavLin
 })
 export class Navbar {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      map((event) => event.urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
 
   protected readonly user = this.auth.user;
+  // Sulla pagina di login il pulsante «Accedi» non serve.
+  protected readonly onLoginPage = computed(() => this.url().startsWith('/login'));
   protected readonly links = computed(() => visibleLinks(LINKS, this.user()));
   protected readonly roleLabel = roleLabel;
 

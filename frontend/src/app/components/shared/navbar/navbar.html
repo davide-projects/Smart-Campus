@@ -24,7 +24,7 @@
         Esci
       </button>
     </mat-menu>
-  } @else {
+  } @else if (!onLoginPage()) {
     <a matButton="outlined" routerLink="/login">Accedi</a>
   }
 

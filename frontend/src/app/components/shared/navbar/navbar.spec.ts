@@ -1,9 +1,9 @@
 import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatMenuHarness } from '@angular/material/menu/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { UserProfile } from '../../../models/user.model';
 import { AuthService } from '../../../services/auth.service';
 import { NavLink, Navbar, visibleLinks } from './navbar';
@@ -11,6 +11,9 @@ import { NavLink, Navbar, visibleLinks } from './navbar';
 // Dati sintetici di prova.
 const STUDENT: UserProfile = { id: 'u1', username: 'student1', displayName: 'Mario Rossi', role: 'Student' };
 const STAFF: UserProfile = { id: 'u2', username: 'staff1', displayName: 'Elena Conti', role: 'Staff' };
+
+@Component({ template: '' })
+class EmptyPage {}
 
 describe('Navbar', () => {
   const user = signal<UserProfile | null>(null);
@@ -22,7 +25,10 @@ describe('Navbar', () => {
   async function render(): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [Navbar],
-      providers: [provideRouter([]), { provide: AuthService, useValue: { user, logout } }],
+      providers: [
+        provideRouter([{ path: 'login', component: EmptyPage }]),
+        { provide: AuthService, useValue: { user, logout } },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Navbar);
@@ -51,11 +57,23 @@ describe('Navbar', () => {
     expect(element.querySelector('button[aria-label="Apri il menu"]')).not.toBeNull();
   });
 
+  function loginLink(): HTMLAnchorElement | undefined {
+    return [...element.querySelectorAll('a')].find((a) => a.textContent!.trim() === 'Accedi');
+  }
+
   it('offers the login to a guest', async () => {
     await render();
 
-    const login = [...element.querySelectorAll('a')].find((a) => a.textContent!.trim() === 'Accedi')!;
-    expect(login.getAttribute('href')).toBe('/login');
+    expect(loginLink()!.getAttribute('href')).toBe('/login');
+  });
+
+  it('hides the login button on the login page', async () => {
+    await render();
+
+    await TestBed.inject(Router).navigateByUrl('/login');
+    await fixture.whenStable();
+
+    expect(loginLink()).toBeUndefined();
   });
 
   it('shows name and role of the logged in user and lets them log out', async () => {
