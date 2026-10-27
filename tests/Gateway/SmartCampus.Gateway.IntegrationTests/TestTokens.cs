@@ -11,17 +11,18 @@ namespace SmartCampus.Gateway.IntegrationTests;
 /// </summary>
 public static class TestTokens
 {
-    public const string SigningKey = "chiave-di-test-del-gateway-almeno-32-byte-0123";
+    public const string SigningKey = "chiave-di-test-del-gateway-lunga-abbastanza-per-HS512-0123456789-abcdefghijkl";
     public const string OtherSigningKey = "un-altra-chiave-di-test-diversa-dalla-prima-0123";
     public const string Issuer = "SmartCampus.Identity";
     public const string Audience = "SmartCampus";
 
     public static string Create(
-        string? role,
-        string signingKey = SigningKey,
-        string issuer = Issuer,
-        string audience = Audience,
-        TimeSpan? lifetime = null)
+    string? role,
+    string signingKey = SigningKey,
+    string issuer = Issuer,
+    string audience = Audience,
+    TimeSpan? lifetime = null,
+    string algorithm = SecurityAlgorithms.HmacSha256)
     {
         var now = DateTime.UtcNow;
         var remaining = lifetime ?? TimeSpan.FromMinutes(30);
@@ -48,7 +49,7 @@ public static class TestTokens
             Expires = now + remaining,
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
-                SecurityAlgorithms.HmacSha256)
+                algorithm)
         };
 
         return new JsonWebTokenHandler().CreateToken(descriptor);

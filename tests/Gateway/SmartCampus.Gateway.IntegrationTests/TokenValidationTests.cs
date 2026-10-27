@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.IdentityModel.Tokens;
 
 namespace SmartCampus.Gateway.IntegrationTests;
 
@@ -15,6 +16,7 @@ public sealed class TokenValidationTests(GatewayFixture fixture) : IClassFixture
         { TestTokens.Create("Student", signingKey: TestTokens.OtherSigningKey) },
         { TestTokens.Create("Student", issuer: "Qualcun.Altro") },
         { TestTokens.Create("Student", audience: "AltroPubblico") },
+        { TestTokens.Create("Student", algorithm: SecurityAlgorithms.HmacSha512) },
         { "non-e-un-jwt" }
     };
 

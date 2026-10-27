@@ -34,6 +34,7 @@ public static class AuthenticationExtensions
                     ValidateAudience = true,
                     ValidAudience = settings.Audience,
                     ValidateIssuerSigningKey = true,
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SigningKey)),
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromSeconds(30),
