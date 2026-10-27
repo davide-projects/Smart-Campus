@@ -20,7 +20,8 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
 - **Dati:** `Building`, `Room` (`Type`, `Capacity`, `Floor`, `IsBookable`, `IsActive`), `Equipment`, `OpeningHours`.
 - **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=` restituisce solo gli spazi attivi. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
-- **Orari:** nel primo incremento è prevista una fascia per spazio e giorno; i giorni chiusi sono assenti e le chiusure straordinarie fuori ambito. `RoomCreated` e `RoomUpdated` includono lo snapshot delle fasce.
+- **Gestione:** `POST /api/rooms` e `PUT /api/rooms/{id}` sono riservati al ruolo `Staff`; aggiornano anche attrezzature e orari.
+- **Orari:** nel primo incremento è prevista una fascia per spazio e giorno; i giorni chiusi sono assenti e le chiusure straordinarie fuori ambito. `RoomCreated` e `RoomUpdated` includono lo snapshot degli orari.
 - **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. All'avvio Rooms ne pubblica gli eventi una sola volta tramite outbox.
 - **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati.
 

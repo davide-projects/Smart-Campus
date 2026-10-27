@@ -10,4 +10,5 @@ public sealed record RoomWriteRequest(
     int Capacity,
     int Floor,
     bool IsBookable,
+    IReadOnlyList<Guid> EquipmentIds,
     IReadOnlyList<RoomOpeningHours> OpeningHours);

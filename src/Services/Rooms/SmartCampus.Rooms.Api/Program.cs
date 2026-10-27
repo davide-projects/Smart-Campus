@@ -1,6 +1,9 @@
+using System.Text;
 using System.Text.Json.Serialization;
 using MassTransit;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using SmartCampus.Rooms.Data;
 using SmartCampus.Rooms.Features.Rooms;
 using SmartCampus.ServiceDefaults;
@@ -17,12 +20,40 @@ builder.Services.AddDbContext<RoomsDbContext>((provider, options) =>
         provider.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
         sql => sql.EnableRetryOnFailure()));
 
+var jwt = builder.Configuration.GetSection("Jwt");
+var jwtIssuer = jwt["Issuer"] ?? throw new InvalidOperationException("Jwt:Issuer è obbligatorio.");
+var jwtAudience = jwt["Audience"] ?? throw new InvalidOperationException("Jwt:Audience è obbligatorio.");
+var jwtSigningKey = jwt["SigningKey"];
+if (string.IsNullOrWhiteSpace(jwtSigningKey) || Encoding.UTF8.GetByteCount(jwtSigningKey) < 32)
+{
+    throw new InvalidOperationException("Jwt:SigningKey deve contenere almeno 32 byte.");
+}
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
+            ValidateLifetime = true,
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            RoleClaimType = "role",
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorization();
+
 var rabbitMqHost = builder.Configuration["RabbitMq:Host"] ?? "localhost";
 var rabbitMqPort = builder.Configuration.GetValue<ushort?>("RabbitMq:Port") ?? 5672;
 var rabbitMqVirtualHost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
 var rabbitMqUsername = builder.Configuration["RabbitMq:Username"] ?? "guest";
 var rabbitMqPassword = builder.Configuration["RabbitMq:Password"] ?? "guest";
-
 builder.Services.AddMassTransit(configure =>
 {
     configure.AddEntityFrameworkOutbox<RoomsDbContext>(outbox =>
@@ -44,7 +75,6 @@ builder.Services.AddMassTransit(configure =>
 });
 
 builder.Services.AddScoped<RoomSeedEventPublisher>();
-
 // La readiness include la disponibilità del database, per le probe di orchestrazione.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<RoomsDbContext>("database");
@@ -75,6 +105,8 @@ else
     app.Logger.LogInformation("Database Rooms allineato con le migrazioni.");
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapDefaultEndpoints();
 
 // Tutte le route del servizio stanno sotto /api/rooms: il gateway le inoltra senza riscriverle.

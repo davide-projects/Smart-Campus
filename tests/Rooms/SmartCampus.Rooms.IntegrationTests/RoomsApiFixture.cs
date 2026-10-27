@@ -12,6 +12,8 @@ namespace SmartCampus.Rooms.IntegrationTests;
 
 public sealed class RoomsApiFixture : IAsyncLifetime
 {
+    private const string JwtSigningKey = "rooms-integration-signing-key-with-at-least-32-bytes";
+
     private readonly MsSqlContainer _database = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
         .Build();
 
@@ -26,6 +28,8 @@ public sealed class RoomsApiFixture : IAsyncLifetime
 
     public RabbitMqContainer RabbitMq => _rabbitMq;
 
+    public static string SigningKey => JwtSigningKey;
+
     public async Task InitializeAsync()
     {
         await _database.StartAsync();
@@ -36,6 +40,9 @@ public sealed class RoomsApiFixture : IAsyncLifetime
             {
                 builder.UseEnvironment("Development");
                 builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString());
+                builder.UseSetting("Jwt:Issuer", "SmartCampus.Identity");
+                builder.UseSetting("Jwt:Audience", "SmartCampus");
+                builder.UseSetting("Jwt:SigningKey", JwtSigningKey);
                 builder.UseSetting("RabbitMq:Host", "localhost");
                 builder.UseSetting("RabbitMq:Port", _rabbitMq.GetMappedPublicPort(5672).ToString());
                 builder.UseSetting("RabbitMq:VirtualHost", "/");

@@ -1,6 +1,6 @@
 # Identity: login, profilo e token
 
-Servizio `src/Services/Identity/` (porta locale **5101**, database `SmartCampus_Identity`). Copre la storia **US-09** (task #29): utenti sintetici, login e profilo. La validazione del token e le regole di accesso sono nel Gateway (task #30): vedi [gateway.md](gateway.md).
+Servizio `src/Services/Identity/` (porta locale **5101**, database `SmartCampus_Identity`). Copre la storia **US-09** (task #29): utenti sintetici, login e profilo. La validazione del token negli altri servizi e nel Gateway è il task #30.
 
 ## API
 
@@ -32,7 +32,7 @@ Con credenziali errate la risposta è sempre `401` con il messaggio "Nome utente
 
 **Profilo**: `GET /api/identity/me` con l'intestazione `Authorization: Bearer <jwt>`. Il profilo è letto dal database, non dal token.
 
-## Contratto del token (letto dal Gateway)
+## Contratto del token (per il task #30)
 
 JWT firmato HMAC-SHA256. I nomi dei claim sono in `JwtClaimNames` e **non vengono rimappati** (`MapInboundClaims = false`).
 
@@ -45,14 +45,14 @@ JWT firmato HMAC-SHA256. I nomi dei claim sono in `JwtClaimNames` e **non vengon
 | `iss` / `aud` | `SmartCampus.Identity` / `SmartCampus` (configurabili in `Jwt:Issuer` e `Jwt:Audience`) |
 | `iat` / `nbf` / `exp` | Durata di default 60 minuti (`Jwt:ExpirationMinutes`) |
 
-Il Gateway usa **stessi issuer, audience e chiave di firma** di Identity, con `NameClaimType = "name"` e `RoleClaimType = "role"`, e li legge dalla stessa configurazione `Jwt`. I servizi a valle non rivalidano il token (vedi [gateway.md](gateway.md#limiti-noti)). Se cambi i nomi dei claim o i ruoli, aggiorna anche `Auth/GatewayJwtOptions.cs` del Gateway: sono copiati lì di proposito.
+Il Gateway e gli altri servizi devono usare **stessi issuer, audience e chiave di firma**, con `NameClaimType = "name"` e `RoleClaimType = "role"`, così `[Authorize(Roles = "Staff")]` funziona senza altre mappature.
 
 ## Configurazione
 
 | Chiave | Dove | Note |
 |---|---|---|
 | `ConnectionStrings:Database` | user-secrets / variabile d'ambiente | Stringa di connessione a `SmartCampus_Identity` |
-| `Jwt:SigningKey` | user-secrets / variabile d'ambiente `Jwt__SigningKey` | **Segreto**, almeno 32 byte, **la stessa del Gateway**. Se manca o è corta, il servizio non parte e dice perché |
+| `Jwt:SigningKey` | user-secrets / variabile d'ambiente `Jwt__SigningKey` | **Segreto condiviso** da Identity, Gateway e Rooms, almeno 32 byte. Se manca o è corta, il servizio non parte e dice perché |
 | `Jwt:Issuer`, `Jwt:Audience`, `Jwt:ExpirationMinutes` | `appsettings.json` | Non sono segreti |
 | `Seed:DefaultPassword` | user-secrets / variabile d'ambiente `Seed__DefaultPassword` | Password di sviluppo degli utenti sintetici. Se vuota, gli utenti non vengono caricati |
 
@@ -61,10 +61,11 @@ Il Gateway usa **stessi issuer, audience e chiave di firma** di Identity, con `N
 ```bash
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Identity" --project src/Services/Identity/SmartCampus.Identity.Api
 dotnet user-secrets set "Jwt:SigningKey" "<una stringa casuale di almeno 32 caratteri>" --project src/Services/Identity/SmartCampus.Identity.Api
+dotnet user-secrets set "Jwt:SigningKey" "<la stessa chiave usata da Identity>" --project src/Services/Rooms/SmartCampus.Rooms.Api
 dotnet user-secrets set "Seed:DefaultPassword" "<password di sviluppo>" --project src/Services/Identity/SmartCampus.Identity.Api
 ```
 
-**Docker.** `JWT_SIGNING_KEY` e `SEED_DEFAULT_PASSWORD` si impostano nel `.env` (il modello è `.env.example`); `docker-compose.yml` le passa al servizio `identity` come `Jwt__SigningKey` e `Seed__DefaultPassword` (`JWT_SIGNING_KEY` va anche al `gateway`). Se mancano, `docker compose` si ferma con un messaggio che lo spiega.
+**Docker.** `JWT_SIGNING_KEY` e `SEED_DEFAULT_PASSWORD` si impostano nel `.env` (il modello è `.env.example`); `docker-compose.yml` passa la stessa chiave di firma a Identity e Rooms. Se mancano, `docker compose` si ferma con un messaggio che lo spiega.
 
 ## Utenti sintetici
 

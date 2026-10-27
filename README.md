@@ -76,6 +76,12 @@ dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Bookings" --project src/Services/Bookings/SmartCampus.Bookings.Api
 ```
 
+Rooms valida i JWT emessi da Identity: imposta la stessa chiave di firma di almeno 32 byte in entrambi i progetti.
+
+```bash
+dotnet user-secrets set "Jwt:SigningKey" "<stessa chiave casuale di almeno 32 byte usata da Identity>" --project src/Services/Rooms/SmartCampus.Rooms.Api
+```
+
 Rooms pubblica gli eventi e Bookings li consuma tramite RabbitMQ. Per avviare entrambi con `dotnet run`, imposta gli user-secrets di ciascun progetto con gli stessi valori di `RABBITMQ_USER` e `RABBITMQ_PASSWORD` presenti in `.env`:
 
 ```bash

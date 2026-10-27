@@ -41,7 +41,7 @@ Il gruppo è in grado di produrre una prima versione di Product Backlog ordinabi
 | docker-compose (SQL Server, RabbitMQ, servizi, web) | ✅ configurazione valida; build immagini da verificare con Docker attivo |
 | CI GitHub Actions | ✅ eseguita e verde sul commit precedente alla rebase; da rieseguire sul branch aggiornato |
 | Database, EF Core, migrazioni, seed | ✅ Identity, Rooms e Bookings hanno persistenza e migrazioni |
-| Autenticazione JWT | ✅ Identity emette i token e Gateway li valida; le API di scrittura Rooms devono applicare il ruolo Staff |
+| Autenticazione JWT | ✅ Identity emette i token; Rooms applica l'autorizzazione Staff |
 | Messaggistica (MassTransit + outbox) | ✅ versione 8.5.12 condivisa; Rooms usa RabbitMQ e outbox EF Core; Bookings consuma gli eventi |
 | Test di concorrenza prenotazioni | ❌ da fare (prova chiave del progetto) |
 
