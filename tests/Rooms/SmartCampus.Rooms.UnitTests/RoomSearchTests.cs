@@ -3,7 +3,7 @@ using SmartCampus.Rooms.Features.Rooms;
 
 namespace SmartCampus.Rooms.UnitTests;
 
-// Regole della ricerca pubblica, verificate su una lista in memoria: niente database, niente HTTP.
+
 public sealed class RoomSearchTests
 {
     private static readonly Guid BuildingAId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -22,7 +22,7 @@ public sealed class RoomSearchTests
     ];
 
     [Fact]
-    public void SenzaFiltri_RestituisceSoloGliSpaziAttivi()
+    public void Search_WithoutFilters_ReturnsOnlyActiveRooms()
     {
         var result = Search(new RoomFilter());
 
@@ -31,7 +31,7 @@ public sealed class RoomSearchTests
     }
 
     [Fact]
-    public void FiltroPerTipo_RestituisceSoloQuelTipo()
+    public void Search_ByType_ReturnsOnlyMatchingRoomType()
     {
         var result = Search(new RoomFilter(Type: RoomType.StudyRoom));
 
@@ -40,7 +40,7 @@ public sealed class RoomSearchTests
     }
 
     [Fact]
-    public void FiltroPerCapienzaMinima_IncludeLaSoglia()
+    public void Search_ByMinimumCapacity_IncludesBoundary()
     {
         var result = Search(new RoomFilter(MinCapacity: 30));
 
@@ -51,7 +51,7 @@ public sealed class RoomSearchTests
     }
 
     [Fact]
-    public void FiltroPerEdificio_RestituisceSoloQuellEdificio()
+    public void Search_ByBuilding_ReturnsOnlyRoomsInBuilding()
     {
         var result = Search(new RoomFilter(BuildingId: BuildingBId));
 
@@ -61,7 +61,7 @@ public sealed class RoomSearchTests
     }
 
     [Fact]
-    public void FiltriCombinati_ApplicanoTutteLeCondizioni()
+    public void Search_WithCombinedFilters_AppliesAllConditions()
     {
         var result = Search(new RoomFilter(RoomType.Classroom, MinCapacity: 30, BuildingId: BuildingAId));
 
@@ -70,7 +70,7 @@ public sealed class RoomSearchTests
     }
 
     [Fact]
-    public void FiltroCheEscludeGliSpaziDismessi_NonLiRiporta()
+    public void Search_WhenOnlyInactiveRoomsMatch_ReturnsEmpty()
     {
         // Anche chiedendo esplicitamente il tipo e la capienza di uno spazio dismesso, non compare.
         var result = Search(new RoomFilter(RoomType.Classroom, MinCapacity: 45));

@@ -19,6 +19,7 @@ Prodotto per **trovare e prenotare gli spazi del campus senza impegni incompatib
 Ogni servizio ha **il proprio database SQL Server** e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale).
 
 - **Cosa fa ogni servizio, spiegato semplice:** [docs/servizi.md](docs/servizi.md)
+- **Catalogo endpoint HTTP** (route attive, pianificate e istruzioni per aggiungerne): [docs/endpoints.md](docs/endpoints.md)
 - Dettagli tecnici: [docs/architettura.md](docs/architettura.md)
 - Base per le user stories: [docs/handoff-architettura.md](docs/handoff-architettura.md) · bozza: [docs/user-stories-bozza.md](docs/user-stories-bozza.md)
 
@@ -67,16 +68,11 @@ cd frontend && npm install && npm start
 
 Ogni servizio usa un database dedicato, anche quando i database risiedono sulla stessa istanza SQL Server. Per lo sviluppo locale, configura la connection string negli **user-secrets del singolo progetto**: tutti usano la chiave `ConnectionStrings:Database`, ma ciascuno punta al proprio database. Non inserire credenziali in `appsettings.json` e non committarle.
 
-Per SQL Server locale avviato con Docker Compose (`localhost,1433`, utente `sa`), inizializza gli user-secrets una volta per ogni progetto e imposta la relativa connection string. Sostituisci `<password>` con la password locale di SQL Server e aggiorna server o utente se il tuo ambiente è diverso. I nomi database qui sotto sono distinti intenzionalmente:
+Per SQL Server locale avviato con Docker Compose (`localhost,1433`, utente `sa`), imposta la connection string per ogni progetto. Sostituisci `<password>` con la password locale di SQL Server; se usi un altro server o utente, aggiorna i relativi campi. Gli ID degli user-secrets sono definiti nei progetti, quindi non serve eseguire `dotnet user-secrets init`.
 
 ```bash
-dotnet user-secrets init --project src/Services/Identity/SmartCampus.Identity.Api
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Identity" --project src/Services/Identity/SmartCampus.Identity.Api
-
-dotnet user-secrets init --project src/Services/Rooms/SmartCampus.Rooms.Api
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Rooms" --project src/Services/Rooms/SmartCampus.Rooms.Api
-
-dotnet user-secrets init --project src/Services/Bookings/SmartCampus.Bookings.Api
 dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Bookings" --project src/Services/Bookings/SmartCampus.Bookings.Api
 ```
 
@@ -84,7 +80,7 @@ Gli user-secrets sono separati per progetto: se lavori su più servizi, esegui i
 
 Attualmente Rooms legge `ConnectionStrings:Database` e applica le migrazioni EF Core all'avvio. Identity e Bookings useranno la stessa chiave quando verrà implementata la loro persistenza.
 
-Rooms applica le migrazioni EF Core all'avvio. Per crearne una nuova dopo aver modificato il modello:
+Per creare una migrazione dopo aver modificato il modello:
 
 ```bash
 dotnet tool restore

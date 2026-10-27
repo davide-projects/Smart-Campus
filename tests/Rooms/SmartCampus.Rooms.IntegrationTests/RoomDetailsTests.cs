@@ -18,7 +18,7 @@ public sealed class RoomDetailsTests(RoomsApiFixture fixture) : IClassFixture<Ro
     private static readonly Guid ReadingRoomId = Guid.Parse("c1000000-0000-0000-0000-000000000002");
 
     [Fact]
-    public async Task DettaglioSpazio_RestituisceTutteLeInformazioni()
+    public async Task Details_ForActiveRoom_ReturnsAllInformation()
     {
         var room = await GetRoomAsync(ClassroomA1Id);
 
@@ -50,7 +50,7 @@ public sealed class RoomDetailsTests(RoomsApiFixture fixture) : IClassFixture<Ro
     }
 
     [Fact]
-    public async Task DettaglioSpazioNonPrenotabile_IndicaCheNonEPrenotabile()
+    public async Task Details_ForNonBookableRoom_IndicatesItCannotBeBooked()
     {
         var room = await GetRoomAsync(ReadingRoomId);
 
@@ -59,7 +59,7 @@ public sealed class RoomDetailsTests(RoomsApiFixture fixture) : IClassFixture<Ro
     }
 
     [Fact]
-    public async Task SpazioInesistente_Restituisce404ProblemDetails()
+    public async Task Details_ForUnknownRoom_ReturnsNotFoundProblemDetails()
     {
         var response = await fixture.Client.GetAsync($"/api/rooms/{Guid.NewGuid()}");
 

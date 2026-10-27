@@ -8,7 +8,7 @@ namespace SmartCampus.Rooms.Data;
 public sealed class RoomsDbContextFactory : IDesignTimeDbContextFactory<RoomsDbContext>
 {
     private const string DesignTimeConnectionString =
-        "Server=localhost,1433;User Id=sa;Password=DevelopmentOnly_123!;TrustServerCertificate=True;Database=SmartCampus_Rooms";
+        "Server=localhost,1433;Database=SmartCampus_Rooms;Integrated Security=True;TrustServerCertificate=True";
 
     public RoomsDbContext CreateDbContext(string[] args)
     {

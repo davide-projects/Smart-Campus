@@ -16,7 +16,7 @@ builder.Services.AddDbContext<RoomsDbContext>((provider, options) =>
         provider.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
         sql => sql.EnableRetryOnFailure()));
 
-// /health/ready resta "unhealthy" finché il database non risponde: docker compose aspetta questo.
+// La readiness include la disponibilità del database, per le probe di orchestrazione.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<RoomsDbContext>("database");
 

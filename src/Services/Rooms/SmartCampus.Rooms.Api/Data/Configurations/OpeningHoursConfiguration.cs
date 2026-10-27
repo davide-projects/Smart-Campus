@@ -19,7 +19,7 @@ internal sealed class OpeningHoursConfiguration : IEntityTypeConfiguration<Openi
             .HasMaxLength(10)
             .IsRequired();
 
-        // Una sola fascia per spazio e giorno: i test e le prenotazioni restano semplici.
+        // The initial implementation allows one opening interval per room and day.
         builder.HasIndex(openingHours => new { openingHours.RoomId, openingHours.DayOfWeek })
             .IsUnique();
 

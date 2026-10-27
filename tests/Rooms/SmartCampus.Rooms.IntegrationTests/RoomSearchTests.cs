@@ -19,7 +19,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     private static readonly Guid LibraryId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     [Fact]
-    public async Task RicercaSenzaFiltri_RestituisceGliSpaziAttiviDelSeed()
+    public async Task Search_WithoutFilters_ReturnsSeededActiveRooms()
     {
         var rooms = await SearchAsync("/api/rooms/");
 
@@ -29,7 +29,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task RicercaPerTipo_RestituisceSoloLeSaleStudio()
+    public async Task Search_ByType_ReturnsOnlyStudyRooms()
     {
         var rooms = await SearchAsync("/api/rooms/?type=StudyRoom");
 
@@ -38,7 +38,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task RicercaPerCapienzaMinima_IncludeGliSpaziCapienti()
+    public async Task Search_ByMinimumCapacity_ReturnsRoomsWithSufficientCapacity()
     {
         var rooms = await SearchAsync("/api/rooms/?minCapacity=30");
 
@@ -47,7 +47,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task RicercaCombinata_ApplicaTipoCapienzaEdEdificio()
+    public async Task Search_WithCombinedFilters_AppliesTypeCapacityAndBuilding()
     {
         var rooms = await SearchAsync(
             $"/api/rooms/?type=Classroom&minCapacity=30&buildingId={BuildingAId}");
@@ -62,7 +62,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task RicercaPerEdificio_RestituisceSoloGliSpaziDellaBiblioteca()
+    public async Task Search_ByBuilding_ReturnsOnlyLibraryRooms()
     {
         var rooms = await SearchAsync($"/api/rooms/?buildingId={LibraryId}");
 
@@ -71,7 +71,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task SpazioNonPrenotabile_RestaVisibileMaSegnalato()
+    public async Task Search_WhenRoomIsNotBookable_IncludesItAndMarksIt()
     {
         var rooms = await SearchAsync("/api/rooms/");
 
@@ -80,7 +80,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task LaRicerca_NonMostraMaiGliSpaziDismessi()
+    public async Task Search_NeverReturnsDecommissionedRooms()
     {
         // Anche con i filtri che descrivono esattamente l'aula dismessa (Classroom, 50 posti).
         var rooms = await SearchAsync($"/api/rooms/?type=Classroom&minCapacity=50&buildingId={BuildingAId}");
@@ -89,7 +89,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task Risultati_OrdinatiPerEdificioEPoiPerNome()
+    public async Task SearchResults_AreOrderedByBuildingThenName()
     {
         var rooms = await SearchAsync("/api/rooms/");
 
@@ -104,7 +104,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     [Theory]
     [InlineData("/api/rooms/?minCapacity=0")]
     [InlineData("/api/rooms/?minCapacity=-5")]
-    public async Task CapienzaMinimaNonValida_Restituisce400(string url)
+    public async Task Search_WithInvalidMinimumCapacity_ReturnsBadRequest(string url)
     {
         var response = await fixture.Client.GetAsync(url);
 
@@ -112,7 +112,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task EdificioNonValido_Restituisce400()
+    public async Task Search_WithInvalidBuildingId_ReturnsBadRequest()
     {
         var response = await fixture.Client.GetAsync($"/api/rooms/?buildingId={Guid.Empty}");
 
@@ -120,7 +120,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task HealthReady_ConDatabaseAttivo_RispondeSano()
+    public async Task HealthReady_WhenDatabaseIsAvailable_ReturnsOk()
     {
         var response = await fixture.Client.GetAsync("/health/ready");
 
@@ -128,7 +128,7 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
-    public async Task HealthLive_RispondeSano()
+    public async Task HealthLive_ReturnsOk()
     {
         var response = await fixture.Client.GetAsync("/health/live");
 
