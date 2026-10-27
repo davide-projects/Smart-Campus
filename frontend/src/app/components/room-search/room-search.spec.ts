@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
-import { RoomFilter, RoomSummary } from '../shared/room.model';
+import { RoomFilter, RoomSummary } from '../../models/room.model';
 import { RoomsService } from '../shared/rooms.service';
 import { RoomSearch } from './room-search';
 
@@ -55,14 +55,24 @@ describe('RoomSearch', () => {
     expect(card).toContain('40 posti');
   });
 
-  it('ricava gli edifici del filtro dalla ricerca senza filtri', async () => {
+  it('ricava tipi ed edifici dei filtri dalla ricerca senza filtri', async () => {
     await render();
 
-    const component = fixture.componentInstance as unknown as { buildings: () => unknown };
+    const component = fixture.componentInstance as unknown as RoomSearchInternals;
+    expect(component.types()).toEqual(['Classroom', 'StudyRoom']);
     expect(component.buildings()).toEqual([
       { id: 'b-a', name: 'Edificio A' },
       { id: 'b-b', name: 'Edificio B' },
     ]);
+  });
+
+  it('un tipo nuovo senza etichetta compare con il valore del backend', async () => {
+    search.mockReturnValue(of([{ ...ROOMS[0], id: 'r3', name: 'Aula Magna', type: 'Auditorium' }]));
+    await render();
+
+    const component = fixture.componentInstance as unknown as RoomSearchInternals;
+    expect(component.types()).toEqual(['Auditorium']);
+    expect(element.querySelector('mat-card-subtitle')!.textContent!.trim()).toBe('Auditorium');
   });
 
   it('premendo Cerca invia tutti i filtri impostati', async () => {
@@ -117,4 +127,6 @@ describe('RoomSearch', () => {
 
 interface RoomSearchInternals {
   filters: RoomSearch['filters'];
+  types: () => string[];
+  buildings: () => unknown;
 }

@@ -6,8 +6,8 @@
       <mat-label>Tipo</mat-label>
       <mat-select formControlName="type">
         <mat-option [value]="null">Tutti i tipi</mat-option>
-        @for (type of types; track type) {
-          <mat-option [value]="type">{{ typeLabels[type] }}</mat-option>
+        @for (type of types(); track type) {
+          <mat-option [value]="type">{{ typeLabel(type) }}</mat-option>
         }
       </mat-select>
     </mat-form-field>
@@ -54,7 +54,7 @@
           <mat-card appearance="outlined">
             <mat-card-header>
               <mat-card-title>{{ room.name }}</mat-card-title>
-              <mat-card-subtitle>{{ typeLabels[room.type] }}</mat-card-subtitle>
+              <mat-card-subtitle>{{ typeLabel(room.type) }}</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
               <dl>

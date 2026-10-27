@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { Subject, catchError, map, of, switchMap, tap } from 'rxjs';
-import { ROOM_TYPE_LABELS, RoomFilter, RoomSummary, RoomType } from '../shared/room.model';
+import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
 import { RoomsService } from '../shared/rooms.service';
 
 interface BuildingOption {
@@ -36,8 +36,7 @@ export class RoomSearch {
   private readonly roomsService = inject(RoomsService);
   private readonly searches = new Subject<RoomFilter>();
 
-  protected readonly typeLabels = ROOM_TYPE_LABELS;
-  protected readonly types = Object.keys(ROOM_TYPE_LABELS) as RoomType[];
+  protected readonly typeLabel = roomTypeLabel;
 
   protected readonly filters = new FormGroup({
     type: new FormControl<RoomType | null>(null),
@@ -49,6 +48,7 @@ export class RoomSearch {
   });
 
   protected readonly rooms = signal<RoomSummary[]>([]);
+  protected readonly types = signal<RoomType[]>([]);
   protected readonly buildings = signal<BuildingOption[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
@@ -66,8 +66,10 @@ export class RoomSearch {
             map((rooms): SearchResult => ({ rooms })),
             catchError(() => of<SearchResult>({ error: true })),
             tap((result) => {
-              // Senza filtri arrivano tutti gli spazi attivi: da lì si ricavano gli edifici del filtro.
+              // Senza filtri arrivano tutti gli spazi attivi: da lì si ricavano i tipi e gli edifici
+              // dei filtri, così un tipo o un edificio nuovo compare senza modificare il frontend.
               if ('rooms' in result && isEmptyFilter(filter)) {
+                this.types.set(typesOf(result.rooms));
                 this.buildings.set(buildingsOf(result.rooms));
               }
             }),
@@ -106,6 +108,12 @@ export class RoomSearch {
 
 function isEmptyFilter(filter: RoomFilter): boolean {
   return !filter.type && filter.minCapacity == null && !filter.buildingId;
+}
+
+function typesOf(rooms: RoomSummary[]): RoomType[] {
+  return [...new Set(rooms.map((room) => room.type))].sort((a, b) =>
+    roomTypeLabel(a).localeCompare(roomTypeLabel(b), 'it'),
+  );
 }
 
 function buildingsOf(rooms: RoomSummary[]): BuildingOption[] {
