@@ -86,7 +86,9 @@
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 12px;
 
+  // Su desktop la tabella occupa tutta la larghezza, su mobile non scende sotto i 560px e scorre.
   table {
+    width: 100%;
     min-width: 560px;
   }
 
