@@ -1,0 +1,11 @@
+.footer {
+  padding: 16px;
+  text-align: center;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+
+  p {
+    margin: 0;
+  }
+}

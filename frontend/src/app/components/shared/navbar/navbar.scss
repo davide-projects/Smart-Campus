@@ -1,0 +1,32 @@
+.navbar {
+  gap: 8px;
+  background-color: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.brand {
+  margin-right: auto;
+  font: var(--mat-sys-title-large);
+}
+
+.active {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+// Da tablet in su le voci sono visibili, su mobile si usa il menu.
+.links {
+  display: none;
+  gap: 4px;
+
+  @media (min-width: 720px) {
+    display: flex;
+  }
+}
+
+.menu-toggle {
+  @media (min-width: 720px) {
+    display: none;
+  }
+}
