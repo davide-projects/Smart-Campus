@@ -19,6 +19,7 @@ Prodotto per **trovare e prenotare gli spazi del campus senza impegni incompatib
 Ogni servizio ha **il proprio database SQL Server** e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale).
 
 - **Cosa fa ogni servizio, spiegato semplice:** [docs/servizi.md](docs/servizi.md)
+- **Catalogo endpoint HTTP** (route attive, pianificate e istruzioni per aggiungerne): [docs/endpoints.md](docs/endpoints.md)
 - Dettagli tecnici: [docs/architettura.md](docs/architettura.md)
 - Base per le user stories: [docs/handoff-architettura.md](docs/handoff-architettura.md) · bozza: [docs/user-stories-bozza.md](docs/user-stories-bozza.md)
 
@@ -65,12 +66,28 @@ dotnet run --project src/Gateway/SmartCampus.Gateway
 cd frontend && npm install && npm start
 ```
 
-Le connection string locali vanno negli **user-secrets**, non in `appsettings.json`:
+Ogni servizio usa un database dedicato, anche quando i database risiedono sulla stessa istanza SQL Server. Per lo sviluppo locale, configura la connection string negli **user-secrets del singolo progetto**: tutti usano la chiave `ConnectionStrings:Database`, ma ciascuno punta al proprio database. Non inserire credenziali in `appsettings.json` e non committarle.
+
+Per SQL Server locale avviato con Docker Compose (`localhost,1433`, utente `sa`), imposta la connection string per ogni progetto. Sostituisci `<password>` con la password locale di SQL Server; se usi un altro server o utente, aggiorna i relativi campi. Gli ID degli user-secrets sono definiti nei progetti, quindi non serve eseguire `dotnet user-secrets init`.
 
 ```bash
-dotnet user-secrets init --project src/Services/Rooms/SmartCampus.Rooms.Api
-dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Rooms" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Identity" --project src/Services/Identity/SmartCampus.Identity.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Rooms" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Bookings" --project src/Services/Bookings/SmartCampus.Bookings.Api
 ```
+
+Gli user-secrets sono separati per progetto: se lavori su più servizi, esegui i comandi per ognuno. In Docker Compose gli host dei database sono `sqlserver` e le tre connection string con database distinti sono già configurate in `docker-compose.yml`; per avviare lo stack completo imposta in `.env` le credenziali locali richieste da `.env.example`. La password `MSSQL_SA_PASSWORD` deve avere almeno 8 caratteri e includere almeno 3 categorie tra lettere maiuscole, minuscole, numeri e simboli, altrimenti SQL Server si arresta durante l'inizializzazione. Compose controlla che SQL Server accetti una query prima di avviare Identity, Rooms e Bookings.
+
+Attualmente Rooms legge `ConnectionStrings:Database` e applica le migrazioni EF Core all'avvio. Identity e Bookings useranno la stessa chiave quando verrà implementata la loro persistenza.
+
+Per creare una migrazione dopo aver modificato il modello:
+
+```bash
+dotnet tool restore
+dotnet ef migrations add NomeMigrazione --project src/Services/Rooms/SmartCampus.Rooms.Api --output-dir Data/Migrations
+```
+
+Il tool `dotnet-ef` è versionato in `.config/dotnet-tools.json`: `dotnet tool restore` lo installa per il repository, senza installazioni globali. La migrazione iniziale di Rooms include anche i dati sintetici di sviluppo (edifici, spazi, attrezzature, orari).
 
 In sviluppo Angular inoltra `/api/*` al gateway tramite `frontend/proxy.conf.json`.
 
