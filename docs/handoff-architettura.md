@@ -36,13 +36,13 @@ Il gruppo è in grado di produrre una prima versione di Product Backlog ordinabi
 |---|---|
 | Solution .NET 10, 4 servizi + gateway YARP | ✅ scheletro, compila, solo endpoint informativo `GET /api/{service}/` |
 | Health check `/health/live`, `/health/ready` | ✅ |
-| Contratti eventi (`SmartCampus.Contracts`) | ✅ definiti, non ancora pubblicati/consumati |
+| Contratti eventi (`SmartCampus.Contracts`) | ✅ definiti; Rooms pubblica gli eventi di ciclo di vita con gli orari, consumer degli altri servizi da completare |
 | Frontend Angular 22 con proxy verso il gateway | ✅ shell vuota |
 | docker-compose (SQL Server, RabbitMQ, servizi, web) | ✅ configurazione valida; build immagini da verificare con Docker attivo |
 | CI GitHub Actions | ✅ definita, mai eseguita |
-| Database, EF Core, migrazioni, seed | ❌ da fare |
+| Database, EF Core, migrazioni, seed | ✅ Rooms completato; altri servizi da completare |
 | Autenticazione JWT | ❌ da fare |
-| Messaggistica (MassTransit + outbox) | ❌ da fare |
+| Messaggistica (MassTransit + outbox) | ✅ configurata in Rooms con RabbitMQ e outbox EF Core; consumer da completare |
 | Test di concorrenza prenotazioni | ❌ da fare (prova chiave del progetto) |
 
 ### Vincoli che le storie devono rispettare
@@ -121,7 +121,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | `Building` | Id, Name, Address/Code | |
 | `Room` | Id, BuildingId, Name, Type (`Classroom`/`Lab`/`StudyRoom`), Capacity, Floor, IsBookable, IsActive | `IsActive=false` = dismesso, non cancellato fisicamente |
 | `Equipment` | Id, Name | Relazione N:M con `Room` |
-| `OpeningHours` | RoomId, DayOfWeek, OpensAt, ClosesAt | Per il primo incremento è prevista una sola fascia per spazio e giorno; verificare con il PO se servono più fasce. |
+| `OpeningHours` | RoomId, DayOfWeek, OpensAt, ClosesAt | Decisione I-3: una sola fascia per spazio e giorno; i giorni chiusi non hanno righe. Le chiusure straordinarie non sono modellate nel primo incremento. |
 
 **API previste**
 | Metodo | Route | Ruolo | Scopo |
@@ -133,7 +133,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | POST | `/api/rooms/{id}/deactivate` | Staff | Disattiva |
 | GET/POST/PUT | `/api/rooms/buildings`, `/api/rooms/equipment` | Staff (scrittura) | Anagrafiche |
 
-**Eventi pubblicati:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated` (+ orari di apertura, vedi incertezza I-3).
+**Eventi pubblicati:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`. `RoomCreated` e `RoomUpdated` trasportano lo snapshot degli orari come lista di `{ DayOfWeek, OpensAt, ClosesAt }`; i giorni senza fascia sono chiusi. Rooms usa l'EF Core Bus Outbox per rendere atomici gli aggiornamenti di database e l'accodamento dei messaggi; all'avvio pubblica una volta gli eventi corrispondenti agli spazi seed.
 
 **Regole**
 - Capienza > 0.
@@ -354,7 +354,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 |---|---|---|
 | I-1 | Granularità delle prenotazioni: libera, a slot di 30 min o di 1 ora? | US-03, US-04, UI |
 | I-2 | Durata massima di una prenotazione e anticipo massimo (es. 14 giorni)? | Nuove invarianti |
-| I-3 | Più fasce di apertura al giorno? Chiusure straordinarie (festività)? | Rooms, INV-3 |
+| I-3 | Più fasce di apertura al giorno? Chiusure straordinarie (festività)? | **Decisione per il primo incremento:** una fascia al giorno; giorni chiusi assenti, chiusure straordinarie fuori ambito. Riaprire con il PO se cambiano i requisiti. |
 | I-4 | È accettabile che una modifica del catalogo si rifletta sulle prenotazioni dopo qualche secondo? | Consistenza eventuale |
 | I-5 | Cosa succede alle prenotazioni future se uno spazio viene disattivato o cambia orario? | US-11: cancellazione automatica, avviso, blocco della modifica? |
 | I-6 | Limite di prenotazioni attive per studente? | Equità d'uso |

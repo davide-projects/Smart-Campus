@@ -1,3 +1,4 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Rooms.Models;
 
@@ -16,9 +17,20 @@ public class RoomsDbContext(DbContextOptions<RoomsDbContext> options) : DbContex
 
     public DbSet<RoomEquipment> RoomEquipment => Set<RoomEquipment>();
 
+    public DbSet<RoomSeedEventDispatch> RoomSeedEventDispatches => Set<RoomSeedEventDispatch>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RoomsDbContext).Assembly);
+        modelBuilder.Entity<RoomSeedEventDispatch>(entity =>
+        {
+            entity.ToTable("RoomSeedEventDispatches");
+            entity.HasKey(dispatch => dispatch.Id);
+            entity.Property(dispatch => dispatch.Id).ValueGeneratedNever();
+        });
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
 
         SeedData.Apply(modelBuilder);
     }

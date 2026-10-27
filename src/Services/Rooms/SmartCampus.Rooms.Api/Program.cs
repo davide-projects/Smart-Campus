@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Rooms.Data;
 using SmartCampus.Rooms.Features.Rooms;
@@ -15,6 +16,34 @@ builder.Services.AddDbContext<RoomsDbContext>((provider, options) =>
     options.UseSqlServer(
         provider.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
         sql => sql.EnableRetryOnFailure()));
+
+var rabbitMqHost = builder.Configuration["RabbitMq:Host"] ?? "localhost";
+var rabbitMqPort = builder.Configuration.GetValue<ushort?>("RabbitMq:Port") ?? 5672;
+var rabbitMqVirtualHost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
+var rabbitMqUsername = builder.Configuration["RabbitMq:Username"] ?? "guest";
+var rabbitMqPassword = builder.Configuration["RabbitMq:Password"] ?? "guest";
+
+builder.Services.AddMassTransit(configure =>
+{
+    configure.AddEntityFrameworkOutbox<RoomsDbContext>(outbox =>
+    {
+        outbox.UseSqlServer();
+        outbox.UseBusOutbox();
+    });
+
+    configure.UsingRabbitMq((context, rabbitMq) =>
+    {
+        rabbitMq.Host(rabbitMqHost, rabbitMqPort, rabbitMqVirtualHost, host =>
+        {
+            host.Username(rabbitMqUsername);
+            host.Password(rabbitMqPassword);
+        });
+
+        rabbitMq.ConfigureEndpoints(context);
+    });
+});
+
+builder.Services.AddScoped<RoomSeedEventPublisher>();
 
 // La readiness include la disponibilità del database, per le probe di orchestrazione.
 builder.Services.AddHealthChecks()
@@ -40,6 +69,9 @@ else
     var db = scope.ServiceProvider.GetRequiredService<RoomsDbContext>();
 
     await db.Database.MigrateAsync();
+    await scope.ServiceProvider
+        .GetRequiredService<RoomSeedEventPublisher>()
+        .PublishOnceAsync(CancellationToken.None);
     app.Logger.LogInformation("Database Rooms allineato con le migrazioni.");
 }
 

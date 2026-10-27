@@ -42,6 +42,11 @@ services:
   rooms:
     build: { context: ., dockerfile: src/Services/Rooms/SmartCampus.Rooms.Api/Dockerfile }
     environment:
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__VirtualHost: /
+      RabbitMq__Username: ${RABBITMQ_USER:?Imposta RABBITMQ_USER nel file .env}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?Imposta RABBITMQ_PASSWORD nel file .env}
       ConnectionStrings__Database: "Server=sqlserver,1433;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Database=SmartCampus_Rooms"
     depends_on:
       sqlserver:
