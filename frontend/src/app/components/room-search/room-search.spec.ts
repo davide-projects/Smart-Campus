@@ -2,8 +2,8 @@ import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
-import { MatInputHarness } from '@angular/material/input/testing';
 import { MatSelectHarness } from '@angular/material/select/testing';
+import { MatSliderHarness } from '@angular/material/slider/testing';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { RoomFilter, RoomSummary } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
@@ -47,8 +47,14 @@ describe('RoomSearch', () => {
     return loader.getHarness(MatSelectHarness.with({ selector: `[formControlName="${control}"]` }));
   }
 
-  function minCapacityInput(): Promise<MatInputHarness> {
-    return loader.getHarness(MatInputHarness.with({ selector: '[formControlName="minCapacity"]' }));
+  async function setMinCapacity(value: number): Promise<void> {
+    const slider = await loader.getHarness(MatSliderHarness);
+    await (await slider.getEndThumb()).setValue(value);
+    await fixture.whenStable();
+  }
+
+  function capacityText(): string {
+    return element.querySelector('.capacity-value')!.textContent!.trim();
   }
 
   async function optionTexts(control: 'type' | 'buildingId'): Promise<string[]> {
@@ -103,17 +109,29 @@ describe('RoomSearch', () => {
     expect(element.querySelector('mat-card-subtitle')!.textContent!.trim()).toBe('Auditorium');
   });
 
-  it('sends all the selected filters when Cerca is pressed', async () => {
+  it('searches as soon as a filter changes, combining all of them', async () => {
     await render();
     search.mockReturnValue(of([ROOMS[1]]));
 
     await (await select('type')).clickOptions({ text: 'Sala studio' });
-    await (await minCapacityInput()).setValue('30');
+    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: null, buildingId: null });
+
+    await setMinCapacity(15);
+    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: 15, buildingId: null });
+
     await (await select('buildingId')).clickOptions({ text: 'Edificio B' });
+    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: 15, buildingId: 'b-b' });
+    expect(cardTitles()).toEqual(['Sala studio B']);
+  });
+
+  it('repeats the search with the current filters when Cerca is pressed', async () => {
+    await render();
+    await setMinCapacity(15);
+    search.mockClear();
+
     await click('Cerca');
 
-    expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: 30, buildingId: 'b-b' });
-    expect(cardTitles()).toEqual(['Sala studio B']);
+    expect(search).toHaveBeenCalledExactlyOnceWith({ type: null, minCapacity: 15, buildingId: null });
   });
 
   it('keeps the filter options when Cerca is pressed during the first load', async () => {
@@ -130,15 +148,36 @@ describe('RoomSearch', () => {
     expect(await optionTexts('buildingId')).toEqual(['Tutti gli edifici', 'Edificio A', 'Edificio B']);
   });
 
-  it('does not search when the minimum capacity is invalid', async () => {
+  it('limits the capacity slider from 0 to the largest room', async () => {
     await render();
-    const callsOnLoad = search.mock.calls.length;
 
-    await (await minCapacityInput()).setValue('0');
-    await click('Cerca');
+    const thumb = await (await loader.getHarness(MatSliderHarness)).getEndThumb();
+    expect(await thumb.getMinValue()).toBe(0);
+    expect(await thumb.getMaxValue()).toBe(40);
+    expect(await thumb.getValue()).toBe(0);
+    expect(capacityText()).toBe('Qualsiasi');
+  });
 
-    expect(search).toHaveBeenCalledTimes(callsOnLoad);
-    expect(element.textContent).toContain('Inserisci un numero intero maggiore di zero.');
+  it('shows the chosen capacity and sends no minimum when it goes back to 0', async () => {
+    await render();
+
+    await setMinCapacity(25);
+    expect(capacityText()).toBe('Almeno 25 posti');
+
+    await setMinCapacity(0);
+    expect(capacityText()).toBe('Qualsiasi');
+    expect(search).toHaveBeenLastCalledWith({ type: null, minCapacity: null, buildingId: null });
+  });
+
+  it('puts the slider back to 0 when the filters are reset', async () => {
+    await render();
+    await setMinCapacity(25);
+
+    await click('Azzera filtri');
+
+    expect(await (await (await loader.getHarness(MatSliderHarness)).getEndThumb()).getValue()).toBe(0);
+    expect(capacityText()).toBe('Qualsiasi');
+    expect(search).toHaveBeenLastCalledWith({});
   });
 
   it('shows the message on zero results and lets the user reset the filters', async () => {

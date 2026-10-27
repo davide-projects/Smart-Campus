@@ -19,6 +19,35 @@
   }
 }
 
+// Lo slider sta su una riga con il valore scelto accanto, alto quanto i campi vicini.
+.capacity {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.capacity-label {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.capacity-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  mat-slider {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.capacity-value {
+  min-width: 9ch;
+  font: var(--mat-sys-body-medium);
+  text-align: right;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
