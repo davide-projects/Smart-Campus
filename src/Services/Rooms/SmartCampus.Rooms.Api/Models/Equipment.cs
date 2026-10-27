@@ -1,4 +1,4 @@
-namespace SmartCampus.Rooms.Domain;
+namespace SmartCampus.Rooms.Models;
 
 // Attrezzatura che può essere presente in più spazi (proiettore, PC, lavagna...).
 public class Equipment

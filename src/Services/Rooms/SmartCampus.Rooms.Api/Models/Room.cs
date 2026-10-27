@@ -1,4 +1,4 @@
-namespace SmartCampus.Rooms.Domain;
+namespace SmartCampus.Rooms.Models;
 
 // Spazio del campus: aula, laboratorio o sala studio.
 // IsActive = false significa dismesso: resta in archivio ma non compare nella ricerca (US-01, US-11).

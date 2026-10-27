@@ -1,4 +1,4 @@
-namespace SmartCampus.Rooms.Domain;
+namespace SmartCampus.Rooms.Models;
 
 // Edificio del campus: raggruppa gli spazi.
 public class Building

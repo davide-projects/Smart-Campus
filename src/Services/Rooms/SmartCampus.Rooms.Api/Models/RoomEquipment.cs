@@ -1,4 +1,4 @@
-namespace SmartCampus.Rooms.Domain;
+namespace SmartCampus.Rooms.Models;
 
 // Relazione molti-a-molti tra spazi e attrezzature.
 // Esplicita perché serve anche per il seed e per configurare i vincoli di cancellazione.

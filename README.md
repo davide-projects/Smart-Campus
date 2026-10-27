@@ -65,14 +65,26 @@ dotnet run --project src/Gateway/SmartCampus.Gateway
 cd frontend && npm install && npm start
 ```
 
-Le connection string locali vanno negli **user-secrets**, non in `appsettings.json`:
+Ogni servizio usa un database dedicato, anche quando i database risiedono sulla stessa istanza SQL Server. Per lo sviluppo locale, configura la connection string negli **user-secrets del singolo progetto**: tutti usano la chiave `ConnectionStrings:Database`, ma ciascuno punta al proprio database. Non inserire credenziali in `appsettings.json` e non committarle.
+
+Per SQL Server locale avviato con Docker Compose (`localhost,1433`, utente `sa`), inizializza gli user-secrets una volta per ogni progetto e imposta la relativa connection string. Sostituisci `<password>` con la password locale di SQL Server e aggiorna server o utente se il tuo ambiente è diverso. I nomi database qui sotto sono distinti intenzionalmente:
 
 ```bash
+dotnet user-secrets init --project src/Services/Identity/SmartCampus.Identity.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Identity" --project src/Services/Identity/SmartCampus.Identity.Api
+
 dotnet user-secrets init --project src/Services/Rooms/SmartCampus.Rooms.Api
-dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<la tua>;TrustServerCertificate=True;Database=SmartCampus_Rooms" --project src/Services/Rooms/SmartCampus.Rooms.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Rooms" --project src/Services/Rooms/SmartCampus.Rooms.Api
+
+dotnet user-secrets init --project src/Services/Bookings/SmartCampus.Bookings.Api
+dotnet user-secrets set "ConnectionStrings:Database" "Server=localhost,1433;User Id=sa;Password=<password>;TrustServerCertificate=True;Database=SmartCampus_Bookings" --project src/Services/Bookings/SmartCampus.Bookings.Api
 ```
 
-Ogni servizio applica le migrazioni EF Core all'avvio. Per crearne una nuova dopo aver modificato il modello:
+Gli user-secrets sono separati per progetto: se lavori su più servizi, esegui i comandi per ognuno. In Docker Compose gli host dei database sono `sqlserver` e le tre connection string con database distinti sono già configurate in `docker-compose.yml`; per avviare lo stack completo imposta in `.env` le credenziali locali richieste da `.env.example`. La password `MSSQL_SA_PASSWORD` deve avere almeno 8 caratteri e includere almeno 3 categorie tra lettere maiuscole, minuscole, numeri e simboli, altrimenti SQL Server si arresta durante l'inizializzazione. Compose controlla che SQL Server accetti una query prima di avviare Identity, Rooms e Bookings.
+
+Attualmente Rooms legge `ConnectionStrings:Database` e applica le migrazioni EF Core all'avvio. Identity e Bookings useranno la stessa chiave quando verrà implementata la loro persistenza.
+
+Rooms applica le migrazioni EF Core all'avvio. Per crearne una nuova dopo aver modificato il modello:
 
 ```bash
 dotnet tool restore

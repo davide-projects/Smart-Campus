@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SmartCampus.Rooms.Domain;
+using SmartCampus.Rooms.Models;
 
 namespace SmartCampus.Rooms.Data.Configurations;
 

@@ -1,4 +1,4 @@
-namespace SmartCampus.Rooms.Domain;
+namespace SmartCampus.Rooms.Models;
 
 // Fascia di apertura di uno spazio in un giorno della settimana.
 // Lo spazio è prenotabile solo dentro queste fasce (lo verificherà Bookings).

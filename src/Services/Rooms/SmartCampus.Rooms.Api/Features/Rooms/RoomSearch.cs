@@ -1,4 +1,4 @@
-using SmartCampus.Rooms.Domain;
+using SmartCampus.Rooms.Models;
 
 namespace SmartCampus.Rooms.Features.Rooms;
 

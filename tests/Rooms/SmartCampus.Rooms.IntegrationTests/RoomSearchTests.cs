@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using SmartCampus.Rooms.Domain;
+using SmartCampus.Rooms.Models;
 using SmartCampus.Rooms.Features.Rooms;
 
 namespace SmartCampus.Rooms.IntegrationTests;

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using SmartCampus.Rooms.Domain;
+using SmartCampus.Rooms.Models;
 
 namespace SmartCampus.Rooms.Data;
 
