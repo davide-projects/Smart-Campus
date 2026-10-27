@@ -31,9 +31,11 @@ public sealed class RoomManagementTests(RoomsApiFixture fixture) : IClassFixture
     {
         var createdEvents = Channel.CreateUnbounded<RoomCreated>();
         var updatedEvents = Channel.CreateUnbounded<RoomUpdated>();
+        var deactivatedEvents = Channel.CreateUnbounded<RoomDeactivated>();
         var receiverServices = new ServiceCollection();
         receiverServices.AddSingleton(createdEvents);
         receiverServices.AddSingleton(updatedEvents);
+        receiverServices.AddSingleton(deactivatedEvents);
         receiverServices.AddMassTransit(configure =>
         {
             configure.AddConsumer<CapturingRoomEventsConsumer>();
@@ -183,24 +185,5 @@ public sealed class RoomManagementTests(RoomsApiFixture fixture) : IClassFixture
                 return message;
             }
         }
-    }
-}
-
-internal sealed class CapturingRoomEventsConsumer(
-    Channel<RoomCreated> createdEvents,
-    Channel<RoomUpdated> updatedEvents) :
-    IConsumer<RoomCreated>,
-    IConsumer<RoomUpdated>
-{
-    public Task Consume(ConsumeContext<RoomCreated> context)
-    {
-        createdEvents.Writer.TryWrite(context.Message);
-        return Task.CompletedTask;
-    }
-
-    public Task Consume(ConsumeContext<RoomUpdated> context)
-    {
-        updatedEvents.Writer.TryWrite(context.Message);
-        return Task.CompletedTask;
     }
 }
