@@ -24,6 +24,9 @@
     <Project Path="tests/Rooms/SmartCampus.Rooms.IntegrationTests/SmartCampus.Rooms.IntegrationTests.csproj" />
     <Project Path="tests/Rooms/SmartCampus.Rooms.UnitTests/SmartCampus.Rooms.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/tests/Gateway/">
+    <Project Path="tests/Gateway/SmartCampus.Gateway.IntegrationTests/SmartCampus.Gateway.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/tests/Identity/">
     <Project Path="tests/Identity/SmartCampus.Identity.IntegrationTests/SmartCampus.Identity.IntegrationTests.csproj" />
     <Project Path="tests/Identity/SmartCampus.Identity.UnitTests/SmartCampus.Identity.UnitTests.csproj" />

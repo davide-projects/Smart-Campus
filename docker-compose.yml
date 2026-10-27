@@ -66,6 +66,7 @@ services:
       ReverseProxy__Clusters__rooms__Destinations__d1__Address: http://rooms:8080
       ReverseProxy__Clusters__bookings__Destinations__d1__Address: http://bookings:8080
       Cors__AllowedOrigins__0: http://localhost:4200
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Imposta JWT_SIGNING_KEY nel file .env}
     ports:
       - "5000:8080"
     depends_on: [identity, rooms, bookings]
