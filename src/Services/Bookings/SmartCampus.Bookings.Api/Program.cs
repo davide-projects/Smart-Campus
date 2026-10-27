@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.ServiceDefaults;
+using MassTransit;
+using SmartCampus.Bookings.Api.Consumers;
 
 // Servizio Bookings: chi userà quale spazio e quando, e se lo ha usato davvero. Prenotazioni singole e di gruppo senza conflitti, disponibilità, check-in, mancate presentazioni e report.
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +19,32 @@ builder.Services.AddDbContext<BookingDbContext>((provider, options) =>
 // /health/ready resta "unhealthy" finché il database non risponde.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<BookingDbContext>("database");
+
+// Messaggistica: in locale RabbitMQ, in cloud si sostituirà con Azure Service Bus cambiando solo il trasporto.
+builder.Services.AddMassTransit(bus =>
+{
+    // Registra i consumer: MassTransit crea una coda per ognuno e ci collega gli eventi che gestisce.
+    bus.AddConsumer<RoomEventsConsumer>();
+
+    // Nomi delle code leggibili, es. "room-events" per RoomEventsConsumer.
+    bus.SetKebabCaseEndpointNameFormatter();
+
+    bus.UsingRabbitMq((context, rabbit) =>
+    {
+        var config = context.GetRequiredService<IConfiguration>();
+
+        rabbit.Host(config["RabbitMq:Host"] ?? "localhost", "/", host =>
+        {
+            host.Username(config["RabbitMq:Username"] ?? "guest");
+            host.Password(config["RabbitMq:Password"] ?? "guest");
+        });
+
+        // Se il database è giù per un attimo, riprova prima di considerare il messaggio fallito.
+        rabbit.UseMessageRetry(retry => retry.Intervals(100, 500, 1000, 5000));
+
+        rabbit.ConfigureEndpoints(context);
+    });
+});
 
 var app = builder.Build();
 
