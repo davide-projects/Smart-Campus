@@ -56,15 +56,19 @@ public sealed class GatewayRoomsFixture : IAsyncLifetime
             disposeHandler: false);
 
         _gatewayFactory = new WebApplicationFactory<Gateway::Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.ConfigureServices(services =>
-                {
-                    services.RemoveAll<IForwarderHttpClientFactory>();
-                    services.AddSingleton<IForwarderHttpClientFactory>(
-                        new RoomsForwarderHttpClientFactory(roomsInvoker));
-                });
-            });
+    .WithWebHostBuilder(builder =>
+    {
+        // Il Gateway non parte senza una chiave JWT valida (almeno 32 byte): qui basta una chiave di prova.
+        // Questi test usano solo il catalogo, che è anonimo, quindi la chiave non firma nessun token.
+        builder.UseSetting("Jwt:SigningKey", "chiave-di-test-e2e-almeno-32-byte-0123456789");
+
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IForwarderHttpClientFactory>();
+            services.AddSingleton<IForwarderHttpClientFactory>(
+                new RoomsForwarderHttpClientFactory(roomsInvoker));
+        });
+    });
 
         Client = _gatewayFactory.CreateClient(new WebApplicationFactoryClientOptions
         {
