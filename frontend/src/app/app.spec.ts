@@ -17,7 +17,7 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('mostra navbar e footer attorno al contenuto', async () => {
+  it('renders navbar and footer around the content', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;

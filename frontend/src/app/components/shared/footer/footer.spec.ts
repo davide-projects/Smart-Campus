@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Footer } from './footer';
 
 describe('Footer', () => {
-  it('mostra anno corrente, nome dell\'app e progetto', async () => {
+  it('shows the current year, app name and project', async () => {
     await TestBed.configureTestingModule({ imports: [Footer] }).compileComponents();
     const fixture = TestBed.createComponent(Footer);
     await fixture.whenStable();

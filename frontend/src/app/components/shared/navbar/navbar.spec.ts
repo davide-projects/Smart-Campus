@@ -10,7 +10,7 @@ describe('Navbar', () => {
     }).compileComponents();
   });
 
-  it('mostra il nome dell\'app e il link alla ricerca degli spazi', async () => {
+  it('shows the app name and the link to the room search', async () => {
     const fixture = TestBed.createComponent(Navbar);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
@@ -21,7 +21,7 @@ describe('Navbar', () => {
     expect(link.getAttribute('href')).toBe('/rooms');
   });
 
-  it('ha il pulsante del menu per mobile', async () => {
+  it('has the menu button for mobile', async () => {
     const fixture = TestBed.createComponent(Navbar);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
