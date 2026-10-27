@@ -2,6 +2,10 @@
   max-width: 1100px;
   margin: 0 auto;
   padding: 16px;
+
+  h1 {
+    font: var(--mat-sys-headline-small);
+  }
 }
 
 // Su mobile i filtri stanno uno sotto l'altro, da tablet in su si affiancano.
@@ -57,4 +61,14 @@ dt {
 
 dd {
   margin: 0;
+}
+
+.not-bookable {
+  display: inline-block;
+  margin: 12px 0 0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
 }

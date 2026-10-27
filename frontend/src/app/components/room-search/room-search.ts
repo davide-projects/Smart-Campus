@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -34,6 +34,7 @@ type SearchResult = { rooms: RoomSummary[] } | { error: true };
 })
 export class RoomSearch {
   private readonly roomsService = inject(RoomsService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly searches = new Subject<RoomFilter>();
 
   protected readonly typeLabel = roomTypeLabel;
@@ -54,6 +55,8 @@ export class RoomSearch {
   protected readonly loadFailed = signal(false);
 
   constructor() {
+    this.loadFilterOptions();
+
     this.searches
       .pipe(
         tap(() => {
@@ -65,14 +68,6 @@ export class RoomSearch {
           this.roomsService.search(filter).pipe(
             map((rooms): SearchResult => ({ rooms })),
             catchError(() => of<SearchResult>({ error: true })),
-            tap((result) => {
-              // Senza filtri arrivano tutti gli spazi attivi: da lì si ricavano i tipi e gli edifici
-              // dei filtri, così un tipo o un edificio nuovo compare senza modificare il frontend.
-              if ('rooms' in result && isEmptyFilter(filter)) {
-                this.types.set(typesOf(result.rooms));
-                this.buildings.set(buildingsOf(result.rooms));
-              }
-            }),
           ),
         ),
         takeUntilDestroyed(),
@@ -102,12 +97,28 @@ export class RoomSearch {
 
   protected resetFilters(): void {
     this.filters.reset();
+    // Se il primo caricamento dei filtri non era riuscito, è l'occasione per riprovare.
+    if (this.types().length === 0) {
+      this.loadFilterOptions();
+    }
     this.searches.next({});
   }
-}
 
-function isEmptyFilter(filter: RoomFilter): boolean {
-  return !filter.type && filter.minCapacity == null && !filter.buildingId;
+  // Tipi ed edifici dei filtri si ricavano da tutti gli spazi attivi, così un tipo o un edificio
+  // nuovo compare senza modificare il frontend. È una richiesta separata dalla ricerca:
+  // premere «Cerca» durante il primo caricamento non la annulla.
+  private loadFilterOptions(): void {
+    this.roomsService
+      .search()
+      .pipe(
+        catchError(() => of<RoomSummary[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rooms) => {
+        this.types.set(typesOf(rooms));
+        this.buildings.set(buildingsOf(rooms));
+      });
+  }
 }
 
 function typesOf(rooms: RoomSummary[]): RoomType[] {

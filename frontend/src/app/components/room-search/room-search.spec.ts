@@ -1,5 +1,10 @@
+import { HarnessLoader } from '@angular/cdk/testing';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Observable, of, throwError } from 'rxjs';
+import { MatButtonHarness } from '@angular/material/button/testing';
+import { MatInputHarness } from '@angular/material/input/testing';
+import { MatSelectHarness } from '@angular/material/select/testing';
+import { Observable, Subject, of, throwError } from 'rxjs';
 import { RoomFilter, RoomSummary } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
 import { RoomSearch } from './room-search';
@@ -12,13 +17,14 @@ const ROOMS: RoomSummary[] = [
   },
   {
     id: 'r2', name: 'Sala studio B', type: 'StudyRoom', capacity: 20, floor: 1,
-    isBookable: true, buildingId: 'b-b', buildingName: 'Edificio B',
+    isBookable: false, buildingId: 'b-b', buildingName: 'Edificio B',
   },
 ];
 
 describe('RoomSearch', () => {
   let fixture: ComponentFixture<RoomSearch>;
   let element: HTMLElement;
+  let loader: HarnessLoader;
   let search: ReturnType<typeof vi.fn<(filter?: RoomFilter) => Observable<RoomSummary[]>>>;
 
   async function render(): Promise<void> {
@@ -29,6 +35,7 @@ describe('RoomSearch', () => {
 
     fixture = TestBed.createComponent(RoomSearch);
     element = fixture.nativeElement;
+    loader = TestbedHarnessEnvironment.loader(fixture);
     await fixture.whenStable();
   }
 
@@ -36,8 +43,26 @@ describe('RoomSearch', () => {
     return [...element.querySelectorAll('mat-card-title')].map((e) => e.textContent!.trim());
   }
 
-  function buttonWithText(text: string): HTMLButtonElement {
-    return [...element.querySelectorAll('button')].find((b) => b.textContent!.trim() === text)!;
+  function select(control: 'type' | 'buildingId'): Promise<MatSelectHarness> {
+    return loader.getHarness(MatSelectHarness.with({ selector: `[formControlName="${control}"]` }));
+  }
+
+  function minCapacityInput(): Promise<MatInputHarness> {
+    return loader.getHarness(MatInputHarness.with({ selector: '[formControlName="minCapacity"]' }));
+  }
+
+  async function optionTexts(control: 'type' | 'buildingId'): Promise<string[]> {
+    const harness = await select(control);
+    await harness.open();
+    const texts = await Promise.all((await harness.getOptions()).map((option) => option.getText()));
+    await harness.close();
+    return texts;
+  }
+
+  async function click(text: string): Promise<void> {
+    const buttons = await loader.getAllHarnesses(MatButtonHarness.with({ text }));
+    await buttons[0].click();
+    await fixture.whenStable();
   }
 
   beforeEach(() => {
@@ -55,48 +80,64 @@ describe('RoomSearch', () => {
     expect(card).toContain('40 posti');
   });
 
-  it('derives the filter types and buildings from the unfiltered search', async () => {
+  it('marks only the rooms that cannot be booked', async () => {
     await render();
 
-    const component = fixture.componentInstance as unknown as RoomSearchInternals;
-    expect(component.types()).toEqual(['Classroom', 'StudyRoom']);
-    expect(component.buildings()).toEqual([
-      { id: 'b-a', name: 'Edificio A' },
-      { id: 'b-b', name: 'Edificio B' },
-    ]);
+    const cards = [...element.querySelectorAll('mat-card')].map((card) => card.textContent!);
+    expect(cards[0]).not.toContain('Non prenotabile');
+    expect(cards[1]).toContain('Non prenotabile');
+  });
+
+  it('offers the types and buildings of the existing rooms in the filters', async () => {
+    await render();
+
+    expect(await optionTexts('type')).toEqual(['Tutti i tipi', 'Aula', 'Sala studio']);
+    expect(await optionTexts('buildingId')).toEqual(['Tutti gli edifici', 'Edificio A', 'Edificio B']);
   });
 
   it('shows the backend value for a new type without a label', async () => {
     search.mockReturnValue(of([{ ...ROOMS[0], id: 'r3', name: 'Aula Magna', type: 'Auditorium' }]));
     await render();
 
-    const component = fixture.componentInstance as unknown as RoomSearchInternals;
-    expect(component.types()).toEqual(['Auditorium']);
+    expect(await optionTexts('type')).toEqual(['Tutti i tipi', 'Auditorium']);
     expect(element.querySelector('mat-card-subtitle')!.textContent!.trim()).toBe('Auditorium');
   });
 
   it('sends all the selected filters when Cerca is pressed', async () => {
     await render();
-    const component = fixture.componentInstance as unknown as RoomSearchInternals;
     search.mockReturnValue(of([ROOMS[1]]));
 
-    component.filters.setValue({ type: 'StudyRoom', minCapacity: 30, buildingId: 'b-b' });
-    buttonWithText('Cerca').click();
-    await fixture.whenStable();
+    await (await select('type')).clickOptions({ text: 'Sala studio' });
+    await (await minCapacityInput()).setValue('30');
+    await (await select('buildingId')).clickOptions({ text: 'Edificio B' });
+    await click('Cerca');
 
     expect(search).toHaveBeenLastCalledWith({ type: 'StudyRoom', minCapacity: 30, buildingId: 'b-b' });
     expect(cardTitles()).toEqual(['Sala studio B']);
   });
 
+  it('keeps the filter options when Cerca is pressed during the first load', async () => {
+    // Prima chiamata: valori dei filtri; seconda: ricerca iniziale, ancora senza risposta.
+    const firstSearch = new Subject<RoomSummary[]>();
+    search.mockReturnValueOnce(of(ROOMS)).mockReturnValueOnce(firstSearch);
+    await render();
+
+    await (await select('type')).clickOptions({ text: 'Aula' });
+    await click('Cerca');
+
+    expect(firstSearch.observed).toBe(false);
+    expect(cardTitles()).toEqual(['Aula A1', 'Sala studio B']);
+    expect(await optionTexts('buildingId')).toEqual(['Tutti gli edifici', 'Edificio A', 'Edificio B']);
+  });
+
   it('does not search when the minimum capacity is invalid', async () => {
     await render();
-    const component = fixture.componentInstance as unknown as RoomSearchInternals;
+    const callsOnLoad = search.mock.calls.length;
 
-    component.filters.controls.minCapacity.setValue(0);
-    buttonWithText('Cerca').click();
-    await fixture.whenStable();
+    await (await minCapacityInput()).setValue('0');
+    await click('Cerca');
 
-    expect(search).toHaveBeenCalledTimes(1);
+    expect(search).toHaveBeenCalledTimes(callsOnLoad);
     expect(element.textContent).toContain('Inserisci un numero intero maggiore di zero.');
   });
 
@@ -108,8 +149,7 @@ describe('RoomSearch', () => {
     expect(element.querySelector('mat-card')).toBeNull();
 
     search.mockReturnValue(of(ROOMS));
-    buttonWithText('Azzera filtri').click();
-    await fixture.whenStable();
+    await click('Azzera filtri');
 
     expect(search).toHaveBeenLastCalledWith({});
     expect(cardTitles()).toEqual(['Aula A1', 'Sala studio B']);
@@ -124,9 +164,3 @@ describe('RoomSearch', () => {
     );
   });
 });
-
-interface RoomSearchInternals {
-  filters: RoomSearch['filters'];
-  types: () => string[];
-  buildings: () => unknown;
-}

@@ -1,5 +1,5 @@
 <section class="room-search">
-  <h2>Cerca uno spazio</h2>
+  <h1>Cerca uno spazio</h1>
 
   <form class="filters" [formGroup]="filters" (ngSubmit)="search()">
     <mat-form-field appearance="outline">
@@ -63,6 +63,9 @@
                 <dt>Capienza</dt>
                 <dd>{{ room.capacity }} posti</dd>
               </dl>
+              @if (!room.isBookable) {
+                <p class="not-bookable">Non prenotabile</p>
+              }
             </mat-card-content>
           </mat-card>
         </li>
