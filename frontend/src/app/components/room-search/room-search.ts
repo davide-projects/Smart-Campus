@@ -59,8 +59,9 @@ export class RoomSearch {
 
   protected readonly filters = new FormGroup({
     type: new FormControl<RoomType | null>(null),
-    // 0 vuol dire nessuna capienza minima.
+    // 0 vuol dire nessuna capienza minima/massima.
     minCapacity: new FormControl(0, { nonNullable: true }),
+    maxCapacity: new FormControl(0, { nonNullable: true }),
     buildingId: new FormControl<string | null>(null),
   });
 
@@ -76,7 +77,23 @@ export class RoomSearch {
   private readonly minCapacity = toSignal(this.filters.controls.minCapacity.valueChanges, {
     initialValue: 0,
   });
-  protected readonly capacityText = computed(() => capacityLabel(this.minCapacity()));
+  private readonly maxCapacityFilter = toSignal(this.filters.controls.maxCapacity.valueChanges, {
+    initialValue: 0,
+  });
+  protected readonly capacityText = computed(() => {
+    const min = this.minCapacity();
+    const max = this.maxCapacityFilter();
+    if (min <= 0 && (max <= 0 || max >= this.maxCapacity())) {
+      return 'Qualsiasi';
+    }
+    if (min > 0 && max > 0 && max < this.maxCapacity()) {
+      return `Da ${min} a ${max} posti`;
+    }
+    if (min > 0) {
+      return min === 1 ? 'Almeno 1 posto' : `Almeno ${min} posti`;
+    }
+    return `Fino a ${max} posti`;
+  });
   // Lo slider usa lo stesso testo anche per i lettori di schermo (aria-valuetext).
   protected readonly capacityLabel = capacityLabel;
 
@@ -132,8 +149,14 @@ export class RoomSearch {
 
   // Parte quando cambia un menu, quando si ferma lo slider e con «Cerca».
   protected search(): void {
-    const { type, minCapacity, buildingId } = this.filters.getRawValue();
-    this.searches.next({ type, minCapacity: minCapacity > 0 ? minCapacity : null, buildingId });
+    const { type, minCapacity, maxCapacity, buildingId } = this.filters.getRawValue();
+    const max = this.maxCapacity();
+    this.searches.next({
+      type,
+      minCapacity: minCapacity > 0 ? minCapacity : null,
+      maxCapacity: maxCapacity > 0 && maxCapacity < max ? maxCapacity : null,
+      buildingId,
+    });
   }
 
   protected resetFilters(): void {

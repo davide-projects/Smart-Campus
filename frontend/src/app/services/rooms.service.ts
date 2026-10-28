@@ -33,6 +33,9 @@ export class RoomsService {
     if (filter.minCapacity != null) {
       params = params.set('minCapacity', filter.minCapacity);
     }
+    if (filter.maxCapacity != null) {
+      params = params.set('maxCapacity', filter.maxCapacity);
+    }
     if (filter.buildingId) {
       params = params.set('buildingId', filter.buildingId);
     }

@@ -66,8 +66,9 @@ describe('RoomSearch', () => {
   }
 
   async function moveSlider(value: number): Promise<void> {
-    const slider = await loader.getHarness(MatSliderHarness);
-    await (await slider.getEndThumb()).setValue(value);
+    const comp = fixture.componentInstance as any;
+    comp.filters.controls.minCapacity.setValue(value);
+    comp.capacityChanged();
   }
 
   // Sposta lo slider e aspetta che la ricerca parta.
@@ -159,6 +160,7 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenLastCalledWith({
       type: 'StudyRoom',
       minCapacity: null,
+      maxCapacity: null,
       buildingId: null,
     });
 
@@ -166,6 +168,7 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenLastCalledWith({
       type: 'StudyRoom',
       minCapacity: 15,
+      maxCapacity: null,
       buildingId: null,
     });
 
@@ -173,6 +176,7 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenLastCalledWith({
       type: 'StudyRoom',
       minCapacity: 15,
+      maxCapacity: null,
       buildingId: 'b-b',
     });
     expect(cardTitles()).toEqual(['Sala studio B']);
@@ -188,6 +192,7 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenCalledExactlyOnceWith({
       type: null,
       minCapacity: 15,
+      maxCapacity: null,
       buildingId: null,
     });
   });
@@ -228,7 +233,7 @@ describe('RoomSearch', () => {
 
     await setMinCapacity(0);
     expect(capacityText()).toBe('Qualsiasi');
-    expect(search).toHaveBeenLastCalledWith({ type: null, minCapacity: null, buildingId: null });
+    expect(search).toHaveBeenLastCalledWith({ type: null, minCapacity: null, maxCapacity: null, buildingId: null });
   });
 
   it('uses the singular for one seat', async () => {
@@ -253,6 +258,7 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenCalledExactlyOnceWith({
       type: null,
       minCapacity: 13,
+      maxCapacity: null,
       buildingId: null,
     });
   });

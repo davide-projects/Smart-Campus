@@ -23,12 +23,18 @@
     </mat-form-field>
 
     <div class="capacity">
-      <span class="capacity-label" id="capacity-label">Capienza minima</span>
+      <span class="capacity-label" id="capacity-label">Capienza (range)</span>
       <div class="capacity-control">
         <mat-slider min="0" [max]="maxCapacity()" step="1" [displayWith]="capacityLabel">
           <input
-            matSliderThumb
+            matSliderStartThumb
             formControlName="minCapacity"
+            aria-labelledby="capacity-label"
+            (change)="capacityChanged()"
+          />
+          <input
+            matSliderEndThumb
+            formControlName="maxCapacity"
             aria-labelledby="capacity-label"
             (change)="capacityChanged()"
           />

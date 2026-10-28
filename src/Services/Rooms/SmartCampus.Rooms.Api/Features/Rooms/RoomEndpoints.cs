@@ -368,6 +368,7 @@ public static class RoomEndpoints
     private static async Task<IResult> SearchAsync(
         [FromQuery] RoomType? type,
         [FromQuery] int? minCapacity,
+        [FromQuery] int? maxCapacity,
         [FromQuery] Guid? buildingId,
         [FromQuery] Guid[]? equipmentIds,
         RoomsDbContext db,
@@ -404,7 +405,7 @@ public static class RoomEndpoints
 
         var rooms = await RoomSearch
             .ApplyEquipmentFilter(
-                RoomSearch.Apply(db.Rooms.AsNoTracking(), new RoomFilter(type, minCapacity, buildingId)),
+                RoomSearch.Apply(db.Rooms.AsNoTracking(), new RoomFilter(type, minCapacity, maxCapacity, buildingId)),
                 matchingRoomIds?.ToArray())
             .OrderBy(room => room.Building.Name)
             .ThenBy(room => room.Name)

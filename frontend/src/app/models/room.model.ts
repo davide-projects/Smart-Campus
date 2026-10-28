@@ -35,6 +35,7 @@ export interface RoomSummary {
 export interface RoomFilter {
   type?: RoomType | null;
   minCapacity?: number | null;
+  maxCapacity?: number | null;
   buildingId?: string | null;
 }
 
