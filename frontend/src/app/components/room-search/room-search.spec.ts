@@ -1,6 +1,7 @@
 import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { MatButtonToggleHarness } from '@angular/material/button-toggle/testing';
 import { MatSelectHarness } from '@angular/material/select/testing';
@@ -44,7 +45,10 @@ describe('RoomSearch', () => {
   async function render(): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [RoomSearch],
-      providers: [{ provide: RoomsService, useValue: { search } }],
+      providers: [
+        provideRouter([]),
+        { provide: RoomsService, useValue: { search } },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(RoomSearch);

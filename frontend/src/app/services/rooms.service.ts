@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { RoomFilter, RoomSummary } from '../models/room.model';
+import { RoomDetail, RoomFilter, RoomSummary } from '../models/room.model';
 
 // Accesso al servizio Rooms attraverso il gateway.
 @Injectable({ providedIn: 'root' })
@@ -23,5 +23,10 @@ export class RoomsService {
     }
 
     return this.http.get<RoomSummary[]>('/api/rooms', { params });
+  }
+
+  // Recupera il dettaglio di uno spazio tramite il suo identificativo.
+  getRoomById(id: string): Observable<RoomDetail> {
+    return this.http.get<RoomDetail>(`/api/rooms/${id}`);
   }
 }

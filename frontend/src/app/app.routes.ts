@@ -12,4 +12,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./components/room-search/room-search').then((m) => m.RoomSearch),
   },
+  {
+    path: 'rooms/:id',
+    title: 'Dettaglio spazio',
+    loadComponent: () =>
+      import('./components/room-detail/room-detail').then((m) => m.RoomDetail),
+  },
 ];

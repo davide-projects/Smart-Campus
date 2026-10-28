@@ -10,6 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
 import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
@@ -40,6 +41,7 @@ type SearchResult = { rooms: RoomSummary[] } | { error: true };
     MatSliderModule,
     MatTableModule,
     ReactiveFormsModule,
+    RouterLink,
   ],
   selector: 'app-room-search',
   styleUrl: './room-search.scss',
