@@ -205,7 +205,6 @@ describe('RoomDetail', () => {
     );
   });
 
-<<<<<<< HEAD
   // Il personale può aprire il modulo di modifica, gli altri no.
   it('dovrebbe mostrare il pulsante Modifica solo al personale', () => {
     isStaff.set(true);
@@ -225,7 +224,8 @@ describe('RoomDetail', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('a[href="/staff/rooms/room-1/edit"]')).toBeNull();
-=======
+  });
+
   // US-04: «Prenota spazio» apre la pagina di prenotazione dello spazio prenotabile.
   it('dovrebbe collegare «Prenota spazio» alla pagina di prenotazione dello spazio', async () => {
     fixture = TestBed.createComponent(RoomDetail);
@@ -257,7 +257,6 @@ describe('RoomDetail', () => {
       await loader.getHarnessOrNull(MatButtonHarness.with({ text: /Prenota spazio/ })),
     ).toBeNull();
     expect((fixture.nativeElement as HTMLElement).querySelector('a[href$="/book"]')).toBeNull();
->>>>>>> 533377b (feat(frontend): aggiunge la pagina di prenotazione di uno spazio (#15))
   });
 
   // Test 7: Criteri 2, 3 e 4 - Fasce libere, occupate e privacy

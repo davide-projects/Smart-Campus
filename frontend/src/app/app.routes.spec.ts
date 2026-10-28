@@ -77,7 +77,6 @@ describe('app routes', () => {
     expect(TestBed.inject(Title).getTitle()).toBe('Le mie prenotazioni · SmartCampus');
   });
 
-<<<<<<< HEAD
   it('sends a guest from the new room form to the login, remembering the page', async () => {
     await router.navigateByUrl('/staff/rooms/new');
 
@@ -105,7 +104,8 @@ describe('app routes', () => {
     await router.navigateByUrl('/staff/rooms/room-1/edit');
     expect(router.url).toBe('/staff/rooms/room-1/edit');
     expect(TestBed.inject(Title).getTitle()).toBe('Modifica spazio · SmartCampus');
-=======
+  });
+
   it('sends a guest from the booking page to the login, remembering the page', async () => {
     await router.navigateByUrl('/rooms/r1/book');
 
@@ -119,6 +119,5 @@ describe('app routes', () => {
 
     expect(router.url).toBe('/rooms/r1/book');
     expect(TestBed.inject(Title).getTitle()).toBe('Prenota spazio · SmartCampus');
->>>>>>> 533377b (feat(frontend): aggiunge la pagina di prenotazione di uno spazio (#15))
   });
 });
