@@ -25,6 +25,31 @@
   }
 }
 
+// Su mobile il pulsante dell'account mostra solo l'icona.
+.user-name {
+  display: none;
+
+  @media (min-width: 720px) {
+    display: inline;
+  }
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.user-info-name {
+  font: var(--mat-sys-title-small);
+}
+
+.user-info-role {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
 .menu-toggle {
   @media (min-width: 720px) {
     display: none;

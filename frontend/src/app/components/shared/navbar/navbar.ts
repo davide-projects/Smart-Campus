@@ -1,13 +1,30 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
+import { UserProfile, roleLabel } from '../../../models/user.model';
+import { AuthService } from '../../../services/auth.service';
 
-interface NavLink {
+// access: "user" se la pagina richiede il login, "staff" se è riservata al personale.
+export interface NavLink {
   path: string;
   label: string;
+  access?: 'user' | 'staff';
+}
+
+// Voci di navigazione: per una nuova pagina basta aggiungerla qui.
+const LINKS: NavLink[] = [{ path: '/rooms', label: 'Cerca spazi' }];
+
+// Ognuno vede solo le voci delle pagine che può aprire.
+export function visibleLinks(links: NavLink[], user: UserProfile | null): NavLink[] {
+  return links.filter(
+    (link) =>
+      !link.access || (user !== null && (link.access === 'user' || user.role === 'Staff')),
+  );
 }
 
 @Component({
@@ -17,6 +34,23 @@ interface NavLink {
   templateUrl: './navbar.html',
 })
 export class Navbar {
-  // Voci di navigazione: per una nuova pagina basta aggiungerla qui.
-  protected readonly links: NavLink[] = [{ path: '/rooms', label: 'Cerca spazi' }];
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      map((event) => event.urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
+
+  protected readonly user = this.auth.user;
+  // Sulla pagina di login il pulsante «Accedi» non serve.
+  protected readonly onLoginPage = computed(() => this.url().startsWith('/login'));
+  protected readonly links = computed(() => visibleLinks(LINKS, this.user()));
+  protected readonly roleLabel = roleLabel;
+
+  protected logout(): void {
+    this.auth.logout();
+  }
 }
