@@ -63,4 +63,9 @@ export class RoomsService {
   update(id: string, request: RoomWriteRequest): Observable<void> {
     return this.http.put<void>(`/api/rooms/${id}`, request);
   }
+
+  // Dismette uno spazio attivo (solo personale): esce dalla ricerca e non è più prenotabile.
+  deactivate(id: string): Observable<void> {
+    return this.http.post<void>(`/api/rooms/${id}/deactivate`, null);
+  }
 }

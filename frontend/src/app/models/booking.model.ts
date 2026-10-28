@@ -42,6 +42,12 @@ export interface ReservationResponse {
   status: ReservationStatus;
 }
 
+// Risposta di GET /api/bookings/rooms/{id}/future-reservations-count (solo personale).
+export interface FutureReservationsCountResponse {
+  roomId: string;
+  count: number;
+}
+
 // Giorno e orario si mostrano sempre nell'ora del campus, qualunque sia il fuso del dispositivo.
 const CAMPUS_TIME_ZONE = 'Europe/Rome';
 

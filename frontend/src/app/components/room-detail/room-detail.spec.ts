@@ -3,6 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { Component } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -55,8 +57,10 @@ const mockClosedAvailability: DailyAvailability = {
 describe('RoomDetail', () => {
   let component: RoomDetail;
   let fixture: ComponentFixture<RoomDetail>;
-  let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn> };
+  let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn>; deactivate: ReturnType<typeof vi.fn> };
   let mockBookingsService: { getDailyAvailability: ReturnType<typeof vi.fn> };
+  let mockDialog: { open: ReturnType<typeof vi.fn>; afterClosedResult: unknown };
+  let mockSnackBar: { open: ReturnType<typeof vi.fn> };
   let currentParamId: string | null = 'room-1';
   const isStaff = signal(false);
   const isLoggedIn = signal(true);
@@ -67,7 +71,13 @@ describe('RoomDetail', () => {
     isLoggedIn.set(true);
     mockRoomsService = {
       getRoomById: vi.fn().mockReturnValue(of(mockRoom)),
+      deactivate: vi.fn().mockReturnValue(of(undefined)),
     };
+    mockDialog = {
+      afterClosedResult: true,
+      open: vi.fn().mockImplementation(() => ({ afterClosed: () => of(mockDialog.afterClosedResult) })),
+    };
+    mockSnackBar = { open: vi.fn() };
     mockBookingsService = {
       getDailyAvailability: vi.fn().mockReturnValue(of(mockAvailability)),
     };
@@ -79,6 +89,8 @@ describe('RoomDetail', () => {
         { provide: RoomsService, useValue: mockRoomsService },
         { provide: AuthService, useValue: { isStaff, isLoggedIn } },
         { provide: BookingsService, useValue: mockBookingsService },
+        { provide: MatDialog, useValue: mockDialog },
+        { provide: MatSnackBar, useValue: mockSnackBar },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -328,5 +340,98 @@ describe('RoomDetail', () => {
 
     // Verifica che il servizio di disponibilità non sia stato chiamato
     expect(mockBookingsService.getDailyAvailability).not.toHaveBeenCalled();
+  });
+
+  // Pulsante Dismetti: visibilità solo al personale
+  it('dovrebbe mostrare il pulsante Dismetti solo al personale', () => {
+    isStaff.set(true);
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    );
+    expect(button).toBeTruthy();
+  });
+
+  it('dovrebbe nascondere il pulsante Dismetti a chi non è del personale', () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    );
+    expect(button).toBeUndefined();
+  });
+
+  // Flusso di dismissione
+  it('dovrebbe aprire la finestra di conferma e, se confermata, dismettere lo spazio e tornare all\'elenco', () => {
+    isStaff.set(true);
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation(() => Promise.resolve(true));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    ) as HTMLButtonElement;
+    button.click();
+
+    expect(mockDialog.open).toHaveBeenCalledTimes(1);
+    const data = mockDialog.open.mock.calls[0][1].data;
+    expect(data).toEqual({ roomId: 'room-1', roomName: 'Aula A1' });
+
+    expect(mockRoomsService.deactivate).toHaveBeenCalledWith('room-1');
+    expect(vi.mocked(router.navigate)).toHaveBeenCalledWith(['/rooms']);
+  });
+
+  it('dovrebbe non dismettere lo spazio se la finestra viene annullata', () => {
+    isStaff.set(true);
+    mockDialog.afterClosedResult = false;
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation(() => Promise.resolve(true));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    ) as HTMLButtonElement;
+    button.click();
+
+    expect(mockDialog.open).toHaveBeenCalledTimes(1);
+    expect(mockRoomsService.deactivate).not.toHaveBeenCalled();
+    expect(vi.mocked(router.navigate)).not.toHaveBeenCalled();
+  });
+
+  it('dovrebbe mostrare un messaggio inline se la dismissione fallisce', () => {
+    isStaff.set(true);
+    mockRoomsService.deactivate.mockReturnValue(throwError(() => ({ status: 500 })));
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation(() => Promise.resolve(true));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    ) as HTMLButtonElement;
+    button.click();
+
+    fixture.detectChanges();
+    expect(compiled.textContent).toContain(
+      'Si è verificato un errore durante la dismissione dello spazio. Riprova.',
+    );
+    expect(vi.mocked(router.navigate)).not.toHaveBeenCalled();
   });
 });

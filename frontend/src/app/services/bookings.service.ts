@@ -1,9 +1,10 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { DailyAvailability } from '../models/availability.model';
 import {
   CreateReservationRequest,
+  FutureReservationsCountResponse,
   MyReservationsResponse,
   ReservationResponse,
 } from '../models/booking.model';
@@ -34,5 +35,12 @@ export class BookingsService {
   // Crea una prenotazione singola confermata a nome dell'utente autenticato.
   create(request: CreateReservationRequest): Observable<ReservationResponse> {
     return this.http.post<ReservationResponse>('/api/bookings', request);
+  }
+
+  // Numero di prenotazioni future di uno spazio, mostrato prima di dismetterlo (solo personale).
+  futureReservationsCount(roomId: string): Observable<number> {
+    return this.http
+      .get<FutureReservationsCountResponse>(`/api/bookings/rooms/${roomId}/future-reservations-count`)
+      .pipe(map((response) => response.count));
   }
 }

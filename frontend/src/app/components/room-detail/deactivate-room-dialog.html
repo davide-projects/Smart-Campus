@@ -1,0 +1,42 @@
+<h2 mat-dialog-title>
+  <mat-icon fontSet="material-symbols-outlined" class="warning-icon">archive</mat-icon>
+  Dismettere lo spazio?
+</h2>
+
+<mat-dialog-content>
+  <p>
+    Stai per dismettere lo spazio
+    <strong>{{ data.roomName }}</strong>.
+    Uno spazio dismesso esce dalla ricerca e non può più essere prenotato.
+  </p>
+
+  @if (isLoading()) {
+    <div class="count-loading">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Calcolo delle prenotazioni future in corso...</span>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="count-error">
+      <mat-icon fontSet="material-symbols-outlined">cloud_off</mat-icon>
+      <span>{{ errorMessage() }}</span>
+      <button matIconButton aria-label="Riprova" (click)="retry()">
+        <mat-icon fontSet="material-symbols-outlined">refresh</mat-icon>
+      </button>
+    </div>
+  } @else {
+    <div class="count-result">
+      <mat-icon fontSet="material-symbols-outlined">event</mat-icon>
+      <span>
+        Prenotazioni non ancora concluse: <strong>{{ count() }}</strong>
+      </span>
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton (click)="cancel()">Annulla</button>
+  <button matButton="filled" [disabled]="!canConfirm()" (click)="confirm()">
+    <mat-icon fontSet="material-symbols-outlined">archive</mat-icon>
+    Dismetti
+  </button>
+</mat-dialog-actions>

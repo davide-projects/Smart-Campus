@@ -135,4 +135,14 @@ describe('BookingsService', () => {
 
     expect(await result).toEqual(created);
   });
+
+  it('reads the count of future reservations of a room from the API response', async () => {
+    const result = new Promise((resolve) => service.futureReservationsCount('room-1').subscribe(resolve));
+
+    const request = http.expectOne('/api/bookings/rooms/room-1/future-reservations-count');
+    expect(request.request.method).toBe('GET');
+    request.flush({ roomId: 'room-1', count: 7 });
+
+    expect(await result).toBe(7);
+  });
 });
