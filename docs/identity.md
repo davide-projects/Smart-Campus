@@ -30,6 +30,8 @@ POST /api/identity/login
 
 Con credenziali errate la risposta è sempre `401` con il messaggio "Nome utente o password non corretti.", sia per un utente inesistente sia per una password sbagliata: non si rivela quale dei due dati è sbagliato.
 
+**Maiuscole e minuscole.** Lo username **non distingue** maiuscole e minuscole: `student1`, `Student1` e `STUDENT1` accedono con lo stesso utente, perché il confronto è fatto dal database (SQL Server, collation predefinita insensibile alle maiuscole). La **password** invece le distingue. Il token e il profilo riportano sempre lo username come è salvato (`student1`), non come è stato digitato. Per lo stesso motivo non possono esistere due utenti con username che differiscono solo per le maiuscole.
+
 **Profilo**: `GET /api/identity/me` con l'intestazione `Authorization: Bearer <jwt>`. Il profilo è letto dal database, non dal token.
 
 ## Contratto del token (per il task #30)
@@ -99,4 +101,5 @@ Un database di sviluppo creato con una versione precedente, senza migrazioni, va
 - **Uscita (logout):** il token è senza stato e non c'è revoca lato server. "Uscire" significa che il frontend scarta il token; resta valido fino alla scadenza se qualcuno lo ha copiato. Per un progetto dimostrativo è un limite accettato; la durata breve lo contiene.
 - **Nessun refresh token e nessuna registrazione autonoma** (fuori perimetro, assunzione A7).
 - **Nessun limite ai tentativi di login** (rate limiting o blocco temporaneo): da valutare se il PO lo richiede.
+- **Username senza distinzione tra maiuscole e minuscole:** dipende dalla collation del database e non da codice dell'applicazione. Se si cambiasse database o collation (per esempio una collation sensibile alle maiuscole), il comportamento cambierebbe: in quel caso va aggiornato questo documento e va aggiunto un test.
 - Se un utente cambia ruolo, il token già emesso mantiene il ruolo vecchio fino alla scadenza.
