@@ -1,0 +1,46 @@
+<section class="my-bookings">
+  <h1>Le mie prenotazioni</h1>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Caricamento delle prenotazioni" />
+  } @else if (loadFailed()) {
+    <p class="message" role="alert">
+      Non è stato possibile caricare le prenotazioni. Riprova più tardi.
+    </p>
+  } @else if (tabs().length > 0) {
+    <mat-tab-group>
+      @for (tab of tabs(); track tab.label) {
+        <mat-tab [label]="tab.label">
+          @if (tab.items.length > 0) {
+            <ul class="reservations">
+              @for (item of tab.items; track item.id) {
+                <li>
+                  <mat-card appearance="outlined">
+                    <mat-card-header>
+                      <mat-card-title>{{ item.roomName }}</mat-card-title>
+                      <mat-card-subtitle>{{ item.buildingName }}</mat-card-subtitle>
+                    </mat-card-header>
+                    <mat-card-content>
+                      <p class="time">{{ item.time }}</p>
+                      @if (item.organizer) {
+                        <p class="group">Prenotazione di gruppo</p>
+                        <p class="organizer">{{ item.organizer }}</p>
+                      }
+                    </mat-card-content>
+                  </mat-card>
+                </li>
+              }
+            </ul>
+          } @else {
+            <div class="message" role="status">
+              <p>{{ tab.emptyMessage }}</p>
+              @if (tab.showSearchLink) {
+                <a matButton="outlined" routerLink="/rooms">Cerca uno spazio</a>
+              }
+            </div>
+          }
+        </mat-tab>
+      }
+    </mat-tab-group>
+  }
+</section>

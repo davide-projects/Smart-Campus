@@ -51,6 +51,48 @@ describe('Navbar', () => {
     expect(link.getAttribute('href')).toBe('/rooms');
   });
 
+  function navLinks(): { text: string; href: string | null }[] {
+    return [...element.querySelectorAll<HTMLAnchorElement>('nav a')].map((a) => ({
+      text: a.textContent!.trim(),
+      href: a.getAttribute('href'),
+    }));
+  }
+
+  const MY_BOOKINGS = { text: 'Le mie prenotazioni', href: '/my-bookings' };
+
+  it('shows the link to my reservations to a student', async () => {
+    user.set(STUDENT);
+    await render();
+
+    expect(navLinks()).toContainEqual(MY_BOOKINGS);
+  });
+
+  it('shows the link to my reservations to the staff', async () => {
+    user.set(STAFF);
+    await render();
+
+    expect(navLinks()).toContainEqual(MY_BOOKINGS);
+  });
+
+  it('hides the link to my reservations from a guest', async () => {
+    await render();
+
+    expect(navLinks()).not.toContainEqual(MY_BOOKINGS);
+  });
+
+  it('has the link to my reservations in the mobile menu', async () => {
+    user.set(STUDENT);
+    await render();
+
+    const menu = await loader.getHarness(
+      MatMenuHarness.with({ selector: 'button[aria-label="Apri il menu"]' }),
+    );
+    await menu.open();
+
+    const items = await Promise.all((await menu.getItems()).map((item) => item.getText()));
+    expect(items).toEqual(['Cerca spazi', 'Le mie prenotazioni']);
+  });
+
   it('has the menu button for mobile', async () => {
     await render();
 
