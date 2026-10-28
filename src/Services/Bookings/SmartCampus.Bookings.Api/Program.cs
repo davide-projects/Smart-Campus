@@ -79,10 +79,7 @@ app.MapDefaultEndpoints();
 // Tutte le route del servizio stanno sotto /api/bookings: il gateway le inoltra senza riscriverle.
 var api = app.MapGroup("/api/bookings");
 api.MapReservationEndpoints();
-
-api.MapGet("/", () => Results.Ok(new { service = "bookings", status = "ok" }))
-    .WithName("InfoBookings");
-
+api.MapReservationListEndpoints();
 api.MapAvailabilityEndpoints();
 
 app.Run();
