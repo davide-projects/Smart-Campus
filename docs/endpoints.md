@@ -50,8 +50,9 @@ Base pubblica: `/api/rooms`
 |---|---|---|---|---|
 | `GET` | `/api/rooms/` | anonimo | Query opzionali: `type`, `minCapacity`, `buildingId` | Cerca gli spazi attivi; i filtri possono essere combinati. |
 | `GET` | `/api/rooms/{id}` | anonimo | `id`: GUID dello spazio | Restituisce il dettaglio di uno spazio attivo, incluse attrezzature e orari; risponde `404` se non esiste o è dismesso. |
-
-Il catalogo è pubblico. Il Gateway riserva già al ruolo `Staff` le chiamate `POST`, `PUT`, `PATCH` e `DELETE` su `/api/rooms/**`, pronte per la gestione degli spazi (US-10): oggi non esiste nessuna di queste route.
+| `POST` | `/api/rooms/` | Staff | Body: `RoomWriteRequest` | Crea uno spazio attivo e pubblica `RoomCreated` tramite outbox; risponde `409` se il nome è già usato nell'edificio. |
+| `PUT` | `/api/rooms/{id}` | Staff | `id`: GUID; body: `RoomWriteRequest` | Aggiorna i dati e gli orari, quindi pubblica `RoomUpdated` tramite outbox; risponde `404` se lo spazio non esiste o è dismesso e `409` se il nome è già usato nell'edificio. |
+| `POST` | `/api/rooms/{id}/deactivate` | Staff | `id`: GUID dello spazio | Dismette lo spazio e pubblica `RoomDeactivated` tramite outbox. |
 
 Esempio di ricerca filtrata:
 

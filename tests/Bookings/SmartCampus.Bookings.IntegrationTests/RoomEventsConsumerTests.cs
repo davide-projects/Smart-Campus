@@ -17,12 +17,20 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture) : IClass
         // Arrange
         var roomId = Guid.NewGuid();
         var harness = fixture.Factory.Services.GetTestHarness();
+        var mondayHours = new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0));
+        var tuesdayHours = new RoomOpeningHours(DayOfWeek.Tuesday, new TimeOnly(10, 0), new TimeOnly(18, 0));
 
         // Act
-        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true));
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true)
+        {
+            OpeningHours = [mondayHours]
+        });
         await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
 
-        await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1", 40, IsBookable: true, IsActive: true));
+        await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1", 40, IsBookable: true, IsActive: true)
+        {
+            OpeningHours = [tuesdayHours]
+        });
         await WaitUntilAsync(() => harness.Consumed.Select<RoomUpdated>(x => x.Context.Message.RoomId == roomId).Any());
 
         // Assert
@@ -30,6 +38,13 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture) : IClass
         Assert.NotNull(room);
         Assert.Equal(40, room.Capacity);
         Assert.True(room.IsActive);
+        Assert.Collection(room.OpeningHours,
+            hours =>
+            {
+                Assert.Equal(DayOfWeek.Tuesday, hours.DayOfWeek);
+                Assert.Equal(tuesdayHours.OpensAt, hours.OpensAt);
+                Assert.Equal(tuesdayHours.ClosesAt, hours.ClosesAt);
+            });
     }
 
     [Fact]
@@ -94,7 +109,10 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture) : IClass
     {
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
-        return await db.BookableRooms.AsNoTracking().SingleOrDefaultAsync(room => room.RoomId == roomId);
+        return await db.BookableRooms
+            .AsNoTracking()
+            .Include(room => room.OpeningHours)
+            .SingleOrDefaultAsync(room => room.RoomId == roomId);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutSeconds = 10)

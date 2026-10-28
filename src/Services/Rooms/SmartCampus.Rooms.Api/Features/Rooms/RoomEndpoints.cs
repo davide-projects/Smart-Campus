@@ -1,5 +1,7 @@
+using MassTransit;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SmartCampus.Contracts;
 using SmartCampus.Rooms.Data;
 using SmartCampus.Rooms.Models;
 
@@ -21,7 +23,309 @@ public static class RoomEndpoints
             .Produces<RoomDetailResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        api.MapPost("/", CreateAsync)
+            .WithName("CreateRoom")
+            .WithTags("Rooms")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
+            .Produces(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem();
+
+        api.MapPut("/{id:guid}", UpdateAsync)
+            .WithName("UpdateRoom")
+            .WithTags("Rooms")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem();
+
+        api.MapPost("/{id:guid}/deactivate", DeactivateAsync)
+            .WithName("DeactivateRoom")
+            .WithTags("Rooms")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return api;
+    }
+
+    private static async Task<IResult> CreateAsync(
+        RoomWriteRequest request,
+        RoomsDbContext db,
+        IPublishEndpoint publishEndpoint,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = ValidateWriteRequest(request);
+        if (validationErrors.Count > 0)
+        {
+            return Results.ValidationProblem(validationErrors);
+        }
+
+        if (!await db.Buildings.AnyAsync(building => building.Id == request.BuildingId, cancellationToken))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.BuildingId)] = ["L'edificio indicato non esiste."]
+            });
+        }
+
+        var roomName = request.Name.Trim();
+        if (await db.Rooms.AnyAsync(room => room.BuildingId == request.BuildingId && room.Name == roomName, cancellationToken))
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Title = "Nome spazio già utilizzato",
+                Detail = "Esiste già uno spazio con questo nome nell'edificio indicato."
+            });
+        }
+
+        var equipmentIds = await db.Equipment
+            .Where(item => request.EquipmentIds.Contains(item.Id))
+            .Select(item => item.Id)
+            .ToListAsync(cancellationToken);
+        if (equipmentIds.Count != request.EquipmentIds.Count)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.EquipmentIds)] = ["Una o più attrezzature indicate non esistono."]
+            });
+        }
+
+        var roomId = Guid.NewGuid();
+        var room = new Room
+        {
+            Id = roomId,
+            BuildingId = request.BuildingId,
+            Name = roomName,
+            Type = request.Type,
+            Capacity = request.Capacity,
+            Floor = request.Floor,
+            IsBookable = request.IsBookable,
+            IsActive = true,
+            OpeningHours = CreateOpeningHours(request.OpeningHours),
+            RoomEquipment = request.EquipmentIds
+                .Select(equipmentId => new RoomEquipment { RoomId = roomId, EquipmentId = equipmentId })
+                .ToList()
+        };
+
+        db.Rooms.Add(room);
+        await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Results.Created($"/api/rooms/{room.Id}", new { room.Id });
+    }
+
+    private static async Task<IResult> UpdateAsync(
+        Guid id,
+        RoomWriteRequest request,
+        RoomsDbContext db,
+        IPublishEndpoint publishEndpoint,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = ValidateWriteRequest(request);
+        if (validationErrors.Count > 0)
+        {
+            return Results.ValidationProblem(validationErrors);
+        }
+
+        var room = await db.Rooms
+            .Include(existing => existing.OpeningHours)
+            .Include(existing => existing.RoomEquipment)
+            .SingleOrDefaultAsync(existing => existing.Id == id && existing.IsActive, cancellationToken);
+
+        if (room is null)
+        {
+            return Results.Problem(
+                title: "Spazio non trovato",
+                detail: "Non esiste uno spazio attivo con l'identificativo richiesto.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        if (!await db.Buildings.AnyAsync(building => building.Id == request.BuildingId, cancellationToken))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.BuildingId)] = ["L'edificio indicato non esiste."]
+            });
+        }
+
+        var roomName = request.Name.Trim();
+        if (await db.Rooms.AnyAsync(existing =>
+                existing.Id != id && existing.BuildingId == request.BuildingId && existing.Name == roomName,
+                cancellationToken))
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Title = "Nome spazio già utilizzato",
+                Detail = "Esiste già uno spazio con questo nome nell'edificio indicato."
+            });
+        }
+
+        var equipmentIds = await db.Equipment
+            .Where(item => request.EquipmentIds.Contains(item.Id))
+            .Select(item => item.Id)
+            .ToListAsync(cancellationToken);
+        if (equipmentIds.Count != request.EquipmentIds.Count)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.EquipmentIds)] = ["Una o più attrezzature indicate non esistono."]
+            });
+        }
+
+        room.BuildingId = request.BuildingId;
+        room.Name = roomName;
+        room.Type = request.Type;
+        room.Capacity = request.Capacity;
+        room.Floor = request.Floor;
+        room.IsBookable = request.IsBookable;
+        UpdateOpeningHours(room, request.OpeningHours, db);
+
+        var requestedEquipmentIds = request.EquipmentIds.ToHashSet();
+        foreach (var existingLink in room.RoomEquipment.ToArray())
+        {
+            if (!requestedEquipmentIds.Remove(existingLink.EquipmentId))
+            {
+                db.RoomEquipment.Remove(existingLink);
+            }
+        }
+
+        foreach (var equipmentId in requestedEquipmentIds)
+        {
+            db.RoomEquipment.Add(new RoomEquipment { RoomId = room.Id, EquipmentId = equipmentId });
+        }
+
+        var roomUpdated = new RoomUpdated(room.Id, room.Name, room.Capacity, room.IsBookable, room.IsActive)
+        {
+            OpeningHours = RoomEventFactory.ToOpeningHours(room)
+        };
+        await publishEndpoint.Publish(roomUpdated, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> DeactivateAsync(
+        Guid id,
+        RoomsDbContext db,
+        IPublishEndpoint publishEndpoint,
+        CancellationToken cancellationToken)
+    {
+        var room = await db.Rooms
+            .SingleOrDefaultAsync(existing => existing.Id == id && existing.IsActive, cancellationToken);
+
+        if (room is null)
+        {
+            return Results.Problem(
+                title: "Spazio non trovato",
+                detail: "Non esiste uno spazio attivo con l'identificativo richiesto.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        room.IsActive = false;
+        await publishEndpoint.Publish(new RoomDeactivated(room.Id), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static Dictionary<string, string[]> ValidateWriteRequest(RoomWriteRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (request.BuildingId == Guid.Empty)
+        {
+            errors[nameof(request.BuildingId)] = ["L'identificativo dell'edificio non è valido."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 100)
+        {
+            errors[nameof(request.Name)] = ["Il nome deve contenere da 1 a 100 caratteri."];
+        }
+
+        if (request.Capacity <= 0)
+        {
+            errors[nameof(request.Capacity)] = ["La capienza deve essere maggiore di zero."];
+        }
+
+        if (!Enum.IsDefined(request.Type))
+        {
+            errors[nameof(request.Type)] = ["Il tipo di spazio non è valido."];
+        }
+
+        if (request.EquipmentIds is null || request.EquipmentIds.Any(id => id == Guid.Empty))
+        {
+            errors[nameof(request.EquipmentIds)] = ["La lista delle attrezzature è obbligatoria e non può contenere identificativi vuoti."];
+        }
+        else if (request.EquipmentIds.Distinct().Count() != request.EquipmentIds.Count)
+        {
+            errors[nameof(request.EquipmentIds)] = ["Un'attrezzatura non può essere indicata più di una volta."];
+        }
+
+        if (request.OpeningHours is null)
+        {
+            errors[nameof(request.OpeningHours)] = ["Gli orari sono obbligatori; usa una lista vuota per indicare uno spazio sempre chiuso."];
+            return errors;
+        }
+
+        if (request.OpeningHours.Any(hours => hours is null || !Enum.IsDefined(hours.DayOfWeek)))
+        {
+            errors[nameof(request.OpeningHours)] = ["Gli orari contengono un giorno non valido."];
+            return errors;
+        }
+
+        if (request.OpeningHours.GroupBy(hours => hours.DayOfWeek).Any(group => group.Count() > 1))
+        {
+            errors[nameof(request.OpeningHours)] = ["È ammessa una sola fascia di apertura per giorno."];
+        }
+        else if (request.OpeningHours.Any(hours => hours.ClosesAt <= hours.OpensAt))
+        {
+            errors[nameof(request.OpeningHours)] = ["L'orario di chiusura deve essere successivo all'apertura."];
+        }
+
+        return errors;
+    }
+
+    private static List<OpeningHours> CreateOpeningHours(IReadOnlyList<RoomOpeningHours> openingHours) => openingHours
+        .Select(hours => new OpeningHours
+        {
+            Id = Guid.NewGuid(),
+            DayOfWeek = hours.DayOfWeek,
+            OpensAt = hours.OpensAt,
+            ClosesAt = hours.ClosesAt
+        })
+        .ToList();
+
+    private static void UpdateOpeningHours(Room room, IReadOnlyList<RoomOpeningHours> requestedHours, RoomsDbContext db)
+    {
+        var requestedByDay = requestedHours.ToDictionary(hours => hours.DayOfWeek);
+        foreach (var existing in room.OpeningHours.ToArray())
+        {
+            if (!requestedByDay.TryGetValue(existing.DayOfWeek, out var updated))
+            {
+                room.OpeningHours.Remove(existing);
+                db.OpeningHours.Remove(existing);
+                continue;
+            }
+
+            existing.OpensAt = updated.OpensAt;
+            existing.ClosesAt = updated.ClosesAt;
+            requestedByDay.Remove(existing.DayOfWeek);
+        }
+
+        foreach (var hours in requestedByDay.Values)
+        {
+            db.OpeningHours.Add(new OpeningHours
+            {
+                Id = Guid.NewGuid(),
+                RoomId = room.Id,
+                Room = room,
+                DayOfWeek = hours.DayOfWeek,
+                OpensAt = hours.OpensAt,
+                ClosesAt = hours.ClosesAt
+            });
+        }
     }
 
     private static async Task<IResult> GetByIdAsync(

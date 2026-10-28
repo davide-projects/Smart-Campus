@@ -12,6 +12,7 @@ using SmartCampus.Identity.Api.Auth;
 using SmartCampus.Identity.Api.Domain;
 using SmartCampus.Identity.Api.Endpoints;
 using SmartCampus.Identity.Api.Infrastructure;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Identity.IntegrationTests;
 

@@ -1,16 +1,13 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace SmartCampus.Rooms.IntegrationTests;
 
-public class HealthTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class HealthTests(RoomsApiFixture fixture) : IClassFixture<RoomsApiFixture>
 {
     [Fact]
     public async Task HealthLive_ReturnsOk()
     {
-        var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/health/live");
+        var response = await fixture.Client.GetAsync("/health/live");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

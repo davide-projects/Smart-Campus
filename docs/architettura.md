@@ -20,9 +20,10 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
 - **Dati:** `Building`, `Room` (`Type`, `Capacity`, `Floor`, `IsBookable`, `IsActive`), `Equipment`, `OpeningHours`.
 - **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=` restituisce solo gli spazi attivi. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
-- **Orari:** nel primo incremento è prevista una sola fascia per spazio e giorno; la scelta è da verificare con il PO se emergono esigenze di più fasce.
-- **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development.
-- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`).
+- **Gestione:** `POST /api/rooms` e `PUT /api/rooms/{id}` sono riservati al ruolo `Staff`; aggiornano anche attrezzature e orari.
+- **Orari:** nel primo incremento è prevista una fascia per spazio e giorno; i giorni chiusi sono assenti e le chiusure straordinarie fuori ambito. `RoomCreated` e `RoomUpdated` includono lo snapshot degli orari.
+- **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. All'avvio Rooms ne pubblica gli eventi una sola volta tramite outbox.
+- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati.
 
 ### Bookings
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.
@@ -48,7 +49,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Limite noto:** l'ordine è garantito solo tra messaggi elaborati normalmente; un messaggio fallito e rielaborato più tardi potrebbe applicare uno stato vecchio. Per escluderlo servirebbe una versione o un `OccurredAt` negli eventi.
 
 ### API Gateway
-Routing `/api/{service}/**`, validazione JWT, CORS. Nessuna logica di dominio.
+Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms valida di nuovo il token e richiede il ruolo `Staff` sulle route di scrittura.
 
 ### Frontend
 SPA Angular che comunica solo con il gateway.
@@ -68,9 +69,10 @@ SPA Angular che comunica solo con il gateway.
 |---|---|
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
+| Autenticazione | Identity emette i JWT; Gateway e Rooms condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff |
 | Database per servizio | 3 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`) |
-| Messaggistica | MassTransit: RabbitMQ in locale, Azure Service Bus in cloud |
-| Eventi affidabili | Outbox pattern (MassTransit + EF Core) |
+| Messaggistica | MassTransit 8.5.12 in Rooms e Bookings: versione unica scelta per mantenere l'allineamento e usare la licenza open source; RabbitMQ in locale, Azure Service Bus in cloud |
+| Eventi affidabili | Outbox pattern (MassTransit + EF Core) in Rooms |
 | Health check | `/health/live`, `/health/ready` |
 
 ## Corrispondenza con Azure (progettata, non eseguita)

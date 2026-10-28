@@ -15,11 +15,11 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
 {
     public Task Consume(ConsumeContext<RoomCreated> context) =>
         UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.Capacity,
-            context.Message.IsBookable, isActive: true, context.CancellationToken);
+            context.Message.IsBookable, isActive: true, context.Message.OpeningHours, context.CancellationToken);
 
     public Task Consume(ConsumeContext<RoomUpdated> context) =>
         UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.Capacity,
-            context.Message.IsBookable, context.Message.IsActive, context.CancellationToken);
+            context.Message.IsBookable, context.Message.IsActive, context.Message.OpeningHours, context.CancellationToken);
 
     public async Task Consume(ConsumeContext<RoomDeactivated> context)
     {
@@ -37,9 +37,18 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
     }
 
     // "Upsert" = aggiorna se esiste, altrimenti crea. È questo che rende il consumer idempotente.
-    private async Task UpsertAsync(Guid roomId, string name, int capacity, bool isBookable, bool isActive, CancellationToken cancellationToken)
+    private async Task UpsertAsync(
+        Guid roomId,
+        string name,
+        int capacity,
+        bool isBookable,
+        bool isActive,
+        IReadOnlyList<RoomOpeningHours> openingHours,
+        CancellationToken cancellationToken)
     {
-        var room = await db.BookableRooms.FindAsync([roomId], cancellationToken);
+        var room = await db.BookableRooms
+            .Include(existing => existing.OpeningHours)
+            .SingleOrDefaultAsync(existing => existing.RoomId == roomId, cancellationToken);
 
         if (room is null)
         {
@@ -50,7 +59,34 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
         room.Name = name;
         room.Capacity = capacity;
         room.IsBookable = isBookable;
-        room.IsActive = isActive;   // copia sempre lo stato reale di Rooms
+        room.IsActive = isActive;
+
+        var requestedByDay = openingHours.ToDictionary(hours => hours.DayOfWeek);
+        foreach (var existing in room.OpeningHours.ToArray())
+        {
+            if (!requestedByDay.TryGetValue(existing.DayOfWeek, out var updated))
+            {
+                room.OpeningHours.Remove(existing);
+                db.BookableRoomOpeningHours.Remove(existing);
+                continue;
+            }
+
+            existing.OpensAt = updated.OpensAt;
+            existing.ClosesAt = updated.ClosesAt;
+            requestedByDay.Remove(existing.DayOfWeek);
+        }
+
+        foreach (var hours in requestedByDay.Values)
+        {
+            room.OpeningHours.Add(new BookableRoomOpeningHours
+            {
+                RoomId = room.RoomId,
+                Room = room,
+                DayOfWeek = hours.DayOfWeek,
+                OpensAt = hours.OpensAt,
+                ClosesAt = hours.ClosesAt
+            });
+        }
 
         await db.SaveChangesAsync(cancellationToken);
     }

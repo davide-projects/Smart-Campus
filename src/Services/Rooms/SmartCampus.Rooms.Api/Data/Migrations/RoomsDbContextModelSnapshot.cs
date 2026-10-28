@@ -22,7 +22,190 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Building", b =>
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("Consumed")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ConsumerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("Delivered")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpirationTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("LastSequenceNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("LockId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ReceiveCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Received")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Delivered");
+
+                    b.ToTable("InboxState");
+                });
+
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
+                {
+                    b.Property<long>("SequenceNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("SequenceNumber"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DestinationAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("EnqueueTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpirationTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FaultAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Headers")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("InboxConsumerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("InboxMessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("InitiatorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("OutboxId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Properties")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResponseAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("SentTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SourceAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("SequenceNumber");
+
+                    b.HasIndex("EnqueueTime");
+
+                    b.HasIndex("ExpirationTime");
+
+                    b.HasIndex("OutboxId", "SequenceNumber")
+                        .IsUnique()
+                        .HasFilter("[OutboxId] IS NOT NULL");
+
+                    b.HasIndex("InboxMessageId", "InboxConsumerId", "SequenceNumber")
+                        .IsUnique()
+                        .HasFilter("[InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL");
+
+                    b.ToTable("OutboxMessage");
+                });
+
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxState", b =>
+                {
+                    b.Property<Guid>("OutboxId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("Delivered")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("LastSequenceNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("LockId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("OutboxId");
+
+                    b.HasIndex("Created");
+
+                    b.ToTable("OutboxState");
+                });
+
+            modelBuilder.Entity("SmartCampus.Rooms.Data.RoomSeedEventDispatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("DispatchedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RoomSeedEventDispatches", (string)null);
+                });
+
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Building", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -66,7 +249,7 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Equipment", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Equipment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -112,7 +295,7 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.OpeningHours", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.OpeningHours", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -681,7 +864,7 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Room", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Room", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -870,7 +1053,7 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.RoomEquipment", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.RoomEquipment", b =>
                 {
                     b.Property<Guid>("RoomId")
                         .HasColumnType("uniqueidentifier");
@@ -957,9 +1140,21 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.OpeningHours", b =>
+            modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
                 {
-                    b.HasOne("SmartCampus.Rooms.Domain.Room", "Room")
+                    b.HasOne("MassTransit.EntityFrameworkCoreIntegration.OutboxState", null)
+                        .WithMany()
+                        .HasForeignKey("OutboxId");
+
+                    b.HasOne("MassTransit.EntityFrameworkCoreIntegration.InboxState", null)
+                        .WithMany()
+                        .HasForeignKey("InboxMessageId", "InboxConsumerId")
+                        .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("SmartCampus.Rooms.Models.OpeningHours", b =>
+                {
+                    b.HasOne("SmartCampus.Rooms.Models.Room", "Room")
                         .WithMany("OpeningHours")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -968,9 +1163,9 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                     b.Navigation("Room");
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Room", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Room", b =>
                 {
-                    b.HasOne("SmartCampus.Rooms.Domain.Building", "Building")
+                    b.HasOne("SmartCampus.Rooms.Models.Building", "Building")
                         .WithMany("Rooms")
                         .HasForeignKey("BuildingId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -979,15 +1174,15 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                     b.Navigation("Building");
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.RoomEquipment", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.RoomEquipment", b =>
                 {
-                    b.HasOne("SmartCampus.Rooms.Domain.Equipment", "Equipment")
+                    b.HasOne("SmartCampus.Rooms.Models.Equipment", "Equipment")
                         .WithMany("Rooms")
                         .HasForeignKey("EquipmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SmartCampus.Rooms.Domain.Room", "Room")
+                    b.HasOne("SmartCampus.Rooms.Models.Room", "Room")
                         .WithMany("RoomEquipment")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -998,17 +1193,17 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                     b.Navigation("Room");
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Building", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Building", b =>
                 {
                     b.Navigation("Rooms");
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Equipment", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Equipment", b =>
                 {
                     b.Navigation("Rooms");
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Domain.Room", b =>
+            modelBuilder.Entity("SmartCampus.Rooms.Models.Room", b =>
                 {
                     b.Navigation("OpeningHours");
 

@@ -66,7 +66,7 @@ dotnet test tests/Gateway/SmartCampus.Gateway.IntegrationTests
 
 ## Limiti noti
 
-- **I servizi a valle non rivalidano il token** (scelta per semplicità): le regole sono applicate solo dal Gateway. In locale le porte dei servizi (5101–5103) restano raggiungibili direttamente e **senza controlli**; con Docker Compose solo il Gateway (5000) è esposto all'host. Se in futuro un servizio dovesse essere raggiungibile da altre vie, va aggiunta la validazione anche lì (stessa configurazione `Jwt`).
+- **Rooms rivalida il token** con `AddSmartCampusJwtBearer` e applica il ruolo `Staff` alle route di scrittura, anche quando la richiesta passa dal Gateway. Identity e Bookings non aggiungono una seconda validazione oltre a quella del Gateway. In locale le porte dei servizi restano raggiungibili direttamente: le route Staff di Rooms mantengono la propria protezione, mentre Identity e Bookings dipendono dal Gateway. In Docker Compose solo il Gateway è esposto all'host.
 - Il ruolo letto dal Gateway è quello scritto nel token al momento del login: se cambia, vale il vecchio fino alla scadenza.
 - Nessuna revoca dei token: vale quanto scritto in [identity.md](identity.md#limiti-noti).
 - Tolleranza sull'orologio di 30 secondi nella verifica della scadenza.
