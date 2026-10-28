@@ -32,7 +32,7 @@ Il contratto del token (claim, durata, configurazione) e gli utenti sintetici di
 |---|---|---|---|---|
 | `GET` | `/api/identity/` | autenticato | — | Endpoint informativo; conferma che il servizio Identity risponde. |
 | `GET` | `/api/identity/me` | autenticato | Intestazione `Authorization: Bearer <jwt>` | Restituisce il profilo dell'utente autenticato (`id`, `username`, `displayName`, `role`), letto dal database. Risponde `401` se il token è assente, scaduto o non valido. |
-| `POST` | `/api/identity/login` | anonimo | Body JSON: `username`, `password` | Verifica le credenziali e restituisce il token JWT (`accessToken`, `tokenType`, `expiresAt`) insieme al profilo dell'utente. Risponde `400` se mancano i campi e `401` con un messaggio generico se le credenziali non sono corrette. |
+| `POST` | `/api/identity/login` | anonimo | Body JSON: `username`, `password` | Verifica le credenziali e restituisce il token JWT (`accessToken`, `tokenType`, `expiresAt`) insieme al profilo dell'utente. Lo username non distingue maiuscole e minuscole; la password sì. Risponde `400` se mancano i campi e `401` con un messaggio generico se le credenziali non sono corrette. |
 
 Esempio di login:
 
