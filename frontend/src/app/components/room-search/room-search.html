@@ -4,7 +4,7 @@
   <form class="filters" [formGroup]="filters" (ngSubmit)="search()">
     <mat-form-field appearance="outline">
       <mat-label>Tipo</mat-label>
-      <mat-select formControlName="type">
+      <mat-select formControlName="type" (selectionChange)="search()">
         <mat-option [value]="null">Tutti i tipi</mat-option>
         @for (type of types(); track type) {
           <mat-option [value]="type">{{ typeLabel(type) }}</mat-option>
@@ -13,22 +13,29 @@
     </mat-form-field>
 
     <mat-form-field appearance="outline">
-      <mat-label>Capienza minima</mat-label>
-      <input matInput type="number" min="1" step="1" inputmode="numeric" formControlName="minCapacity" />
-      @if (filters.controls.minCapacity.invalid) {
-        <mat-error>Inserisci un numero intero maggiore di zero.</mat-error>
-      }
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
       <mat-label>Edificio</mat-label>
-      <mat-select formControlName="buildingId">
+      <mat-select formControlName="buildingId" (selectionChange)="search()">
         <mat-option [value]="null">Tutti gli edifici</mat-option>
         @for (building of buildings(); track building.id) {
           <mat-option [value]="building.id">{{ building.name }}</mat-option>
         }
       </mat-select>
     </mat-form-field>
+
+    <div class="capacity">
+      <span class="capacity-label" id="capacity-label">Capienza minima</span>
+      <div class="capacity-control">
+        <mat-slider min="0" [max]="maxCapacity()" step="1" [displayWith]="capacityLabel">
+          <input
+            matSliderThumb
+            formControlName="minCapacity"
+            aria-labelledby="capacity-label"
+            (change)="capacityChanged()"
+          />
+        </mat-slider>
+        <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
+      </div>
+    </div>
 
     <div class="actions">
       <button matButton="filled" type="submit">Cerca</button>

@@ -1,13 +1,13 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
-import { Subject, catchError, map, of, switchMap, tap } from 'rxjs';
+import { MatSliderModule } from '@angular/material/slider';
+import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
 import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
 
@@ -16,6 +16,8 @@ interface BuildingOption {
   name: string;
 }
 
+export const CAPACITY_DEBOUNCE_MS = 300;
+
 type SearchResult = { rooms: RoomSummary[] } | { error: true };
 
 @Component({
@@ -23,9 +25,9 @@ type SearchResult = { rooms: RoomSummary[] } | { error: true };
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
-    MatInputModule,
     MatProgressBarModule,
     MatSelectModule,
+    MatSliderModule,
     ReactiveFormsModule,
   ],
   selector: 'app-room-search',
@@ -36,23 +38,30 @@ export class RoomSearch {
   private readonly roomsService = inject(RoomsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly searches = new Subject<RoomFilter>();
+  private readonly capacityChanges = new Subject<void>();
 
   protected readonly typeLabel = roomTypeLabel;
 
   protected readonly filters = new FormGroup({
     type: new FormControl<RoomType | null>(null),
-    minCapacity: new FormControl<number | null>(null, [
-      Validators.min(1),
-      Validators.pattern(/^\d+$/),
-    ]),
+    // 0 vuol dire nessuna capienza minima.
+    minCapacity: new FormControl(0, { nonNullable: true }),
     buildingId: new FormControl<string | null>(null),
   });
 
   protected readonly rooms = signal<RoomSummary[]>([]);
   protected readonly types = signal<RoomType[]>([]);
   protected readonly buildings = signal<BuildingOption[]>([]);
+  protected readonly maxCapacity = signal(0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+
+  private readonly minCapacity = toSignal(this.filters.controls.minCapacity.valueChanges, {
+    initialValue: 0,
+  });
+  protected readonly capacityText = computed(() => capacityLabel(this.minCapacity()));
+  // Lo slider usa lo stesso testo anche per i lettori di schermo (aria-valuetext).
+  protected readonly capacityLabel = capacityLabel;
 
   constructor() {
     this.loadFilterOptions();
@@ -82,17 +91,23 @@ export class RoomSearch {
         }
       });
 
+    // Da tastiera ogni freccia cambia il valore: si cerca solo quando lo slider
+    // resta fermo per 300 ms.
+    this.capacityChanges
+      .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe(() => this.search());
+
     this.searches.next({});
   }
 
-  protected search(): void {
-    if (this.filters.invalid) {
-      this.filters.markAllAsTouched();
-      return;
-    }
+  protected capacityChanged(): void {
+    this.capacityChanges.next();
+  }
 
+  // Parte quando cambia un menu, quando si ferma lo slider e con «Cerca».
+  protected search(): void {
     const { type, minCapacity, buildingId } = this.filters.getRawValue();
-    this.searches.next({ type, minCapacity, buildingId });
+    this.searches.next({ type, minCapacity: minCapacity > 0 ? minCapacity : null, buildingId });
   }
 
   protected resetFilters(): void {
@@ -104,9 +119,10 @@ export class RoomSearch {
     this.searches.next({});
   }
 
-  // Tipi ed edifici dei filtri si ricavano da tutti gli spazi attivi, così un tipo o un edificio
-  // nuovo compare senza modificare il frontend. È una richiesta separata dalla ricerca:
-  // premere «Cerca» durante il primo caricamento non la annulla.
+  // Tipi, edifici e capienza massima dei filtri si ricavano da tutti gli spazi attivi,
+  // così un tipo o un edificio nuovo compare senza modificare il frontend.
+  // È una richiesta separata dalla ricerca: premere «Cerca» durante il primo caricamento
+  // non la annulla.
   private loadFilterOptions(): void {
     this.roomsService
       .search()
@@ -117,8 +133,16 @@ export class RoomSearch {
       .subscribe((rooms) => {
         this.types.set(typesOf(rooms));
         this.buildings.set(buildingsOf(rooms));
+        this.maxCapacity.set(Math.max(0, ...rooms.map((room) => room.capacity)));
       });
   }
+}
+
+function capacityLabel(minCapacity: number): string {
+  if (minCapacity <= 0) {
+    return 'Qualsiasi';
+  }
+  return minCapacity === 1 ? 'Almeno 1 posto' : `Almeno ${minCapacity} posti`;
 }
 
 function typesOf(rooms: RoomSummary[]): RoomType[] {
