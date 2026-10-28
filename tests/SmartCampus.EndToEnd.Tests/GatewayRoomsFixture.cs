@@ -5,9 +5,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+
 using SmartCampus.Rooms.Data;
+
 using Testcontainers.MsSql;
 using Testcontainers.RabbitMq;
+
 using Yarp.ReverseProxy.Forwarder;
 
 namespace SmartCampus.EndToEnd.Tests;
