@@ -20,12 +20,14 @@ Le regole sono nel campo `AuthorizationPolicy` di ogni route in `appsettings.jso
 | `identity` → `/api/identity/**` (tutto il resto) | tutti | utente autenticato | `Default` |
 | `rooms-read` → `/api/rooms/**` | `GET` | anonimo (catalogo pubblico) | `Anonymous` |
 | `rooms-manage` → `/api/rooms/**` | `POST`, `PUT`, `PATCH`, `DELETE` | solo `Staff` | `Staff` |
-| `bookings` → `/api/bookings/**` | tutti | utente autenticato (`Student` o `Staff`) | `Default` |
+| `bookings-future-count` → `/api/bookings/rooms/{roomId}/future-reservations-count` | `GET` | solo `Staff` | `Staff` |
+| `bookings` → `/api/bookings/**` (tutto il resto) | tutti | utente autenticato (`Student` o `Staff`) | `Default` |
 
 Note:
 
 - `Default` e `Anonymous` sono nomi riservati da YARP; `Staff` è definita in `Auth/AuthenticationExtensions.cs` (utente autenticato con claim `role` = `Staff`).
 - `rooms-manage` è già pronta per la gestione degli spazi (US-10): oggi Rooms espone solo `GET`, quindi non cambia nulla per le route esistenti.
+- `bookings-future-count` ha `Order: -1`, quindi viene valutata prima della route generica `bookings` (che ha l'ordine predefinito, `0`): il conteggio delle prenotazioni future, pensato per l'avviso prima di dismettere uno spazio (US-11), è riservato al personale, mentre il resto di Bookings resta aperto a ogni utente autenticato. Le altre route di Bookings riservate a `Staff` si aggiungono allo stesso modo.
 - Le richieste **preflight CORS** (`OPTIONS` con `Origin`) sono gestite dal middleware CORS prima dell'autenticazione: non servono token e non ricevono 401.
 - Su una route anonima (catalogo) un token scaduto o non valido **non** blocca la richiesta: viene ignorato.
 - **Ogni nuova route deve dichiarare la propria `AuthorizationPolicy`.** Un test (`EveryRoute_DeclaresItsAccessPolicy`) fallisce se manca, così nessuna route resta aperta per dimenticanza.
@@ -54,7 +56,8 @@ Con Identity, Rooms, Bookings e Gateway avviati:
 2. `GET http://localhost:5000/api/bookings/` **senza** token → `401`. Con `Authorization: Bearer <token>` → `200`.
 3. `GET http://localhost:5000/api/rooms/` senza token → `200` (catalogo pubblico).
 4. `GET http://localhost:5000/api/identity/me` con il token → `200` con il profilo.
-5. Ripeti il login con `staff1`: i token `Student` e `Staff` sono ammessi su Bookings; solo `Staff` potrà usare le route di gestione degli spazi di Rooms quando esisteranno.
+5. Ripeti il login con `staff1`: i token `Student` e `Staff` sono ammessi su `/api/bookings/`; solo `Staff` potrà usare le route di gestione degli spazi di Rooms quando esisteranno.
+6. `GET http://localhost:5000/api/bookings/rooms/<id dello spazio>/future-reservations-count`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con il conteggio (o `404` se lo spazio non esiste).
 
 ## Test
 
