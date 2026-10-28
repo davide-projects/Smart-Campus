@@ -23,14 +23,14 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Gestione:** `POST /api/rooms` e `PUT /api/rooms/{id}` sono riservati al ruolo `Staff`; aggiornano anche attrezzature e orari.
 - **Orari:** nel primo incremento è prevista una fascia per spazio e giorno; i giorni chiusi sono assenti e le chiusure straordinarie fuori ambito. `RoomCreated` e `RoomUpdated` includono lo snapshot degli orari.
 - **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. All'avvio Rooms ne pubblica gli eventi una sola volta tramite outbox.
-- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati.
+- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`, `BuildingName`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati. `BuildingName` è il nome dell'edificio dello spazio al momento dell'accodamento: Rooms lo valorizza sempre (creazione, modifica e pubblicazione seed), ma nel contratto è facoltativo e vale `null` negli eventi che non lo contengono.
 
 ### Bookings
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.
 - **Dati:**
-  - `Reservation` (`OrganizerId`, `RoomId`, `Start`, `End`, `Participants`, `Status`, `RowVersion`);
+  - `Reservation` (`OrganizerId`, `OrganizerName`, `RoomId`, `Start`, `End`, `Participants`, `Status`, `RowVersion`): `OrganizerName` è il nome visualizzato letto dal claim `name` del token alla creazione;
   - `ReservationMember` (`ReservationId`, `UserId`): gli altri studenti di una prenotazione di gruppo;
-  - `BookableRoom`: copia locale aggiornata dagli eventi del servizio Rooms;
+  - `BookableRoom` (`RoomId`, `Name`, `BuildingName`, `Capacity`, `IsBookable`, `IsActive`, orari di apertura): copia locale aggiornata dagli eventi del servizio Rooms; `BuildingName` si aggiorna solo con eventi che lo contengono;
   - `AttendanceRecord` (`Type`: `CheckIn` / `NoShow`).
 - **Invarianti:**
   - nessuna sovrapposizione tra prenotazioni confermate dello stesso spazio;
@@ -41,15 +41,19 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
   1. `SELECT ... FROM BookableRooms WITH (UPDLOCK, ROWLOCK) WHERE Id = @roomId`, che serializza le prenotazioni dello stesso spazio;
   2. verifica delle sovrapposizioni (`Start < @end AND End > @start`);
   3. `INSERT` e commit; in caso di conflitto restituisce `409 Conflict`.
-- **Prevenzione conflitti sulle persone:** il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi diversi nello stesso istante. **Meccanismo da definire.**
+- **Prevenzione conflitti sulle persone:** il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi diversi nello stesso istante. Nella stessa transazione, dopo il lock sullo spazio, Bookings prende un lock `sp_getapplock` sulla persona (risorsa `user:{id}`, `@LockOwner = 'Transaction'`): si libera da solo al commit o al rollback e, se non arriva entro 10 secondi, la richiesta termina con `409`. Dettagli e alternative scartate in [servizi.md](servizi.md#come-bookings-evita-le-sovrapposizioni-inv-1-e-inv-8).
 - **Prova:** test di integrazione con richieste parallele sullo stesso slot contro SQL Server reale (Testcontainers): ne deve riuscire esattamente una.
 - **Check-in:** consentito all'organizzatore e ai membri; basta un check-in per segnare la prenotazione come usata.
 - **Regola di interpretazione dei report:** distinguono *prenotato e usato*, *prenotato e non usato*, *nessuna informazione*. L'assenza di dati non indica che lo spazio fosse libero.
 - **Consuma:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated` con un consumer idempotente (upsert su `BookableRoom`), un messaggio alla volta (`ConcurrentMessageLimit = 1`) per rispettare l'ordine di arrivo.
 - **Limite noto:** l'ordine è garantito solo tra messaggi elaborati normalmente; un messaggio fallito e rielaborato più tardi potrebbe applicare uno stato vecchio. Per escluderlo servirebbe una versione o un `OccurredAt` negli eventi.
+- **Limiti noti di «le mie prenotazioni» (US-07):**
+  - il nome dell'organizzatore è uno *snapshot*: se il nome visualizzato cambia in Identity, le prenotazioni esistenti mostrano quello vecchio;
+  - la rinomina di un edificio non arriva a Bookings finché ogni suo spazio non riceve un `RoomUpdated`: Rooms non ha un evento per gli edifici;
+  - le prenotazioni create prima del salvataggio del nome dell'organizzatore e gli spazi copiati prima dell'arrivo di `BuildingName` restano con `NULL` (la migrazione non riempie le righe esistenti) e l'API restituisce `null`.
 
 ### API Gateway
-Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms valida di nuovo il token e richiede il ruolo `Staff` sulle route di scrittura.
+Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms e Bookings validano di nuovo il token (Rooms richiede il ruolo `Staff` sulle route di scrittura, Bookings un utente autenticato su tutte le sue route).
 
 ### Frontend
 SPA Angular che comunica solo con il gateway.
@@ -69,7 +73,7 @@ SPA Angular che comunica solo con il gateway.
 |---|---|
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
-| Autenticazione | Identity emette i JWT; Gateway e Rooms condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff |
+| Autenticazione | Identity emette i JWT; Gateway, Rooms e Bookings condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff e Bookings su tutte le sue route |
 | Database per servizio | 3 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`) |
 | Messaggistica | MassTransit 8.5.12 in Rooms e Bookings: versione unica scelta per mantenere l'allineamento e usare la licenza open source; RabbitMQ in locale, Azure Service Bus in cloud |
 | Eventi affidabili | Outbox pattern (MassTransit + EF Core) in Rooms |

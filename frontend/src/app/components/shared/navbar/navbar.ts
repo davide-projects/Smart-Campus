@@ -17,7 +17,10 @@ export interface NavLink {
 }
 
 // Voci di navigazione: per una nuova pagina basta aggiungerla qui.
-const LINKS: NavLink[] = [{ path: '/rooms', label: 'Cerca spazi' }];
+const LINKS: NavLink[] = [
+  { path: '/rooms', label: 'Cerca spazi' },
+  { path: '/my-bookings', label: 'Le mie prenotazioni', access: 'user' },
+];
 
 // Ognuno vede solo le voci delle pagine che può aprire.
 export function visibleLinks(links: NavLink[], user: UserProfile | null): NavLink[] {

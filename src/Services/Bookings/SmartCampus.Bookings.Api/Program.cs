@@ -12,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+// Verifica firma, issuer, audience e scadenza del JWT emesso da Identity (stessa configurazione "Jwt" del Gateway).
+builder.Services.AddSmartCampusJwtBearer(builder.Configuration);
+
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Gli enum viaggiano come stringa ("Confirmed") e non come numero, come in Rooms.
@@ -74,10 +77,14 @@ else
     app.Logger.LogInformation("Database Bookings allineato con le migrazioni.");
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapDefaultEndpoints();
 
 // Tutte le route del servizio stanno sotto /api/bookings: il gateway le inoltra senza riscriverle.
-var api = app.MapGroup("/api/bookings");
+// Richiedono un token valido anche se qualcuno chiama Bookings direttamente, senza passare dal Gateway.
+// Gli endpoint di salute (/health/*) restano fuori dal gruppo e quindi anonimi.
+var api = app.MapGroup("/api/bookings").RequireAuthorization();
 api.MapReservationEndpoints();
 api.MapReservationListEndpoints();
 api.MapAvailabilityEndpoints();

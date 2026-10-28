@@ -1,8 +1,10 @@
+using System.Security.Claims;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -11,6 +13,9 @@ public sealed record FutureReservationsCountResponse(Guid RoomId, int Count);
 public static class ReservationEndpoints
 {
     // Il campus lavora in ora locale italiana (domanda aperta I-11).
+    // Lunghezza massima di DisplayName in Identity e della colonna OrganizerName.
+    public const int MaxUserNameLength = 128;
+
     private static readonly TimeZoneInfo CampusTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
 
     public static IEndpointRouteBuilder MapReservationEndpoints(this IEndpointRouteBuilder api)
@@ -25,6 +30,13 @@ public static class ReservationEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // GET /api/bookings/mine
+        api.MapGet("/mine", GetMineAsync)
+            .WithName("GetMyReservations")
+            .WithTags("Reservations")
+            .Produces<MyReservationsResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
         api.MapGet("/rooms/{roomId:guid}/future-reservations-count", CountFutureAsync)
             .WithName("CountFutureReservations")
             .WithTags("Reservations")
@@ -36,15 +48,17 @@ public static class ReservationEndpoints
 
     private static async Task<IResult> CreateReservationAsync(
         CreateReservationRequest request,
-        HttpRequest httpRequest,
+        ClaimsPrincipal user,
         BookingDbContext db,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        // 1. Chi prenota: dal token inoltrato dal Gateway.
-        var organizerId = CurrentUser.TryGetUserId(httpRequest);
+        // 1. Chi prenota: l'utente del token, già verificato (firma, scadenza...) da AddSmartCampusJwtBearer.
+        // Il nome si salva con la prenotazione così com'è adesso (snapshot): un cambio successivo in Identity non lo aggiorna.
+        // Un token valido ma senza un "sub" che sia un GUID, o senza un nome utilizzabile, non identifica nessun utente.
+        var organizerName = TryGetUserName(user);
 
-        if (organizerId is null)
+        if (!Guid.TryParse(user.FindFirstValue(JwtClaimNames.Subject), out var organizerId) || organizerName is null)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status401Unauthorized,
@@ -145,7 +159,8 @@ public static class ReservationEndpoints
             {
                 Id = Guid.NewGuid(),
                 RoomId = room.RoomId,
-                OrganizerId = organizerId.Value,
+                OrganizerId = organizerId,
+                OrganizerName = organizerName,
                 Start = request.Start,
                 End = request.End,
                 Participants = 1,
@@ -170,6 +185,81 @@ public static class ReservationEndpoints
             return Results.Created($"/api/bookings/{reservation.Id}", response);
         });
     }
+
+    // Le prenotazioni in cui l'utente è organizzatore o membro, divise in future, passate e cancellate.
+    // Nessuna paginazione, per scelta (design della change 22-mie-prenotazioni, decisione 5): le future sono
+    // poche per costruzione (A2, INV-8), mentre passate e cancellate crescono nel tempo.
+    // A parità di inizio l'Id rende l'ordine stabile tra una chiamata e l'altra.
+    private static async Task<IResult> GetMineAsync(
+        ClaimsPrincipal user,
+        BookingDbContext db,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(user.FindFirstValue(JwtClaimNames.Subject), out var userId))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Accesso richiesto",
+                detail: "Effettua l'accesso per vedere le tue prenotazioni.");
+        }
+
+        // Una sola query: gli indici (OrganizerId, Start) e ReservationMembers (UserId) coprono i due rami.
+        var reservations = await db.Reservations
+            .AsNoTracking()
+            .Where(reservation =>
+                reservation.OrganizerId == userId ||
+                reservation.Members.Any(member => member.UserId == userId))
+            .Select(reservation => new
+            {
+                reservation.Status,
+                Item = new MyReservationItem(
+                    reservation.Id,
+                    reservation.RoomId,
+                    reservation.Room.Name,
+                    reservation.Room.BuildingName,
+                    reservation.Start,
+                    reservation.End,
+                    reservation.Members.Any(),
+                    reservation.OrganizerName,
+                    reservation.OrganizerId == userId)
+            })
+            .ToListAsync(cancellationToken);
+
+        // Una prenotazione è "passata" quando la sua fine è già arrivata: quelle in corso restano tra le future.
+        var now = timeProvider.GetUtcNow();
+        var confirmed = reservations.Where(reservation => reservation.Status == ReservationStatus.Confirmed).ToList();
+
+        var response = new MyReservationsResponse(
+            Upcoming: confirmed
+                .Where(reservation => reservation.Item.End > now)
+                .Select(reservation => reservation.Item)
+                .OrderBy(item => item.Start)
+                .ThenBy(item => item.Id)
+                .ToList(),
+            Past: confirmed
+                .Where(reservation => reservation.Item.End <= now)
+                .Select(reservation => reservation.Item)
+                .OrderByDescending(item => item.Start)
+                .ThenBy(item => item.Id)
+                .ToList(),
+            Cancelled: reservations
+                .Where(reservation => reservation.Status == ReservationStatus.Cancelled)
+                .Select(reservation => reservation.Item)
+                .OrderByDescending(item => item.Start)
+                .ThenBy(item => item.Id)
+                .ToList());
+
+        return Results.Ok(response);
+    }
+
+    // Nome visualizzato emesso da Identity. Null se il claim manca, è vuoto o è più lungo della colonna.
+    private static string? TryGetUserName(ClaimsPrincipal user) =>
+        user.FindFirstValue(JwtClaimNames.Name) is { } name
+        && !string.IsNullOrWhiteSpace(name)
+        && name.Length <= MaxUserNameLength
+            ? name
+            : null;
 
     private static IResult ToProblem(ReservationRejection rejection) =>
         Results.Problem(statusCode: rejection.StatusCode, title: rejection.Title, detail: rejection.Detail);

@@ -27,6 +27,10 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
                     b.Property<Guid>("RoomId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BuildingName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<int>("Capacity")
                         .HasColumnType("int");
 
@@ -86,6 +90,10 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
 
                     b.Property<Guid>("OrganizerId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OrganizerName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<int>("Participants")
                         .HasColumnType("int");

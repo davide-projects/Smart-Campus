@@ -25,6 +25,10 @@ internal sealed class ReservationConfiguration : IEntityTypeConfiguration<Reserv
         builder.Property(reservation => reservation.Purpose)
             .HasMaxLength(200);
 
+        // Stessa lunghezza di DisplayName in Identity.
+        builder.Property(reservation => reservation.OrganizerName)
+            .HasMaxLength(128);
+
         // Versione della riga gestita da SQL Server: blocca le modifiche basate su dati vecchi.
         builder.Property(reservation => reservation.RowVersion)
             .IsRowVersion();

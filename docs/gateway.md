@@ -39,7 +39,7 @@ Note:
 
 | Chiave | Dove | Note |
 |---|---|---|
-| `Jwt:SigningKey` | user-secrets / variabile d'ambiente `Jwt__SigningKey` | **Segreto**, almeno 32 byte, **identica a quella di Identity**. Se manca o è corta, il Gateway non parte e dice perché |
+| `Jwt:SigningKey` | user-secrets / variabile d'ambiente `Jwt__SigningKey` | **Segreto**, almeno 32 byte, **identica a quella di Identity** (e a quella di Rooms e Bookings). Se manca o è corta, il Gateway non parte e dice perché |
 | `Jwt:Issuer`, `Jwt:Audience` | `appsettings.json` | Devono coincidere con Identity (`SmartCampus.Identity` / `SmartCampus`) |
 
 **Sviluppo con il Gateway in locale** (lo `UserSecretsId` è già nel progetto):
@@ -48,7 +48,7 @@ Note:
 dotnet user-secrets set "Jwt:SigningKey" "<la stessa chiave di Identity>" --project src/Gateway/SmartCampus.Gateway
 ```
 
-**Docker.** `docker-compose.yml` passa `JWT_SIGNING_KEY` (dal `.env`) sia a `identity` sia a `gateway`, quindi le due chiavi coincidono per costruzione.
+**Docker.** `docker-compose.yml` passa `JWT_SIGNING_KEY` (dal `.env`) a `identity`, `gateway`, `rooms` e `bookings`, quindi le chiavi coincidono per costruzione.
 
 ## Prova manuale (Postman)
 
@@ -81,7 +81,8 @@ dotnet test tests/Gateway/SmartCampus.Gateway.IntegrationTests
 
 ## Limiti noti
 
-- **Rooms rivalida il token** con `AddSmartCampusJwtBearer` e applica il ruolo `Staff` alle route di scrittura, anche quando la richiesta passa dal Gateway. Identity e Bookings non aggiungono una seconda validazione oltre a quella del Gateway. In locale le porte dei servizi restano raggiungibili direttamente: le route Staff di Rooms mantengono la propria protezione, mentre Identity e Bookings dipendono dal Gateway. In Docker Compose solo il Gateway è esposto all'host.
+- **Rooms e Bookings rivalidano il token** con `AddSmartCampusJwtBearer` (stessa configurazione `Jwt` del Gateway), anche quando la richiesta passa dal Gateway. Rooms applica inoltre il ruolo `Staff` alle route di scrittura; Bookings richiede un utente autenticato su tutte le route di `/api/bookings` e ricava chi prenota dal claim `sub` del token verificato. Chiamare direttamente la porta di Bookings in locale, senza token valido, dà `401`; per Rooms vale per le route `Staff` (il catalogo resta pubblico). Identity valida il token solo per `GET /api/identity/me`. In Docker Compose solo il Gateway è esposto all'host.
+- **Il ruolo `Staff` su `future-reservations-count` è controllato solo dal Gateway:** Bookings, chiamato direttamente, lo accetta da qualsiasi utente autenticato.
 - Il ruolo letto dal Gateway è quello scritto nel token al momento del login: se cambia, vale il vecchio fino alla scadenza.
 - Nessuna revoca dei token: vale quanto scritto in [identity.md](identity.md#limiti-noti).
 - Tolleranza sull'orologio di 30 secondi nella verifica della scadenza.

@@ -1,0 +1,38 @@
+# Tasks
+
+Ordine: gruppo 1 (#13, già unito con la PR #86) → gruppo 2 (#14) → gruppo 3 (#15, dopo il merge di #11, US-03).
+
+## 1. Bookings: creare una prenotazione senza conflitti (#13)
+
+Area: `svc:bookings`. Già unito su `main` con la PR #86: i punti descrivono il lavoro fatto e sono spuntati.
+
+- [x] 1.1 Esporre `POST /api/bookings` (`CreateReservationRequest` → `ReservationResponse`) con `201` e `Location`, `401` «Accesso richiesto» senza `sub` valido, `404` «Spazio non trovato», `409` e `422` come ProblemDetails; verificato con i test di integrazione 1.4.
+- [x] 1.2 Scrivere le regole come funzioni pure in `ReservationRules` (INV-2, INV-6, A1 mezz'ora, motivo max 200, A2 4 ore e 14 giorni; INV-4, stesso giorno, giorno chiuso, INV-3 con l'orario nel messaggio) e i rifiuti `RoomConflict`, `OrganizerConflict`, `UserLockTimeout`; unit test in `ReservationRulesTests` sui casi e sui bordi (esattamente 4 ore, esattamente 14 giorni, fine alla chiusura) verdi.
+- [x] 1.3 Creare la prenotazione in una transazione dentro la execution strategy di EF Core, con lock `UPDLOCK, ROWLOCK` sulla riga di `BookableRooms` (INV-1) e `sp_getapplock` su `user:{id}` (`@LockOwner = 'Transaction'`, timeout 10 s → `409` «Prenotazione in corso»), poi i controlli di sovrapposizione sullo spazio e sulla persona (organizzatore o membro) e l'insert.
+- [x] 1.4 Test di integrazione (Testcontainers) in `CreateReservationTests`: `201` con fascia occupata nella disponibilità, sovrapposizione parziale `409` senza nuove righe, adiacenza `201`, stessa persona in un altro spazio `409`, fuori orario `422` con l'orario di apertura, `401` senza token, `404` con spazio sconosciuto; `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` verde.
+- [x] 1.5 Documentare la `POST` in `docs/endpoints.md` (corpo, risposte e codici) e il meccanismo dei due lock in `docs/servizi.md` («Come Bookings evita le sovrapposizioni (INV-1 e INV-8)»).
+
+## 2. Bookings: test di concorrenza su SQL Server reale (#14)
+
+Area: `svc:bookings`. Solo test e documentazione: il codice della `POST` non cambia.
+
+- [ ] 2.1 Creare `ConcurrentReservationTests` nella collezione `Bookings API` con un aiuto che invia N richieste in parallelo, ognuna con il proprio `HttpClient` e token, partendo da un segnale comune; verificare che la classe compili e giri con la fixture esistente.
+- [ ] 2.2 Test «stesso spazio»: 20 utenti diversi chiedono in parallelo la stessa fascia libera dello stesso spazio; verificare esattamente un `201`, 19 `409` con titolo «Spazio già prenotato» e una sola prenotazione `Confirmed` nel database per quello spazio e quella fascia. Ripetere lo scenario 5 volte nella stessa esecuzione, su spazi nuovi.
+- [ ] 2.3 Test «stessa persona»: lo stesso utente chiede in parallelo la stessa fascia su due spazi diversi e liberi; verificare un `201`, un `409` («Hai già una prenotazione», oppure «Prenotazione in corso» solo se l'attesa supera 10 s) e una sola prenotazione `Confirmed` di quell'utente nella fascia. Ripetere 5 volte su spazi nuovi.
+- [ ] 2.4 Test del timeout del lock sulla persona: tenere `sp_getapplock` su `user:{id}` da una connessione separata per più di 10 secondi e verificare che la `POST` di quell'utente riceva `409` con titolo «Prenotazione in corso» e messaggio «Hai un'altra prenotazione in corso, riprova tra qualche secondo.», senza righe nuove.
+- [ ] 2.5 Test INV-8 per un membro di gruppo: inserire nel database una prenotazione confermata con un `ReservationMember` e verificare che il membro, chiedendo un altro spazio nella stessa fascia, riceva `409` «Hai già una prenotazione in questa fascia oraria.» senza righe nuove.
+- [ ] 2.6 Eseguire `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` tre volte consecutive con esito verde e riportarlo nella PR; verificare che il job backend della CI (`dotnet test SmartCampus.slnx`) esegua i nuovi test e sia verde.
+- [ ] 2.7 Aggiornare in `docs/handoff-architettura.md` (sezione 2) la riga «Test di concorrenza prenotazioni» da ❌ a ✅ con il nome della classe di test, e togliere da `CreateReservationTests` il commento che rimanda la concorrenza al #14; verificare che il nome della classe citato coincida con quello nel codice.
+
+## 3. Frontend: modulo di prenotazione e conferma (#15)
+
+Area: `frontend`. Parte dopo il merge di #11 (US-03, vista della disponibilità giornaliera nel dettaglio dello spazio).
+
+- [ ] 3.1 Aggiungere in `models/booking.model.ts` i tipi della richiesta e della risposta di `POST /api/bookings` e `BookingsService.create()` in `services/bookings.service.ts` (se la #24 della change 22 li ha già creati, aggiungere solo metodo e tipi); test Vitest con `HttpTestingController` su URL `/api/bookings`, metodo `POST` e corpo.
+- [ ] 3.2 Aggiungere le funzioni che costruiscono `start` ed `end` dall'ora di `Europe/Rome` e che formattano la conferma («giovedì 5 novembre 2026, 10:00–11:00») con `Intl`; test con orario solare (`+01:00`), ora legale (`+02:00`) e indipendenza dal fuso del dispositivo.
+- [ ] 3.3 Creare la pagina in `components/room-booking/` con la rotta `/rooms/:id/book`, `authGuard` e titolo «Prenota spazio»; mostrare il nome dello spazio da `RoomsService.getRoomById` e «Spazio non trovato» su `404`. Test: visitatore non autenticato portato al login con `returnUrl` `/rooms/<id>/book`; nome dello spazio visibile; `404` senza modulo.
+- [ ] 3.4 Nel dettaglio dello spazio rendere «Prenota spazio» un collegamento a `/rooms/:id/book` sugli spazi prenotabili, lasciando invariato «Non prenotabile»; aggiornare `room-detail.spec.ts` (collegamento presente e con la rotta giusta; pulsante disabilitato sugli spazi non prenotabili).
+- [ ] 3.5 Modulo reattivo con «Giorno» (`MatDatepicker` da oggi a oggi + 14 giorni nell'ora del campus, giorni di chiusura esclusi), «Ora di inizio» e «Ora di fine» (`MatSelect` sulle mezz'ore dentro l'orario di apertura del giorno scelto, azzerate al cambio di giorno), «Motivo» facoltativo con massimo 200 caratteri; pulsante di conferma disabilitato durante l'invio. Test con gli harness di Angular Material e data corrente controllata: solo orari «:00» e «:30» dentro l'apertura, giorni fuori intervallo o di chiusura disabilitati, campi obbligatori senza richiesta inviata, motivo limitato a 200, una sola richiesta con doppio clic.
+- [ ] 3.6 Su `201` mostrare al posto del modulo la conferma con `roomName`, giorno e orario, con il collegamento «Torna allo spazio» (`/rooms/:id`) e il pulsante «Prenota un'altra fascia» (modulo vuoto per lo stesso spazio); su `409`/`422` mostrare il `detail` con `role="alert"` mantenendo i valori; collegamento alla disponibilità (`/rooms/:id`, senza giorno nell'URL, da rivedere con la #11) solo con «Lo spazio è già prenotato in questa fascia.», dichiarando nella PR il limite noto del confronto sul testo; messaggio «Non è stato possibile completare la prenotazione. Riprova più tardi.» per altri errori. Test di ogni caso, compresi i due pulsanti dopo la conferma, i quattro `detail` dei `422` della storia, i due `409` senza collegamento e il `401` che chiude la sessione e porta al login.
+- [ ] 3.7 Verificare a mano tastiera (Tab in ordine di lettura, Invio per confermare, focus visibile, annuncio di conferma ed errori) e larghezza 375px senza scorrimento orizzontale, e riportarlo nella PR; `npx ng test --watch=false` verde.
+- [ ] 3.8 Verificare con `docker compose up --build`: prenotare una fascia libera dal dettaglio di uno spazio, vedere la conferma e la fascia occupata nella vista della disponibilità (#11) anche con un altro utente; ripetere la stessa fascia (`409` con collegamento alla disponibilità), una fascia adiacente (`201`) e una fuori orario (`422` con l'orario di apertura). Riportare l'esito nella PR.

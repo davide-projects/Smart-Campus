@@ -133,7 +133,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | POST | `/api/rooms/{id}/deactivate` | Staff | Disattiva |
 | GET/POST/PUT | `/api/rooms/buildings`, `/api/rooms/equipment` | Staff (scrittura) | Anagrafiche |
 
-**Eventi pubblicati:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`. `RoomCreated` e `RoomUpdated` trasportano lo snapshot degli orari come lista di `{ DayOfWeek, OpensAt, ClosesAt }`; i giorni senza fascia sono chiusi. Rooms usa l'EF Core Bus Outbox per rendere atomici gli aggiornamenti di database e l'accodamento dei messaggi; all'avvio pubblica una volta gli eventi corrispondenti agli spazi seed.
+**Eventi pubblicati:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`. `RoomCreated` e `RoomUpdated` trasportano lo snapshot degli orari come lista di `{ DayOfWeek, OpensAt, ClosesAt }`; i giorni senza fascia sono chiusi. Trasportano anche `BuildingName`, il nome dell'edificio dello spazio al momento dell'accodamento: campo facoltativo nel contratto (`null` se assente), sempre valorizzato da Rooms. Rooms usa l'EF Core Bus Outbox per rendere atomici gli aggiornamenti di database e l'accodamento dei messaggi; all'avvio pubblica una volta gli eventi corrispondenti agli spazi seed.
 
 **Regole**
 - Capienza > 0.
@@ -146,9 +146,9 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 
 | Entità | Campi proposti |
 |---|---|
-| `Reservation` | Id, RoomId, OrganizerId, Start, End, Participants, Purpose *(opz.)*, Status (`Confirmed`/`Cancelled`), CreatedAt, CancelledAt, RowVersion |
+| `Reservation` | Id, RoomId, OrganizerId, OrganizerName *(snapshot del claim `name` alla creazione; `null` per le prenotazioni precedenti)*, Start, End, Participants, Purpose *(opz.)*, Status (`Confirmed`/`Cancelled`), CreatedAt, CancelledAt, RowVersion |
 | `ReservationMember` | ReservationId, UserId: gli altri studenti di una prenotazione di gruppo |
-| `BookableRoom` | RoomId, Name, Capacity, IsBookable, IsActive, OpeningHours — copia aggiornata dagli eventi del servizio Rooms |
+| `BookableRoom` | RoomId, Name, BuildingName *(da `RoomCreated`/`RoomUpdated`; invariato se l'evento non lo contiene)*, Capacity, IsBookable, IsActive, OpeningHours — copia aggiornata dagli eventi del servizio Rooms |
 | `AttendanceRecord` | Id, ReservationId, Type (`CheckIn`/`NoShow`), RecordedAt, RecordedBy |
 
 **API previste**
@@ -157,7 +157,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | GET | `/api/bookings/availability?roomId=&date=` | autenticato | Fasce libere |
 | GET | `/api/bookings/availability/search?date=&start=&end=&minCapacity=` | autenticato | Spazi liberi in un intervallo *(proposta)* |
 | POST | `/api/bookings` | Student, Staff | Crea (singola o con membri) → `201` oppure `409 Conflict` |
-| GET | `/api/bookings/mine` | autenticato | Le mie prenotazioni (come organizzatore o membro) |
+| GET | `/api/bookings/mine` | autenticato | Le mie prenotazioni (come organizzatore o membro), divise in `upcoming`, `past`, `cancelled` *(implementato, US-07)* |
 | DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella |
 | GET | `/api/bookings?roomId=&date=` | Staff | Vista per spazio |
 | GET | `/api/bookings/rooms/{roomId}/future-reservations-count` | Staff | Conteggio delle prenotazioni confermate non ancora terminate di uno spazio (avviso prima della dismissione) |
@@ -176,7 +176,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 8. **INV-8** Nessun utente (organizzatore o membro) è in due prenotazioni `Confirmed` sovrapposte, anche in spazi diversi.
 9. **INV-9** I membri sono utenti con ruolo `Student`.
 
-**Meccanismo anti-conflitto (SQL Server):** per lo spazio, lock `UPDLOCK, ROWLOCK` sulla riga `BookableRoom` + verifica sovrapposizione + insert nella stessa transazione. Vedi [architettura.md](architettura.md). Per INV-8 il meccanismo è **da definire**: il lock sullo spazio non protegge la stessa persona che prenota due spazi diversi nello stesso istante.
+**Meccanismo anti-conflitto (SQL Server):** per lo spazio, lock `UPDLOCK, ROWLOCK` sulla riga `BookableRoom` + verifica sovrapposizione + insert nella stessa transazione. Vedi [architettura.md](architettura.md). Per INV-8 il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi diversi nello stesso istante: nella stessa transazione Bookings prende anche un lock `sp_getapplock` sulla persona (risorsa `user:{id}`, legato alla transazione, attesa massima 10 secondi, poi `409`). Dettagli in [servizi.md](servizi.md#come-bookings-evita-le-sovrapposizioni-inv-1-e-inv-8).
 
 **Eventi:** consuma `Room*`. Non pubblica eventi.
 
@@ -192,6 +192,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 |---|---|---|
 | Conflitto sullo spazio | 409 | "Lo spazio è già prenotato in questa fascia. Ecco le fasce libere…" |
 | Conflitto sulla persona | 409 | "Hai già una prenotazione in questa fascia" / "Uno o più membri hanno già una prenotazione in questa fascia" |
+| Altra prenotazione della stessa persona in elaborazione (lock oltre 10 secondi) | 409 | "Hai un'altra prenotazione in corso, riprova tra qualche secondo." |
 | Fuori orario | 422 | "Lo spazio è aperto dalle X alle Y" |
 | Capienza superata | 422 | "Lo spazio ospita al massimo N persone" |
 | Spazio non prenotabile/disattivato | 422 | "Questo spazio non è prenotabile" |
@@ -215,7 +216,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 ### 6.4 Gateway e Frontend
 
 - Il frontend chiama solo `/api/...` sul gateway.
-- Il Gateway valida il JWT e applica le policy YARP; Rooms lo rivalida con `AddSmartCampusJwtBearer` e richiede il ruolo `Staff` sulle operazioni di scrittura come difesa in profondità.
+- Il Gateway valida il JWT e applica le policy YARP; Rooms e Bookings lo rivalidano con `AddSmartCampusJwtBearer` come difesa in profondità: Rooms richiede il ruolo `Staff` sulle operazioni di scrittura, Bookings un utente autenticato su tutte le route e legge chi prenota dal claim `sub`.
 - Schermate proposte:
   - **Studente:** ricerca spazi · dettaglio spazio con disponibilità · prenota (da solo o con un gruppo) · le mie prenotazioni · check-in.
   - **Personale:** gestione spazi/edifici/attrezzature · prenotazioni per spazio · report utilizzo.
@@ -228,7 +229,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 ### F1. Prenotazione (singola o di gruppo)
 ```
 Angular → Gateway → Bookings
-  Bookings: lock BookableRoom → verifica INV-1..9 → INSERT Reservation + ReservationMember (1 transazione)
+  Bookings: lock BookableRoom → lock persona (sp_getapplock) → verifica INV-1..9 → INSERT Reservation + ReservationMember (1 transazione)
   → 201 Created
 ```
 ### F2. Cancellazione

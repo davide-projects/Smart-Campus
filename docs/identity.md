@@ -47,7 +47,7 @@ JWT firmato HMAC-SHA256. I nomi dei claim sono in `JwtClaimNames` e **non vengon
 | `iss` / `aud` | `SmartCampus.Identity` / `SmartCampus` (configurabili in `Jwt:Issuer` e `Jwt:Audience`) |
 | `iat` / `nbf` / `exp` | Durata di default 60 minuti (`Jwt:ExpirationMinutes`) |
 
-Gateway e Rooms usano `AddSmartCampusJwtBearer` da `ServiceDefaults` per verificare issuer, audience, scadenza e firma con gli stessi valori di Identity. Il Gateway applica le policy YARP; Rooms rivalida il token e richiede `Staff` sulle route di scrittura. `MapInboundClaims = false` mantiene i nomi originali e consente a `[Authorize(Roles = "Staff")]` di leggere il ruolo senza rimappature.
+Gateway, Rooms e Bookings usano `AddSmartCampusJwtBearer` da `ServiceDefaults` per verificare issuer, audience, scadenza e firma con gli stessi valori di Identity. Il Gateway applica le policy YARP; Rooms rivalida il token e richiede `Staff` sulle route di scrittura; Bookings rivalida il token e legge chi prenota dal claim `sub`. `MapInboundClaims = false` mantiene i nomi originali e consente a `[Authorize(Roles = "Staff")]` di leggere il ruolo senza rimappature.
 
 ## Configurazione
 

@@ -23,7 +23,7 @@ public sealed class AvailabilityEndpointTests(BookingsApiFixture fixture)
         var roomId = Guid.NewGuid();
         var organizerId = Guid.NewGuid();
         await SeedAsync(roomId, organizerId);
-        var client = fixture.Factory.CreateClient();
+        var client = fixture.CreateClientFor(Guid.NewGuid());
 
         // Act
         var response = await client.GetAsync($"/api/bookings/availability?roomId={roomId}&date=2026-11-03");
@@ -44,11 +44,21 @@ public sealed class AvailabilityEndpointTests(BookingsApiFixture fixture)
     [Fact]
     public async Task GetAvailability_ForUnknownRoom_ReturnsNotFound()
     {
-        var client = fixture.Factory.CreateClient();
+        var client = fixture.CreateClientFor(Guid.NewGuid());
 
         var response = await client.GetAsync($"/api/bookings/availability?roomId={Guid.NewGuid()}&date=2026-11-03");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAvailability_WithoutToken_ReturnsUnauthorized()
+    {
+        var client = fixture.Factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/bookings/availability?roomId={Guid.NewGuid()}&date=2026-11-03");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     private async Task SeedAsync(Guid roomId, Guid organizerId)

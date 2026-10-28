@@ -11,7 +11,7 @@ namespace SmartCampus.Bookings.IntegrationTests;
 
 public sealed class FutureReservationsCountTests(BookingsApiFixture fixture) : IClassFixture<BookingsApiFixture>
 {
-    private readonly HttpClient _client = fixture.Factory.CreateClient();
+    private readonly HttpClient _client = fixture.CreateClientFor(Guid.NewGuid());
 
     // Inserisce i dati di prova direttamente nel database del test: l'API per creare prenotazioni non esiste ancora.
     private async Task SeedAsync(Func<BookingDbContext, Task> action)
@@ -67,6 +67,16 @@ public sealed class FutureReservationsCountTests(BookingsApiFixture fixture) : I
             $"/api/bookings/rooms/{Guid.NewGuid()}/future-reservations-count");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Count_WithoutToken_ReturnsUnauthorized()
+    {
+        var anonymous = fixture.Factory.CreateClient();
+
+        var response = await anonymous.GetAsync($"/api/bookings/rooms/{Guid.NewGuid()}/future-reservations-count");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     private async Task<FutureReservationsCountResponse> GetCountAsync(Guid roomId)
