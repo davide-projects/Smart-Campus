@@ -14,6 +14,7 @@ namespace SmartCampus.Rooms.IntegrationTests;
 public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixture<RoomsApiFixture>
 {
     private static readonly Guid BuildingAId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid BuildingBId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid LibraryId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     // Spazi seed attivi con il nome del relativo edificio (l'«Aula dismessa» pubblica RoomDeactivated).
@@ -41,31 +42,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
         var createdEvents = Channel.CreateUnbounded<RoomCreated>();
         var updatedEvents = Channel.CreateUnbounded<RoomUpdated>();
         var deactivatedEvents = Channel.CreateUnbounded<RoomDeactivated>();
-        var receiverServices = new ServiceCollection();
-        receiverServices.AddSingleton(createdEvents);
-        receiverServices.AddSingleton(updatedEvents);
-        receiverServices.AddSingleton(deactivatedEvents);
-        receiverServices.AddMassTransit(configure =>
-        {
-            configure.AddConsumer<CapturingRoomEventsConsumer>();
-            configure.UsingRabbitMq((context, rabbitMq) =>
-            {
-                rabbitMq.Host(
-                    "localhost",
-                    fixture.RabbitMq.GetMappedPublicPort(5672),
-                    "/",
-                    host =>
-                    {
-                        host.Username("rooms-integration");
-                        host.Password("rooms-integration");
-                    });
-
-                rabbitMq.ReceiveEndpoint($"rooms-events-{Guid.NewGuid():N}", endpoint =>
-                    endpoint.ConfigureConsumer<CapturingRoomEventsConsumer>(context));
-            });
-        });
-
-        await using var receiverProvider = receiverServices.BuildServiceProvider();
+        await using var receiverProvider = BuildReceiver(createdEvents, updatedEvents, deactivatedEvents);
         var receiverBus = receiverProvider.GetRequiredService<IBusControl>();
         await receiverBus.StartAsync();
 
@@ -76,7 +53,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             var createResponse = await fixture.Client.PostAsJsonAsync(
                 "/api/rooms/",
                 new RoomWriteRequest(
-                    BuildingAId,
+                    BuildingBId,
                     "Integration room",
                     RoomType.Classroom,
                     20,
@@ -101,12 +78,12 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             Assert.True(createdEvent.IsBookable);
             Assert.Equal(new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0)),
                 Assert.Single(createdEvent.OpeningHours));
-            Assert.Equal("Edificio A", createdEvent.BuildingName);
+            Assert.Equal("Edificio B", createdEvent.BuildingName);
 
             var updateResponse = await fixture.Client.PutAsJsonAsync(
                 $"/api/rooms/{createdEvent.RoomId}",
                 new RoomWriteRequest(
-                    BuildingAId,
+                    BuildingBId,
                     "Updated integration room",
                     RoomType.Classroom,
                     24,
@@ -125,7 +102,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             Assert.Equal(24, updatedEvent.Capacity);
             Assert.True(updatedEvent.IsActive);
             Assert.Equal(DayOfWeek.Tuesday, Assert.Single(updatedEvent.OpeningHours).DayOfWeek);
-            Assert.Equal("Edificio A", updatedEvent.BuildingName);
+            Assert.Equal("Edificio B", updatedEvent.BuildingName);
 
             var deactivateResponse = await fixture.Client.PostAsync(
                 $"/api/rooms/{createdEvent.RoomId}/deactivate",
@@ -235,27 +212,21 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
         Assert.Equal("Room for duplicate test", detail.RootElement.GetProperty("name").GetString());
     }
 
-    private ServiceProvider BuildReceiver(Channel<RoomCreated> createdEvents, Channel<RoomUpdated> updatedEvents)
+    private ServiceProvider BuildReceiver(
+        Channel<RoomCreated> createdEvents,
+        Channel<RoomUpdated> updatedEvents,
+        Channel<RoomDeactivated>? deactivatedEvents = null)
     {
         var receiverServices = new ServiceCollection();
         receiverServices.AddSingleton(createdEvents);
         receiverServices.AddSingleton(updatedEvents);
-        receiverServices.AddSingleton(Channel.CreateUnbounded<RoomDeactivated>());
+        receiverServices.AddSingleton(deactivatedEvents ?? Channel.CreateUnbounded<RoomDeactivated>());
         receiverServices.AddMassTransit(configure =>
         {
             configure.AddConsumer<CapturingRoomEventsConsumer>();
             configure.UsingRabbitMq((context, rabbitMq) =>
             {
-                rabbitMq.Host(
-                    "localhost",
-                    fixture.RabbitMq.GetMappedPublicPort(5672),
-                    "/",
-                    host =>
-                    {
-                        host.Username("rooms-integration");
-                        host.Password("rooms-integration");
-                    });
-
+                fixture.ConfigureRabbitMqHost(rabbitMq);
                 rabbitMq.ReceiveEndpoint($"rooms-events-{Guid.NewGuid():N}", endpoint =>
                     endpoint.ConfigureConsumer<CapturingRoomEventsConsumer>(context));
             });

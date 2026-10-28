@@ -60,6 +60,18 @@ public sealed class RoomsApiFixture : IAsyncLifetime
             "Bearer", new JwtSecurityTokenHandler().WriteToken(token));
     }
 
+    // Collega un bus di test al broker del fixture, con le stesse credenziali di Rooms.
+    public void ConfigureRabbitMqHost(IRabbitMqBusFactoryConfigurator rabbitMq) =>
+        rabbitMq.Host(
+            "localhost",
+            _rabbitMq.GetMappedPublicPort(5672),
+            "/",
+            host =>
+            {
+                host.Username("rooms-integration");
+                host.Password("rooms-integration");
+            });
+
     public async Task InitializeAsync()
     {
         await _database.StartAsync();
@@ -113,16 +125,7 @@ public sealed class RoomsApiFixture : IAsyncLifetime
             configure.AddConsumer<SeedRoomCreatedConsumer>();
             configure.UsingRabbitMq((context, rabbitMq) =>
             {
-                rabbitMq.Host(
-                    "localhost",
-                    _rabbitMq.GetMappedPublicPort(5672),
-                    "/",
-                    host =>
-                    {
-                        host.Username("rooms-integration");
-                        host.Password("rooms-integration");
-                    });
-
+                ConfigureRabbitMqHost(rabbitMq);
                 rabbitMq.ReceiveEndpoint($"rooms-seed-events-{Guid.NewGuid():N}", endpoint =>
                     endpoint.ConfigureConsumer<SeedRoomCreatedConsumer>(context));
             });

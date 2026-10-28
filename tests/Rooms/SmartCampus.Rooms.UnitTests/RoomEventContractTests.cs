@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MassTransit.Serialization;
 using SmartCampus.Contracts;
 
 namespace SmartCampus.Rooms.UnitTests;
@@ -6,7 +7,8 @@ namespace SmartCampus.Rooms.UnitTests;
 // Compatibilità dei contratti degli spazi: un evento senza BuildingName resta leggibile.
 public sealed class RoomEventContractTests
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    // Stesse opzioni con cui MassTransit legge i messaggi in Bookings.
+    private static readonly JsonSerializerOptions JsonOptions = SystemTextJsonMessageSerializer.Options;
 
     [Fact]
     public void RoomCreated_WithoutBuildingName_IsReadWithNullBuildingName()
