@@ -11,7 +11,7 @@ using SmartCampus.Bookings.Api.Features.Reservations;
 namespace SmartCampus.Bookings.IntegrationTests;
 
 // Criteri del task #23 (US-07) su GET /api/bookings/mine, con SQL Server reale e "adesso" fissato.
-// I dati si inseriscono direttamente nel database: oggi nessuna API crea membri (US-05) o cancella (US-08).
+// I dati si inseriscono direttamente nel database: oggi nessuna API crea membri (US-05).
 // Ogni test usa utenti nuovi, così non vede le prenotazioni degli altri test.
 [Collection(BookingsApiCollection.Name)]
 public sealed class MyReservationsTests : IDisposable
@@ -222,6 +222,31 @@ public sealed class MyReservationsTests : IDisposable
         var client = _fixture.Factory.CreateClient();
         var token = BookingsApiFixture.CreateToken(Guid.NewGuid().ToString(), signingKey: BookingsApiFixture.OtherSigningKey);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync("/api/bookings/mine");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mine_WithExpiredToken_Returns401()
+    {
+        // Lo rifiuta l'autenticazione prima dell'endpoint: il corpo non è quello dell'endpoint e non si controlla.
+        var client = _fixture.Factory.CreateClient();
+        var token = BookingsApiFixture.CreateToken(Guid.NewGuid().ToString(), lifetime: TimeSpan.FromMinutes(-10));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync("/api/bookings/mine");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mine_WithUnsignedToken_Returns401()
+    {
+        // Token "alg: none" con un sub qualsiasi: senza firma non vale, anche se il contenuto è plausibile.
+        var client = _fixture.Factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", BookingsApiFixture.CreateUnsignedToken(Guid.NewGuid()));
 
         var response = await client.GetAsync("/api/bookings/mine");
 

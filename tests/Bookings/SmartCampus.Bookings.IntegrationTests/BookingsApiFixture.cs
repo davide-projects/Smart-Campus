@@ -1,12 +1,14 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using MassTransit;
 using MassTransit.Testing;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -92,6 +94,15 @@ public sealed class BookingsApiFixture : IAsyncLifetime
             "Bearer", CreateToken(userId.ToString(), name, role));
 
         return client;
+    }
+
+    // JWT senza firma ("alg: none") con un sub qualsiasi: Bookings deve rifiutarlo con 401.
+    public static string CreateUnsignedToken(Guid userId)
+    {
+        static string Encode(object value) =>
+            Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
+
+        return $"{Encode(new { alg = "none", typ = "JWT" })}.{Encode(new { sub = userId.ToString(), role = "Student" })}.test";
     }
 
     // Crea un JWT firmato come quello di Identity. Con subject = null il claim "sub" manca, con name = null manca "name".

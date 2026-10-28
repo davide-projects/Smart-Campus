@@ -61,6 +61,7 @@ Con Identity, Rooms, Bookings e Gateway avviati:
 5. Ripeti il login con `staff1`: i token `Student` e `Staff` sono ammessi sulle route generali di Bookings (per esempio `/api/bookings/availability`); solo `Staff` potrà usare le route di gestione degli spazi di Rooms quando esisteranno.
 6. `GET http://localhost:5000/api/bookings/rooms/<id dello spazio>/future-reservations-count`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con il conteggio (o `404` se lo spazio non esiste).
 7. `GET http://localhost:5000/api/bookings?roomId=<id dello spazio>&date=2026-11-03`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con l'elenco delle prenotazioni di quel giorno (o `404` se lo spazio non esiste).
+8. `DELETE http://localhost:5000/api/bookings/<id della prenotazione>` su una prenotazione futura di `student1` (creata con `POST /api/bookings` e il suo token): senza token → `401` dal Gateway; con il token di un altro studente (per esempio `student2`) → `403` «Non puoi cancellare questa prenotazione.»; con il token di `student1` → `204`, e la fascia torna libera in `GET /api/bookings/availability`.
 
 ### Avvio senza chiave
 
