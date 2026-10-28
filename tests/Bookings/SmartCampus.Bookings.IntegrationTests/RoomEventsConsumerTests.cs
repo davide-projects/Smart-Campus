@@ -105,6 +105,92 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture)
         Assert.False(await harness.Published.Any<Fault<RoomDeactivated>>(x => x.Context.Message.Message.RoomId == roomId));
     }
 
+    // --- #23: nome dell'edificio nella copia locale ---
+
+    [Fact]
+    public async Task RoomCreated_WithBuildingName_SavesIt()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true) { BuildingName = "Edificio A" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.Equal("Edificio A", room.BuildingName);
+    }
+
+    [Fact]
+    public async Task RoomUpdated_WithAnotherBuilding_ReplacesIt()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true) { BuildingName = "Edificio A" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1", 30, IsBookable: true, IsActive: true) { BuildingName = "Biblioteca" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomUpdated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.Equal("Biblioteca", room.BuildingName);
+    }
+
+    [Fact]
+    public async Task RoomUpdated_WithoutBuildingName_KeepsTheKnownBuildingAndUpdatesTheRest()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true) { BuildingName = "Edificio A" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        // Evento senza il campo, per esempio accodato da una versione di Rooms precedente.
+        await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1 rinnovata", 45, IsBookable: true, IsActive: true));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomUpdated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.Equal("Edificio A", room.BuildingName);
+        Assert.Equal("Aula A1 rinnovata", room.Name);
+        Assert.Equal(45, room.Capacity);
+    }
+
+    [Fact]
+    public async Task RoomCreated_WithBuildingNameReceivedTwice_KeepsOneRoomWithTheBuilding()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        var message = new RoomCreated(roomId, "Aula A2", 30, IsBookable: true) { BuildingName = "Edificio A" };
+
+        await harness.Bus.Publish(message);
+        await harness.Bus.Publish(message);
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Count() == 2);
+
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        var rooms = await db.BookableRooms.AsNoTracking().Where(room => room.RoomId == roomId).ToListAsync();
+        var room = Assert.Single(rooms);
+        Assert.Equal("Edificio A", room.BuildingName);
+    }
+
+    [Fact]
+    public async Task RoomDeactivated_KeepsTheBuildingName()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A3", 30, IsBookable: true) { BuildingName = "Edificio A" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        await harness.Bus.Publish(new RoomDeactivated(roomId));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomDeactivated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.False(room.IsActive);
+        Assert.Equal("Edificio A", room.BuildingName);
+    }
+
     // Legge la copia locale con un DbContext nuovo, così vede i dati realmente salvati nel database.
     private async Task<Api.Entities.BookableRoom?> FindRoomAsync(Guid roomId)
     {

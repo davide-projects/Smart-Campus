@@ -58,6 +58,7 @@ Con Identity, Rooms, Bookings e Gateway avviati:
 4. `GET http://localhost:5000/api/identity/me` con il token → `200` con il profilo.
 5. Ripeti il login con `staff1`: i token `Student` e `Staff` sono ammessi su `/api/bookings/`; solo `Staff` potrà usare le route di gestione degli spazi di Rooms quando esisteranno.
 6. `GET http://localhost:5000/api/bookings/rooms/<id dello spazio>/future-reservations-count`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con il conteggio (o `404` se lo spazio non esiste).
+7. `GET http://localhost:5000/api/bookings/mine`: senza token → `401` dal Gateway (con `WWW-Authenticate: Bearer`, la richiesta non arriva a Bookings); con il token di `student1` → `200` con `{ "upcoming": [...], "past": [...], "cancelled": [...] }`.
 
 ### Avvio senza chiave
 

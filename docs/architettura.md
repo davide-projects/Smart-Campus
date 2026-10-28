@@ -28,9 +28,9 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 ### Bookings
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.
 - **Dati:**
-  - `Reservation` (`OrganizerId`, `RoomId`, `Start`, `End`, `Participants`, `Status`, `RowVersion`);
+  - `Reservation` (`OrganizerId`, `OrganizerName`, `RoomId`, `Start`, `End`, `Participants`, `Status`, `RowVersion`): `OrganizerName` è il nome visualizzato letto dal claim `name` del token alla creazione;
   - `ReservationMember` (`ReservationId`, `UserId`): gli altri studenti di una prenotazione di gruppo;
-  - `BookableRoom`: copia locale aggiornata dagli eventi del servizio Rooms;
+  - `BookableRoom` (`RoomId`, `Name`, `BuildingName`, `Capacity`, `IsBookable`, `IsActive`, orari di apertura): copia locale aggiornata dagli eventi del servizio Rooms; `BuildingName` si aggiorna solo con eventi che lo contengono;
   - `AttendanceRecord` (`Type`: `CheckIn` / `NoShow`).
 - **Invarianti:**
   - nessuna sovrapposizione tra prenotazioni confermate dello stesso spazio;
@@ -47,6 +47,10 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Regola di interpretazione dei report:** distinguono *prenotato e usato*, *prenotato e non usato*, *nessuna informazione*. L'assenza di dati non indica che lo spazio fosse libero.
 - **Consuma:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated` con un consumer idempotente (upsert su `BookableRoom`), un messaggio alla volta (`ConcurrentMessageLimit = 1`) per rispettare l'ordine di arrivo.
 - **Limite noto:** l'ordine è garantito solo tra messaggi elaborati normalmente; un messaggio fallito e rielaborato più tardi potrebbe applicare uno stato vecchio. Per escluderlo servirebbe una versione o un `OccurredAt` negli eventi.
+- **Limiti noti di «le mie prenotazioni» (US-07):**
+  - il nome dell'organizzatore è uno *snapshot*: se il nome visualizzato cambia in Identity, le prenotazioni esistenti mostrano quello vecchio;
+  - la rinomina di un edificio non arriva a Bookings finché ogni suo spazio non riceve un `RoomUpdated`: Rooms non ha un evento per gli edifici;
+  - le prenotazioni create prima del salvataggio del nome dell'organizzatore e gli spazi copiati prima dell'arrivo di `BuildingName` restano con `NULL` (la migrazione non riempie le righe esistenti) e l'API restituisce `null`.
 
 ### API Gateway
 Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms valida di nuovo il token e richiede il ruolo `Staff` sulle route di scrittura.

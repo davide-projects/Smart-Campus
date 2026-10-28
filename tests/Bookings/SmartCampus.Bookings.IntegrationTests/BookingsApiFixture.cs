@@ -19,6 +19,12 @@ public sealed class BookingsApiFixture : IAsyncLifetime
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
+    // "Adesso" del servizio: i test lo fissano per controllare la divisione tra future e passate.
+    public TestClock Clock { get; } = new();
+
+    // Connection string del container, per i test che creano un database a parte (es. la migrazione).
+    public string ConnectionString => _database.GetConnectionString();
+
     public async Task InitializeAsync()
     {
         await _database.StartAsync();
@@ -34,7 +40,12 @@ public sealed class BookingsApiFixture : IAsyncLifetime
 
                 // Sostituisce RabbitMQ con il bus in memoria di MassTransit: niente broker nei test.
                 builder.ConfigureTestServices(services =>
-                    services.AddMassTransitTestHarness(bus => bus.AddConsumer<RoomEventsConsumer>()));
+                {
+                    services.AddMassTransitTestHarness(bus => bus.AddConsumer<RoomEventsConsumer>());
+
+                    // Orologio controllabile al posto di TimeProvider.System.
+                    services.AddSingleton<TimeProvider>(Clock);
+                });
             });
 
         // Accedere ai servizi avvia l'applicazione (migrazioni + bus).
