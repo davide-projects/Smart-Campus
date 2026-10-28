@@ -166,6 +166,16 @@ public sealed class RoomsApiFixture : IAsyncLifetime
         }
     }
 
+    public async Task<bool?> GetRoomIsActiveAsync(Guid roomId)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<RoomsDbContext>();
+        return await db.Rooms
+            .Where(room => room.Id == roomId)
+            .Select(room => (bool?)room.IsActive)
+            .SingleOrDefaultAsync();
+    }
+
     public async Task DisposeAsync()
     {
         if (_factory is not null)

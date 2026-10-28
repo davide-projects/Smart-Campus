@@ -35,6 +35,31 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
     };
 
     [Fact]
+    public async Task DeactivateRoom_RequiresStaffRole()
+    {
+        var roomId = ActiveSeedRoomBuildings.Keys.First();
+        var path = $"/api/rooms/{roomId}/deactivate";
+        fixture.Client.DefaultRequestHeaders.Authorization = null;
+
+        try
+        {
+            var unauthenticatedResponse = await fixture.Client.PostAsync(path, content: null);
+            Assert.Equal(HttpStatusCode.Unauthorized, unauthenticatedResponse.StatusCode);
+
+            fixture.AuthorizeAsRole("Student");
+            var studentResponse = await fixture.Client.PostAsync(path, content: null);
+            Assert.Equal(HttpStatusCode.Forbidden, studentResponse.StatusCode);
+
+            var roomResponse = await fixture.Client.GetAsync($"/api/rooms/{roomId}");
+            Assert.Equal(HttpStatusCode.OK, roomResponse.StatusCode);
+        }
+        finally
+        {
+            fixture.Client.DefaultRequestHeaders.Authorization = null;
+        }
+    }
+
+    [Fact]
     public async Task RoomChanges_ArePublishedAfterRabbitMqRecovers()
     {
         Assert.Equal(1, await fixture.GetSeedDispatchCountAsync());
@@ -114,6 +139,26 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
                 createdEvent.RoomId,
                 message => message.RoomId);
             Assert.Equal(createdEvent.RoomId, deactivatedEvent.RoomId);
+
+            var savedRoomIsActive = await fixture.GetRoomIsActiveAsync(createdEvent.RoomId);
+            Assert.NotNull(savedRoomIsActive);
+            Assert.False(savedRoomIsActive.Value);
+
+            var searchResponse = await fixture.Client.GetAsync("/api/rooms/");
+            Assert.Equal(HttpStatusCode.OK, searchResponse.StatusCode);
+            using var searchResults = JsonDocument.Parse(await searchResponse.Content.ReadAsStringAsync());
+            var resultIds = searchResults.RootElement.EnumerateArray()
+                .Select(room => room.GetProperty("id").GetGuid())
+                .ToArray();
+            Assert.DoesNotContain(createdEvent.RoomId, resultIds);
+
+            var detailsResponse = await fixture.Client.GetAsync($"/api/rooms/{createdEvent.RoomId}");
+            Assert.Equal(HttpStatusCode.NotFound, detailsResponse.StatusCode);
+
+            var repeatedDeactivateResponse = await fixture.Client.PostAsync(
+                $"/api/rooms/{createdEvent.RoomId}/deactivate",
+                content: null);
+            Assert.Equal(HttpStatusCode.NotFound, repeatedDeactivateResponse.StatusCode);
         }
         finally
         {
