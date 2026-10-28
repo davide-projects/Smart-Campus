@@ -81,12 +81,6 @@ export class RoomSearch {
   constructor() {
     this.loadFilterOptions();
 
-    // Da tastiera ogni freccia cambia il valore: si cerca solo quando lo slider
-    // resta fermo per 300 ms.
-    this.capacityChanges
-      .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
-      .subscribe(() => this.search());
-
     this.searches
       .pipe(
         tap(() => {
@@ -111,6 +105,12 @@ export class RoomSearch {
           this.loadFailed.set(true);
         }
       });
+
+    // Da tastiera ogni freccia cambia il valore: si cerca solo quando lo slider
+    // resta fermo per 300 ms.
+    this.capacityChanges
+      .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe(() => this.search());
 
     this.searches.next({});
   }

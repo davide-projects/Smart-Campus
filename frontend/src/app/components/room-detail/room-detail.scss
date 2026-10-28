@@ -19,12 +19,16 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
-// Stato spazio non trovato
+// Stato spazio non trovato ed errori
 .not-found-card {
   max-width: 600px;
   margin: 2rem auto;
   padding: 1rem;
   border-left: 4px solid var(--mat-sys-error, #ba1a1a);
+
+  mat-icon {
+    color: var(--mat-sys-error);
+  }
 }
 
 // Header e Badge di prenotabilità
@@ -49,19 +53,19 @@
         font-size: 1.125rem;
         width: 1.125rem;
         height: 1.125rem;
-        transform: translateY(3px); // Prova 1px (o 2px se la vuoi più giù, oppure -1px se la vuoi più su)
+        transform: translateY(1px);
       }
     }
 
     .chip-bookable {
-      --mat-chip-elevated-container-color: #e8f5e9;
-      color: #2e7d32;
+      --mat-chip-elevated-container-color: var(--mat-sys-tertiary-container);
+      color: var(--mat-sys-on-tertiary-container);
     }
 
     .chip-not-bookable {
-      --mat-chip-elevated-container-color: #ffebee;
-      color: #c62828;
-      border: 1px solid #ef9a9a;
+      --mat-chip-elevated-container-color: var(--mat-sys-error-container);
+      color: var(--mat-sys-on-error-container);
+      border: 1px solid var(--mat-sys-error);
     }
   }
 }
