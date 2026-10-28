@@ -3,11 +3,13 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities;
+using SmartCampus.Bookings.Api.Entities.Enums;
 using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -18,6 +20,12 @@ namespace SmartCampus.Bookings.IntegrationTests;
 [Collection(BookingsApiCollection.Name)]
 public sealed class CreateReservationTests(BookingsApiFixture fixture)
 {
+    // Stesse opzioni JSON dell'API: lo stato arriva come stringa ("Confirmed").
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     private static readonly TimeZoneInfo Rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
 
     // Dopodomani: sempre nel futuro e sempre entro i 14 giorni (A2), qualunque sia la data di esecuzione.
@@ -32,10 +40,11 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         var response = await client.PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var created = await response.Content.ReadFromJsonAsync<ReservationResponse>();
+        var created = await response.Content.ReadFromJsonAsync<ReservationResponse>(Json);
         Assert.NotNull(created);
         Assert.Equal(roomId, created.RoomId);
         Assert.Equal(At("10:00"), created.Start);
+        Assert.Equal(ReservationStatus.Confirmed, created.Status);
 
         var availability = await client.GetFromJsonAsync<DailyAvailability>(
             $"/api/bookings/availability?roomId={roomId}&date={Day:yyyy-MM-dd}");

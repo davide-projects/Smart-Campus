@@ -108,6 +108,9 @@ public static class ReservationRules
     public static ReservationRejection OrganizerConflict() =>
         new(StatusCodes.Status409Conflict, "Hai già una prenotazione", "Hai già una prenotazione in questa fascia oraria.");
 
+    public static ReservationRejection UserLockTimeout() =>
+        new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Hai un'altra prenotazione in corso, riprova tra qualche secondo.");
+
     private static bool IsOnSlotBoundary(DateTimeOffset value) =>
         value.TimeOfDay.Ticks % SlotLength.Ticks == 0;
 

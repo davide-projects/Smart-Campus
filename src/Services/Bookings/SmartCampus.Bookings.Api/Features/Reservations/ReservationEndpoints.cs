@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities;
@@ -88,13 +89,21 @@ public static class ReservationEndpoints
             // 4. Lock sulla persona (INV-8): due prenotazioni della stessa persona, anche su spazi diversi,
             // passano una alla volta. Il lock si libera da solo alla fine della transazione.
             var userLock = $"user:{organizerId}";
-            await db.Database.ExecuteSqlAsync(
-                $"""
-                DECLARE @result int;
-                EXEC @result = sp_getapplock @Resource = {userLock}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
-                IF @result < 0 THROW 50001, 'Impossibile ottenere il lock sull''utente.', 1;
-                """,
-                cancellationToken);
+            try
+            {
+                await db.Database.ExecuteSqlAsync(
+                    $"""
+                    DECLARE @result int;
+                    EXEC @result = sp_getapplock @Resource = {userLock}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
+                    IF @result < 0 THROW 50001, 'Impossibile ottenere il lock sull''utente.', 1;
+                    """,
+                    cancellationToken);
+            }
+            catch (SqlException exception) when (exception.Number == 50001)
+            {
+                // Dopo 10 secondi di attesa un'altra prenotazione della stessa persona è ancora in corso.
+                return ToProblem(ReservationRules.UserLockTimeout());
+            }
 
             // 5. Regole sullo spazio: attivo, prenotabile, dentro l'orario (INV-3, INV-4).
             if (ReservationRules.ValidateAgainstRoom(request, room, CampusTimeZone) is { } invalidForRoom)
@@ -156,7 +165,7 @@ public static class ReservationEndpoints
                 reservation.Start,
                 reservation.End,
                 reservation.Participants,
-                reservation.Status.ToString());
+                reservation.Status);
 
             return Results.Created($"/api/bookings/{reservation.Id}", response);
         });

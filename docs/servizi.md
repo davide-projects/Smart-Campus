@@ -67,6 +67,19 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 **Archivio:** prenotazioni, membri, check-in e mancate presentazioni, più una copia ridotta degli spazi prenotabili (`BookableRoom`: capienza, orari) ricevuta da Rooms. Così una prenotazione non dipende dal fatto che Rooms risponda in quel momento.
 **Storie collegate:** US-03, US-04, US-05, US-06, US-07, US-08, US-12, US-13, US-14, US-15, US-16, US-17.
 
+### Come Bookings evita le sovrapposizioni (INV-1 e INV-8)
+*Decisione proposta in #13, da confermare con il team.*
+
+Ogni nuova prenotazione viene creata dentro una transazione che prende **due lock** prima dei controlli:
+
+1. **Lock sullo spazio (INV-1).** La riga dello spazio in `BookableRooms` si legge con `UPDLOCK, ROWLOCK`. Due richieste sullo stesso spazio passano una alla volta: la seconda aspetta che la prima abbia salvato, poi vede la fascia occupata e riceve `409`.
+2. **Lock sulla persona (INV-8).** Il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi **diversi** nello stesso orario. Per questo si usa `sp_getapplock` di SQL Server su una risorsa `user:{id}`.
+   - Non serve una tabella né una migrazione: il lock esiste solo nella memoria di SQL Server.
+   - È legato alla transazione (`@LockOwner = 'Transaction'`): si libera da solo al commit o al rollback, anche se il servizio va in errore.
+   - Se dopo **10 secondi** di attesa il lock non è ancora libero, la richiesta termina con `409` e il messaggio "Hai un'altra prenotazione in corso, riprova tra qualche secondo."; non resta nulla di salvato a metà.
+
+L'alternativa scartata è un vincolo nel database: SQL Server non ha un vincolo nativo "intervalli che non si sovrappongono", e simularlo con le fasce da 30 minuti avrebbe richiesto una tabella in più.
+
 > Prima le presenze erano un servizio separato (*Attendance*). Su indicazione del docente sono state accorpate in Bookings per semplificare: check-in e prenotazioni stanno nello stesso archivio e non serve sincronizzarli.
 
 ---
