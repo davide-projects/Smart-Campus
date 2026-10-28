@@ -155,7 +155,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare piÃ
 | Metodo | Route | Ruolo | Scopo |
 |---|---|---|---|
 | GET | `/api/bookings/availability?roomId=&date=` | autenticato | Fasce libere |
-| GET | `/api/bookings/availability/search?date=&start=&end=&minCapacity=` | autenticato | Spazi liberi in un intervallo *(proposta)* |
+| GET | `/api/bookings/availability/search?date=&start=&end=&type=&minCapacity=` | autenticato | Spazi liberi in una fascia oraria, filtrabili per tipo e capienza minima *(implementato)* |
 | POST | `/api/bookings` | Student, Staff | Crea (singola o con membri) â†’ `201` oppure `409 Conflict` |
 | GET | `/api/bookings/mine` | autenticato | Le mie prenotazioni (come organizzatore o membro), divise in `upcoming`, `past`, `cancelled` *(implementato, US-07)* |
 | DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella (`Status = Cancelled`, `204`), solo prima dell'inizio, idempotente *(implementato, US-08)* |
