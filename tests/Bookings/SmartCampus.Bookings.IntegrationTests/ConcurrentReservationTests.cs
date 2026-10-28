@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -288,12 +287,8 @@ public sealed class ConcurrentReservationTests(BookingsApiFixture fixture)
             reservation.End > from);
     }
 
-    private HttpClient ClientFor(Guid userId, string? name = "Studente di prova")
-    {
-        var client = fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.For(userId, name));
-        return client;
-    }
+    // Client con un token valido, firmato con la chiave che Bookings usa nei test.
+    private HttpClient ClientFor(Guid userId) => fixture.CreateClientFor(userId);
 
     private static CreateReservationRequest Request(Guid roomId, string start, string end) =>
         new(roomId, At(start), At(end), Purpose: null);
