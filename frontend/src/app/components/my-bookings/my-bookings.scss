@@ -1,0 +1,47 @@
+.my-bookings {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+
+  h1 {
+    font: var(--mat-sys-headline-small);
+  }
+}
+
+.message {
+  margin: 24px 0;
+  text-align: center;
+}
+
+// Su mobile le voci stanno una sotto l'altra, su schermi più larghi si affiancano.
+.reservations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+mat-card {
+  height: 100%;
+}
+
+.time {
+  margin: 12px 0 0;
+}
+
+.group {
+  display: inline-block;
+  margin: 12px 0 0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font: var(--mat-sys-label-medium);
+}
+
+.organizer {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}

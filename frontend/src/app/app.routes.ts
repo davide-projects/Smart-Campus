@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './services/auth.guards';
 
 export const routes: Routes = [
   {
@@ -17,5 +18,12 @@ export const routes: Routes = [
     title: 'Dettaglio spazio',
     loadComponent: () =>
       import('./components/room-detail/room-detail').then((m) => m.RoomDetail),
+  },
+  {
+    path: 'my-bookings',
+    title: 'Le mie prenotazioni',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./components/my-bookings/my-bookings').then((m) => m.MyBookings),
   },
 ];
