@@ -3,6 +3,12 @@ import { authGuard, staffGuard } from './services/auth.guards';
 
 export const routes: Routes = [
   {
+    path: '',
+    pathMatch: 'full',
+    title: 'Home',
+    loadComponent: () => import('./components/home/home').then((m) => m.Home),
+  },
+  {
     path: 'login',
     title: 'Accedi',
     loadComponent: () => import('./components/login/login').then((m) => m.Login),

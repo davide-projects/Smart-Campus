@@ -60,6 +60,13 @@ describe('app routes', () => {
     router = TestBed.inject(Router);
   });
 
+  it('opens the home page for everyone, with its title', async () => {
+    await router.navigateByUrl('/');
+
+    expect(router.url).toBe('/');
+    expect(TestBed.inject(Title).getTitle()).toBe('Home · SmartCampus');
+  });
+
   it('sends a guest from my reservations to the login, remembering the page', async () => {
     await router.navigateByUrl('/my-bookings');
 

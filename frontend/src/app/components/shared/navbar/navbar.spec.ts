@@ -51,6 +51,26 @@ describe('Navbar', () => {
     expect(link.getAttribute('href')).toBe('/rooms');
   });
 
+  it('has the logo as a link to the home page, for guests and users alike', async () => {
+    await render();
+    const guestBrand = element.querySelector<HTMLAnchorElement>('a.brand')!;
+    expect(guestBrand.getAttribute('href')).toBe('/');
+    expect(guestBrand.textContent!.trim()).toBe('SmartCampus');
+    expect(guestBrand.getAttribute('aria-label')).toContain('Vai alla pagina iniziale');
+
+    user.set(STUDENT);
+    fixture.detectChanges();
+    expect(element.querySelector<HTMLAnchorElement>('a.brand')!.getAttribute('href')).toBe('/');
+  });
+
+  it('keeps the page links as they were: the logo is not one of them', async () => {
+    user.set(STUDENT);
+    await render();
+
+    // Le voci di navigazione restano quelle di prima: il logo non ne è una.
+    expect(navLinks().map((link) => link.text)).toEqual(['Cerca spazi', 'Le mie prenotazioni']);
+  });
+
   function navLinks(): { text: string; href: string | null }[] {
     return [...element.querySelectorAll<HTMLAnchorElement>('nav a')].map((a) => ({
       text: a.textContent!.trim(),

@@ -6,7 +6,15 @@
 
 .brand {
   margin-right: auto;
+  color: inherit;
   font: var(--mat-sys-title-large);
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
 }
 
 .active {
