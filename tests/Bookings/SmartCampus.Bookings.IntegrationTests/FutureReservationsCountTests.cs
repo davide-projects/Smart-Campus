@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,7 +21,7 @@ public sealed class FutureReservationsCountTests(BookingsApiFixture fixture) : I
     }
 
     [Fact]
-    public async Task Count_IncludesOnlyFutureConfirmedReservationsOfTheRoom()
+    public async Task Count_IncludesOnlyConfirmedReservationsNotYetEnded()
     {
         var room = NewRoom();
         var otherRoom = NewRoom();
@@ -31,17 +31,18 @@ public sealed class FutureReservationsCountTests(BookingsApiFixture fixture) : I
         {
             db.BookableRooms.AddRange(room, otherRoom);
             db.Reservations.AddRange(
-                NewReservation(room, now.AddDays(1), ReservationStatus.Confirmed),
-                NewReservation(room, now.AddDays(3), ReservationStatus.Confirmed),
-                NewReservation(room, now.AddDays(2), ReservationStatus.Cancelled),
-                NewReservation(room, now.AddDays(-2), ReservationStatus.Confirmed),
-                NewReservation(otherRoom, now.AddDays(1), ReservationStatus.Confirmed));
+                NewReservation(room, now.AddDays(1), ReservationStatus.Confirmed),       // futura: contata
+                NewReservation(room, now.AddDays(3), ReservationStatus.Confirmed),       // futura: contata
+                NewReservation(room, now.AddMinutes(-30), ReservationStatus.Confirmed),  // in corso (finisce tra 30 minuti): contata
+                NewReservation(room, now.AddDays(2), ReservationStatus.Cancelled),       // cancellata: no
+                NewReservation(room, now.AddHours(-2), ReservationStatus.Confirmed),     // già terminata: no
+                NewReservation(otherRoom, now.AddDays(1), ReservationStatus.Confirmed)); // altro spazio: no
             await db.SaveChangesAsync();
         });
 
         var result = await GetCountAsync(room.RoomId);
 
-        Assert.Equal(2, result.Count);
+        Assert.Equal(3, result.Count);
     }
 
     [Fact]
@@ -97,4 +98,3 @@ public sealed class FutureReservationsCountTests(BookingsApiFixture fixture) : I
         CancelledAt = status == ReservationStatus.Cancelled ? DateTimeOffset.UtcNow : null
     };
 }
-

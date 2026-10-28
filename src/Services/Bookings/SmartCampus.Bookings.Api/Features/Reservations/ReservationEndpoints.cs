@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities.Enums;
@@ -29,18 +29,22 @@ public static class ReservationEndpoints
         var roomExists = await db.BookableRooms.AnyAsync(room => room.RoomId == roomId, cancellationToken);
         if (!roomExists)
         {
-            return Results.NotFound();
+            return Results.Problem(
+                title: "Spazio non trovato",
+                detail: "Non esiste uno spazio prenotabile con l'identificativo richiesto.",
+                statusCode: StatusCodes.Status404NotFound);
         }
 
+        // Conta le prenotazioni confermate non ancora terminate, comprese quelle in corso:
+        // dismettere lo spazio interromperebbe anche quelle. Le terminate restano nei report.
         var now = clock.GetUtcNow();
         var count = await db.Reservations
             .AsNoTracking()
             .CountAsync(reservation =>
                 reservation.RoomId == roomId
                 && reservation.Status == ReservationStatus.Confirmed
-                && reservation.Start > now, cancellationToken);
+                && reservation.End > now, cancellationToken);
 
         return Results.Ok(new FutureReservationsCountResponse(roomId, count));
     }
 }
-
