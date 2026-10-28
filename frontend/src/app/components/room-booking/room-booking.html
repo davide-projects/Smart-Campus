@@ -1,0 +1,160 @@
+@if (isLoading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="48" aria-label="Caricamento dello spazio"></mat-spinner>
+    <p>Caricamento dello spazio...</p>
+  </div>
+} @else if (isNotFound()) {
+  <mat-card class="message-card">
+    <mat-card-header>
+      <mat-icon fontSet="material-symbols-outlined" mat-card-avatar>error_outline</mat-icon>
+      <mat-card-title>Spazio non trovato</mat-card-title>
+      <mat-card-subtitle>Lo spazio cercato non esiste o non è più attivo.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-actions>
+      <a matButton="filled" routerLink="/rooms">
+        <mat-icon fontSet="material-symbols-outlined">arrow_back</mat-icon>
+        Torna alla lista degli spazi
+      </a>
+    </mat-card-actions>
+  </mat-card>
+} @else if (loadFailed()) {
+  <mat-card class="message-card">
+    <mat-card-header>
+      <mat-icon fontSet="material-symbols-outlined" mat-card-avatar>cloud_off</mat-icon>
+      <mat-card-title>Impossibile caricare lo spazio</mat-card-title>
+      <mat-card-subtitle role="alert">
+        Si è verificato un errore durante il caricamento dello spazio. Riprova più tardi.
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-actions>
+      <a matButton="filled" routerLink="/rooms">
+        <mat-icon fontSet="material-symbols-outlined">arrow_back</mat-icon>
+        Torna alla lista degli spazi
+      </a>
+    </mat-card-actions>
+  </mat-card>
+} @else if (room(); as r) {
+  <section class="room-booking">
+    <h1>Prenota spazio</h1>
+    <p class="room-name">{{ r.name }}</p>
+    <p class="building-name">{{ r.buildingName }}</p>
+
+    @if (confirmation(); as c) {
+      <mat-card class="confirmation" appearance="outlined" role="status">
+        <mat-card-header>
+          <mat-icon fontSet="material-symbols-outlined" mat-card-avatar>event_available</mat-icon>
+          <mat-card-title>
+            <h2 #confirmationHeading tabindex="-1">Prenotazione confermata</h2>
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p class="confirmation-room">{{ c.roomName }}</p>
+          <p class="confirmation-time">{{ c.time }}</p>
+        </mat-card-content>
+        <mat-card-actions class="actions">
+          <a matButton="outlined" [routerLink]="['/rooms', roomId()]">
+            <mat-icon fontSet="material-symbols-outlined">arrow_back</mat-icon>
+            Torna allo spazio
+          </a>
+          <button matButton="filled" type="button" (click)="bookAnother()">
+            <mat-icon fontSet="material-symbols-outlined">add</mat-icon>
+            Prenota un'altra fascia
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    } @else {
+      <form class="booking-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Giorno</mat-label>
+          <input
+            #dayInput
+            matInput
+            formControlName="day"
+            [matDatepicker]="dayPicker"
+            [matDatepickerFilter]="isOpenDay"
+            [min]="minDay"
+            [max]="maxDay"
+            readonly
+            required
+            (click)="dayPicker.open()"
+            (keydown.enter)="openCalendar($event, dayPicker)"
+            (keydown.alt.arrowdown)="openCalendar($event, dayPicker)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="dayPicker" />
+          <mat-datepicker #dayPicker />
+          @if (dayHours(); as hours) {
+            <mat-hint>
+              Aperto dalle {{ hours.opensAt!.slice(0, 5) }} alle {{ hours.closesAt!.slice(0, 5) }}
+            </mat-hint>
+          }
+          @if (form.controls.day.hasError('required')) {
+            <mat-error>Il giorno è obbligatorio.</mat-error>
+          } @else if (form.controls.day.invalid) {
+            <mat-error>Scegli un giorno di apertura entro 14 giorni da oggi.</mat-error>
+          }
+        </mat-form-field>
+
+        <div class="times">
+          <mat-form-field appearance="outline">
+            <mat-label>Ora di inizio</mat-label>
+            <mat-select formControlName="start" required>
+              @for (time of startOptions(); track time) {
+                <mat-option [value]="time">{{ time }}</mat-option>
+              }
+            </mat-select>
+            @if (form.controls.start.hasError('required')) {
+              <mat-error>L'ora di inizio è obbligatoria.</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Ora di fine</mat-label>
+            <mat-select formControlName="end" required>
+              @for (time of endOptions(); track time) {
+                <mat-option [value]="time">{{ time }}</mat-option>
+              }
+            </mat-select>
+            @if (form.controls.end.hasError('required')) {
+              <mat-error>L'ora di fine è obbligatoria.</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Motivo (facoltativo)</mat-label>
+          <textarea
+            matInput
+            formControlName="purpose"
+            rows="3"
+            [attr.maxlength]="maxPurposeLength"
+          ></textarea>
+          <mat-hint align="end">
+            {{ form.controls.purpose.value.length }}/{{ maxPurposeLength }}
+          </mat-hint>
+          @if (form.controls.purpose.hasError('maxlength')) {
+            <mat-error>Il motivo può avere al massimo {{ maxPurposeLength }} caratteri.</mat-error>
+          }
+        </mat-form-field>
+
+        @if (errorMessage(); as message) {
+          <div class="rejection" role="alert">
+            <p>{{ message }}</p>
+            @if (showAvailabilityLink()) {
+              <a matButton="outlined" [routerLink]="['/rooms', roomId()]">
+                <mat-icon fontSet="material-symbols-outlined">event_available</mat-icon>
+                Vedi la disponibilità dello spazio
+              </a>
+            }
+          </div>
+        }
+
+        <div class="actions">
+          <button matButton="filled" type="submit" [disabled]="submitting()">
+            <mat-icon fontSet="material-symbols-outlined">bookmark_add</mat-icon>
+            Conferma prenotazione
+          </button>
+        </div>
+      </form>
+    }
+  </section>
+}

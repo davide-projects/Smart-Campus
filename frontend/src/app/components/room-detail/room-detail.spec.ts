@@ -1,6 +1,9 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatButtonHarness } from '@angular/material/button/testing';
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { Component } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -10,6 +13,9 @@ import { RoomsService } from '../../services/rooms.service';
 import { BookingsService } from '../../services/bookings.service';
 import { RoomDetail as RoomDetailData } from '../../models/room.model';
 import { DailyAvailability } from '../../models/availability.model';
+
+@Component({ template: '' })
+class EmptyPage {}
 
 // Dati sintetici per i test
 const mockRoom: RoomDetailData = {
@@ -69,7 +75,7 @@ describe('RoomDetail', () => {
     await TestBed.configureTestingModule({
       imports: [RoomDetail],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: 'rooms/:id/book', component: EmptyPage }]),
         { provide: RoomsService, useValue: mockRoomsService },
         { provide: AuthService, useValue: { isStaff, isLoggedIn } },
         { provide: BookingsService, useValue: mockBookingsService },
@@ -218,6 +224,39 @@ describe('RoomDetail', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('a[href="/staff/rooms/room-1/edit"]')).toBeNull();
+  });
+
+  // US-04: «Prenota spazio» apre la pagina di prenotazione dello spazio prenotabile.
+  it('dovrebbe collegare «Prenota spazio» alla pagina di prenotazione dello spazio', async () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+    const loader = TestbedHarnessEnvironment.loader(fixture);
+
+    const bookButton = await loader.getHarness(MatButtonHarness.with({ text: /Prenota spazio/ }));
+    expect(await bookButton.isDisabled()).toBe(false);
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a[href="/rooms/room-1/book"]',
+    );
+    expect(link?.textContent).toContain('Prenota spazio');
+
+    await bookButton.click();
+    await fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/rooms/room-1/book');
+  });
+
+  // US-04: sugli spazi non prenotabili resta solo il pulsante disabilitato «Non prenotabile».
+  it('non dovrebbe mostrare «Prenota spazio» attivo su uno spazio non prenotabile', async () => {
+    mockRoomsService.getRoomById.mockReturnValue(of({ ...mockRoom, isBookable: false }));
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+    const loader = TestbedHarnessEnvironment.loader(fixture);
+
+    const notBookable = await loader.getHarness(MatButtonHarness.with({ text: /Non prenotabile/ }));
+    expect(await notBookable.isDisabled()).toBe(true);
+    expect(
+      await loader.getHarnessOrNull(MatButtonHarness.with({ text: /Prenota spazio/ })),
+    ).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href$="/book"]')).toBeNull();
   });
 
   // Test 7: Criteri 2, 3 e 4 - Fasce libere, occupate e privacy

@@ -1,0 +1,109 @@
+:host {
+  display: block;
+  padding: 16px;
+}
+
+.room-booking {
+  max-width: 640px;
+  margin: 0 auto;
+
+  h1 {
+    margin: 0;
+    font: var(--mat-sys-headline-small);
+  }
+}
+
+.room-name {
+  margin: 8px 0 0;
+  font: var(--mat-sys-title-large);
+  color: var(--mat-sys-on-surface);
+}
+
+.building-name {
+  margin: 4px 0 24px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.message-card {
+  max-width: 600px;
+  margin: 32px auto;
+  border-left: 4px solid var(--mat-sys-error);
+
+  mat-icon {
+    color: var(--mat-sys-error);
+  }
+}
+
+.booking-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+// Inizio e fine affiancati; su schermi stretti uno sotto l'altro.
+.times {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  column-gap: 16px;
+}
+
+.rejection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+
+  p {
+    margin: 0;
+    flex: 1 1 200px;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.confirmation {
+  mat-icon {
+    color: var(--mat-sys-primary);
+  }
+
+  h2 {
+    margin: 0;
+    font: inherit;
+  }
+
+  .confirmation-room {
+    margin: 12px 0 0;
+    font: var(--mat-sys-title-medium);
+  }
+
+  .confirmation-time {
+    margin: 4px 0 0;
+  }
+
+  .actions {
+    padding: 8px 16px 16px;
+  }
+}
