@@ -53,7 +53,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
   - le prenotazioni create prima del salvataggio del nome dell'organizzatore e gli spazi copiati prima dell'arrivo di `BuildingName` restano con `NULL` (la migrazione non riempie le righe esistenti) e l'API restituisce `null`.
 
 ### API Gateway
-Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms valida di nuovo il token e richiede il ruolo `Staff` sulle route di scrittura.
+Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms e Bookings validano di nuovo il token (Rooms richiede il ruolo `Staff` sulle route di scrittura, Bookings un utente autenticato su tutte le sue route).
 
 ### Frontend
 SPA Angular che comunica solo con il gateway.
@@ -73,7 +73,7 @@ SPA Angular che comunica solo con il gateway.
 |---|---|
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
-| Autenticazione | Identity emette i JWT; Gateway e Rooms condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff |
+| Autenticazione | Identity emette i JWT; Gateway, Rooms e Bookings condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff e Bookings su tutte le sue route |
 | Database per servizio | 3 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`) |
 | Messaggistica | MassTransit 8.5.12 in Rooms e Bookings: versione unica scelta per mantenere l'allineamento e usare la licenza open source; RabbitMQ in locale, Azure Service Bus in cloud |
 | Eventi affidabili | Outbox pattern (MassTransit + EF Core) in Rooms |
