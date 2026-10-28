@@ -14,11 +14,11 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
     IConsumer<RoomDeactivated>
 {
     public Task Consume(ConsumeContext<RoomCreated> context) =>
-        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.Capacity,
+        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.BuildingName, context.Message.Capacity,
             context.Message.IsBookable, isActive: true, context.Message.OpeningHours, context.CancellationToken);
 
     public Task Consume(ConsumeContext<RoomUpdated> context) =>
-        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.Capacity,
+        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.BuildingName, context.Message.Capacity,
             context.Message.IsBookable, context.Message.IsActive, context.Message.OpeningHours, context.CancellationToken);
 
     public async Task Consume(ConsumeContext<RoomDeactivated> context)
@@ -40,6 +40,7 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
     private async Task UpsertAsync(
         Guid roomId,
         string name,
+        string? buildingName,
         int capacity,
         bool isBookable,
         bool isActive,
@@ -57,6 +58,13 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
         }
 
         room.Name = name;
+
+        // Un evento senza edificio (accodato prima che Rooms lo inviasse) non cancella quello già noto.
+        if (buildingName is not null)
+        {
+            room.BuildingName = buildingName;
+        }
+
         room.Capacity = capacity;
         room.IsBookable = isBookable;
         room.IsActive = isActive;

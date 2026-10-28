@@ -8,6 +8,7 @@ public class Reservation
     public Guid RoomId { get; set; }
     public BookableRoom Room { get; set; } = null!;
     public Guid OrganizerId { get; set; }
+    public string? OrganizerName { get; set; } // Nome visualizzato al momento della creazione (claim "name"); null per le prenotazioni precedenti.
     public DateTimeOffset Start { get; set; }
     public DateTimeOffset End { get; set; }
     public int Participants { get; set; }

@@ -3,12 +3,23 @@ using Microsoft.AspNetCore.WebUtilities;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
-// Legge l'id dell'utente (claim "sub") dal JWT inoltrato dal Gateway.
+// Legge i dati dell'utente (claim "sub" e "name") dal JWT inoltrato dal Gateway.
 // La firma NON viene verificata qui: lo fa già il Gateway, unico punto di ingresso
 // (vedi docs/gateway.md, "I servizi a valle non rivalidano il token").
 public static class CurrentUser
 {
-    public static Guid? TryGetUserId(HttpRequest request)
+    public static Guid? TryGetUserId(HttpRequest request) =>
+        TryReadClaim(request, "sub") is { } sub && Guid.TryParse(sub, out var userId)
+            ? userId
+            : null;
+
+    // Nome visualizzato emesso da Identity. Null se il claim manca o è vuoto.
+    public static string? TryGetUserName(HttpRequest request) =>
+        TryReadClaim(request, "name") is { } name && !string.IsNullOrWhiteSpace(name)
+            ? name
+            : null;
+
+    private static string? TryReadClaim(HttpRequest request, string claim)
     {
         var header = request.Headers.Authorization.ToString();
         const string bearer = "Bearer ";
@@ -30,8 +41,10 @@ public static class CurrentUser
         {
             using var payload = JsonDocument.Parse(Base64UrlTextEncoder.Decode(parts[1]));
 
-            return payload.RootElement.TryGetProperty("sub", out var sub) && Guid.TryParse(sub.GetString(), out var userId)
-                ? userId
+            return payload.RootElement.ValueKind == JsonValueKind.Object
+                   && payload.RootElement.TryGetProperty(claim, out var value)
+                   && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
                 : null;
         }
         catch (Exception exception) when (exception is FormatException or JsonException)

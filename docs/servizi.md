@@ -64,7 +64,7 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 - Registra ciò che è **successo davvero**: il check-in (fatto dall'organizzatore o da un membro) e le mancate presentazioni (`AttendanceRecord`).
 - Produce i riepiloghi per il personale distinguendo sempre tre casi: *usato*, *non usato*, *nessuna informazione*. Quest'ultimo caso **non** viene mai trattato come "spazio vuoto".
 
-**Archivio:** prenotazioni, membri, check-in e mancate presentazioni, più una copia ridotta degli spazi prenotabili (`BookableRoom`: capienza, orari) ricevuta da Rooms. Così una prenotazione non dipende dal fatto che Rooms risponda in quel momento.
+**Archivio:** prenotazioni, membri, check-in e mancate presentazioni, più una copia ridotta degli spazi prenotabili (`BookableRoom`: nome, nome dell'edificio, capienza, orari) ricevuta da Rooms. Così una prenotazione, e l'elenco «le mie prenotazioni» con spazio ed edificio, non dipendono dal fatto che Rooms risponda in quel momento. Con ogni prenotazione si salva anche il nome dell'organizzatore al momento della creazione.
 **Storie collegate:** US-03, US-04, US-05, US-06, US-07, US-08, US-12, US-13, US-14, US-15, US-16, US-17.
 
 ### Come Bookings evita le sovrapposizioni (INV-1 e INV-8)

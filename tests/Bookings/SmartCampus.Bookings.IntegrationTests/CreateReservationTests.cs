@@ -1,10 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
@@ -111,6 +109,40 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
     }
 
     [Fact]
+    public async Task Create_WithNameClaim_Returns201AndSavesTheOrganizerName()
+    {
+        var roomId = await SeedRoomAsync();
+
+        var response = await ClientFor(Guid.NewGuid(), "Mario Rossi").PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<ReservationResponse>(Json);
+        Assert.NotNull(created);
+        Assert.Equal(1, created.Participants);
+
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        var saved = await db.Reservations.AsNoTracking().SingleAsync(reservation => reservation.Id == created.Id);
+        Assert.Equal("Mario Rossi", saved.OrganizerName);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Create_WithoutNameClaim_Returns401AndCreatesNothing(string? name)
+    {
+        var roomId = await SeedRoomAsync();
+
+        var response = await ClientFor(Guid.NewGuid(), name).PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Accesso richiesto", body);
+        Assert.Contains("Effettua l'accesso per prenotare.", body);
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
+    [Fact]
     public async Task Create_UnknownRoom_Returns404()
     {
         var response = await ClientFor(Guid.NewGuid()).PostAsJsonAsync("/api/bookings", Request(Guid.NewGuid(), "10:00", "11:00"));
@@ -152,20 +184,11 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         return await db.Reservations.CountAsync(reservation => reservation.RoomId == roomId);
     }
 
-    private HttpClient ClientFor(Guid userId)
+    private HttpClient ClientFor(Guid userId, string? name = "Studente di prova")
     {
         var client = fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestToken(userId));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.For(userId, name));
         return client;
-    }
-
-    // Token di prova con il solo claim "sub". La firma è finta: Bookings non la verifica (lo fa il Gateway).
-    private static string TestToken(Guid userId)
-    {
-        static string Encode(object value) =>
-            Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
-
-        return $"{Encode(new { alg = "none", typ = "JWT" })}.{Encode(new { sub = userId.ToString(), role = "Student" })}.test";
     }
 
     private static CreateReservationRequest Request(Guid roomId, string start, string end) =>

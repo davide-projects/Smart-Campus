@@ -25,6 +25,13 @@ public static class ReservationEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // GET /api/bookings/mine
+        api.MapGet("/mine", GetMineAsync)
+            .WithName("GetMyReservations")
+            .WithTags("Reservations")
+            .Produces<MyReservationsResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
         api.MapGet("/rooms/{roomId:guid}/future-reservations-count", CountFutureAsync)
             .WithName("CountFutureReservations")
             .WithTags("Reservations")
@@ -41,10 +48,12 @@ public static class ReservationEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        // 1. Chi prenota: dal token inoltrato dal Gateway.
+        // 1. Chi prenota: dal token inoltrato dal Gateway. Il nome si salva con la prenotazione
+        // così com'è adesso (snapshot): un cambio successivo in Identity non lo aggiorna.
         var organizerId = CurrentUser.TryGetUserId(httpRequest);
+        var organizerName = CurrentUser.TryGetUserName(httpRequest);
 
-        if (organizerId is null)
+        if (organizerId is null || organizerName is null)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status401Unauthorized,
@@ -146,6 +155,7 @@ public static class ReservationEndpoints
                 Id = Guid.NewGuid(),
                 RoomId = room.RoomId,
                 OrganizerId = organizerId.Value,
+                OrganizerName = organizerName,
                 Start = request.Start,
                 End = request.End,
                 Participants = 1,
@@ -169,6 +179,70 @@ public static class ReservationEndpoints
 
             return Results.Created($"/api/bookings/{reservation.Id}", response);
         });
+    }
+
+    // Le prenotazioni in cui l'utente è organizzatore o membro, divise in future, passate e cancellate.
+    // Nessuna paginazione: le future sono poche per costruzione (A2, INV-8).
+    private static async Task<IResult> GetMineAsync(
+        HttpRequest httpRequest,
+        BookingDbContext db,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.TryGetUserId(httpRequest);
+
+        if (userId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Accesso richiesto",
+                detail: "Effettua l'accesso per vedere le tue prenotazioni.");
+        }
+
+        // Una sola query: gli indici (OrganizerId, Start) e ReservationMembers (UserId) coprono i due rami.
+        var reservations = await db.Reservations
+            .AsNoTracking()
+            .Where(reservation =>
+                reservation.OrganizerId == userId ||
+                reservation.Members.Any(member => member.UserId == userId))
+            .Select(reservation => new
+            {
+                reservation.Status,
+                Item = new MyReservationItem(
+                    reservation.Id,
+                    reservation.RoomId,
+                    reservation.Room.Name,
+                    reservation.Room.BuildingName,
+                    reservation.Start,
+                    reservation.End,
+                    reservation.Members.Any(),
+                    reservation.OrganizerName,
+                    reservation.OrganizerId == userId)
+            })
+            .ToListAsync(cancellationToken);
+
+        // Una prenotazione è "passata" quando la sua fine è già arrivata: quelle in corso restano tra le future.
+        var now = timeProvider.GetUtcNow();
+        var confirmed = reservations.Where(reservation => reservation.Status == ReservationStatus.Confirmed).ToList();
+
+        var response = new MyReservationsResponse(
+            Upcoming: confirmed
+                .Where(reservation => reservation.Item.End > now)
+                .Select(reservation => reservation.Item)
+                .OrderBy(item => item.Start)
+                .ToList(),
+            Past: confirmed
+                .Where(reservation => reservation.Item.End <= now)
+                .Select(reservation => reservation.Item)
+                .OrderByDescending(item => item.Start)
+                .ToList(),
+            Cancelled: reservations
+                .Where(reservation => reservation.Status == ReservationStatus.Cancelled)
+                .Select(reservation => reservation.Item)
+                .OrderByDescending(item => item.Start)
+                .ToList());
+
+        return Results.Ok(response);
     }
 
     private static IResult ToProblem(ReservationRejection rejection) =>
