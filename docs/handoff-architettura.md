@@ -214,7 +214,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 ### 6.4 Gateway e Frontend
 
 - Il frontend chiama solo `/api/...` sul gateway.
-- Il gateway valida il JWT; i servizi verificano il ruolo sulle singole operazioni.
+- Il Gateway valida il JWT e applica le policy YARP; Rooms lo rivalida con `AddSmartCampusJwtBearer` e richiede il ruolo `Staff` sulle operazioni di scrittura come difesa in profondità.
 - Schermate proposte:
   - **Studente:** ricerca spazi · dettaglio spazio con disponibilità · prenota (da solo o con un gruppo) · le mie prenotazioni · check-in.
   - **Personale:** gestione spazi/edifici/attrezzature · prenotazioni per spazio · report utilizzo.

@@ -133,6 +133,7 @@ public static class RoomEndpoints
             .Include(existing => existing.OpeningHours)
             .Include(existing => existing.RoomEquipment)
             .SingleOrDefaultAsync(existing => existing.Id == id && existing.IsActive, cancellationToken);
+
         if (room is null)
         {
             return Results.Problem(
@@ -225,12 +226,14 @@ public static class RoomEndpoints
         room.IsActive = false;
         await publishEndpoint.Publish(new RoomDeactivated(room.Id), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+
         return Results.NoContent();
     }
 
     private static Dictionary<string, string[]> ValidateWriteRequest(RoomWriteRequest request)
     {
         var errors = new Dictionary<string, string[]>();
+
         if (request.BuildingId == Guid.Empty)
         {
             errors[nameof(request.BuildingId)] = ["L'identificativo dell'edificio non è valido."];

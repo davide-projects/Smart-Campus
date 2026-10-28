@@ -24,6 +24,7 @@ var rabbitMqPort = builder.Configuration.GetValue<ushort?>("RabbitMq:Port") ?? 5
 var rabbitMqVirtualHost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
 var rabbitMqUsername = builder.Configuration["RabbitMq:Username"] ?? "guest";
 var rabbitMqPassword = builder.Configuration["RabbitMq:Password"] ?? "guest";
+
 builder.Services.AddMassTransit(configure =>
 {
     configure.AddEntityFrameworkOutbox<RoomsDbContext>(outbox =>
@@ -45,6 +46,7 @@ builder.Services.AddMassTransit(configure =>
 });
 
 builder.Services.AddScoped<RoomSeedEventPublisher>();
+
 // La readiness include la disponibilità del database, per le probe di orchestrazione.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<RoomsDbContext>("database");

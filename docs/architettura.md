@@ -49,7 +49,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Limite noto:** l'ordine è garantito solo tra messaggi elaborati normalmente; un messaggio fallito e rielaborato più tardi potrebbe applicare uno stato vecchio. Per escluderlo servirebbe una versione o un `OccurredAt` negli eventi.
 
 ### API Gateway
-Routing `/api/{service}/**`, validazione JWT, CORS. Nessuna logica di dominio.
+Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle route YARP. La validazione condivisa usa `AddSmartCampusJwtBearer` di `ServiceDefaults`; Rooms valida di nuovo il token e richiede il ruolo `Staff` sulle route di scrittura.
 
 ### Frontend
 SPA Angular che comunica solo con il gateway.
@@ -69,7 +69,7 @@ SPA Angular che comunica solo con il gateway.
 |---|---|
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
-| Autenticazione | Identity emette i JWT; Identity e Rooms condividono la validazione bearer in `ServiceDefaults` |
+| Autenticazione | Identity emette i JWT; Gateway e Rooms condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff |
 | Database per servizio | 3 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`) |
 | Messaggistica | MassTransit 8.5.12 in Rooms e Bookings: versione unica scelta per mantenere l'allineamento e usare la licenza open source; RabbitMQ in locale, Azure Service Bus in cloud |
 | Eventi affidabili | Outbox pattern (MassTransit + EF Core) in Rooms |

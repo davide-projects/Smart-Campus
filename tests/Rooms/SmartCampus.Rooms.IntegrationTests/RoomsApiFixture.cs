@@ -2,18 +2,20 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
+
 using SmartCampus.Rooms.Data;
+
 using Testcontainers.MsSql;
 using Testcontainers.RabbitMq;
 
 namespace SmartCampus.Rooms.IntegrationTests;
-
 
 public sealed class RoomsApiFixture : IAsyncLifetime
 {
@@ -33,15 +35,13 @@ public sealed class RoomsApiFixture : IAsyncLifetime
 
     public RabbitMqContainer RabbitMq => _rabbitMq;
 
-    public static string SigningKey => JwtSigningKey;
-
-    public void AuthorizeAsStaff()
+    public void AuthorizeAsRole(string role)
     {
         var now = DateTime.UtcNow;
         var token = new JwtSecurityToken(
             issuer: "SmartCampus.Identity",
             audience: "SmartCampus",
-            claims: [new Claim("role", "Staff")],
+            claims: [new Claim("role", role)],
             notBefore: now,
             expires: now.AddMinutes(5),
             signingCredentials: new SigningCredentials(
@@ -82,7 +82,6 @@ public sealed class RoomsApiFixture : IAsyncLifetime
                 });
             });
 
-        
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RoomsDbContext>();

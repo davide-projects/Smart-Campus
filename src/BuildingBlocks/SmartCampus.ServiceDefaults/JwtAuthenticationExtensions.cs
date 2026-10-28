@@ -2,9 +2,16 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace SmartCampus.ServiceDefaults;
+
+public static class JwtClaimNames
+{
+    public const string Name = "name";
+    public const string Role = "role";
+}
 
 public static class JwtAuthenticationExtensions
 {
@@ -12,46 +19,72 @@ public static class JwtAuthenticationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var jwt = configuration.GetSection("Jwt");
-        var issuer = jwt["Issuer"];
-        if (string.IsNullOrWhiteSpace(issuer))
-        {
-            throw new InvalidOperationException("Jwt:Issuer è obbligatorio.");
-        }
+        services.AddOptions<SmartCampusJwtOptions>()
+            .Bind(configuration.GetSection(SmartCampusJwtOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SmartCampusJwtOptions>, SmartCampusJwtOptionsValidator>();
 
-        var audience = jwt["Audience"];
-        if (string.IsNullOrWhiteSpace(audience))
-        {
-            throw new InvalidOperationException("Jwt:Audience è obbligatorio.");
-        }
-
-        var signingKey = jwt["SigningKey"];
-        if (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)
-        {
-            throw new InvalidOperationException("Jwt:SigningKey deve contenere almeno 32 byte.");
-        }
-
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<SmartCampusJwtOptions>>((bearer, jwt) =>
             {
-                options.MapInboundClaims = false;
-                options.TokenValidationParameters = new TokenValidationParameters
+                var settings = jwt.Value;
+
+                // Keep JWT claim names unchanged so authorization policies read the original role claim.
+                bearer.MapInboundClaims = false;
+                bearer.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    ValidIssuer = issuer,
+                    ValidIssuer = settings.Issuer,
                     ValidateAudience = true,
-                    ValidAudience = audience,
+                    ValidAudience = settings.Audience,
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SigningKey)),
                     ValidateLifetime = true,
                     ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
                     ClockSkew = TimeSpan.FromSeconds(30),
-                    NameClaimType = "name",
-                    RoleClaimType = "role"
+                    NameClaimType = JwtClaimNames.Name,
+                    RoleClaimType = JwtClaimNames.Role
                 };
             });
 
         services.AddAuthorization();
         return services;
+    }
+}
+
+public sealed class SmartCampusJwtOptions
+{
+    public const string SectionName = "Jwt";
+    public const int MinimumSigningKeyBytes = 32;
+
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public string SigningKey { get; set; } = string.Empty;
+}
+
+public sealed class SmartCampusJwtOptionsValidator : IValidateOptions<SmartCampusJwtOptions>
+{
+    public ValidateOptionsResult Validate(string? name, SmartCampusJwtOptions options)
+    {
+        var failures = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(options.Issuer))
+        {
+            failures.Add("Jwt:Issuer è obbligatorio.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Audience))
+        {
+            failures.Add("Jwt:Audience è obbligatorio.");
+        }
+
+        if (Encoding.UTF8.GetByteCount(options.SigningKey) < SmartCampusJwtOptions.MinimumSigningKeyBytes)
+        {
+            failures.Add(
+                $"Jwt:SigningKey è obbligatoria e deve avere almeno {SmartCampusJwtOptions.MinimumSigningKeyBytes} byte.");
+        }
+
+        return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }

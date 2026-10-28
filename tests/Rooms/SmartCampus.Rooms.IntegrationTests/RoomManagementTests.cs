@@ -1,14 +1,10 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
 using SmartCampus.Contracts;
 using SmartCampus.Rooms.Features.Rooms;
 using SmartCampus.Rooms.Models;
@@ -63,16 +59,14 @@ public sealed class RoomManagementTests(RoomsApiFixture fixture) : IClassFixture
             var unauthenticatedResponse = await fixture.Client.PostAsJsonAsync("/api/rooms/", ValidRequest(30));
             Assert.Equal(HttpStatusCode.Unauthorized, unauthenticatedResponse.StatusCode);
 
-            fixture.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-                "Bearer", CreateToken("Student"));
+            fixture.AuthorizeAsRole("Student");
             var studentResponse = await fixture.Client.PostAsJsonAsync("/api/rooms/", ValidRequest(30));
             Assert.Equal(HttpStatusCode.Forbidden, studentResponse.StatusCode);
             var studentUpdateResponse = await fixture.Client.PutAsJsonAsync(
                 $"/api/rooms/{ClassroomA1Id}", ValidRequest(30));
             Assert.Equal(HttpStatusCode.Forbidden, studentUpdateResponse.StatusCode);
 
-            fixture.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-                "Bearer", CreateToken("Staff"));
+            fixture.AuthorizeAsRole("Staff");
             var invalidCapacityResponse = await fixture.Client.PostAsJsonAsync("/api/rooms/", ValidRequest(0));
             Assert.Equal(HttpStatusCode.BadRequest, invalidCapacityResponse.StatusCode);
             using (var validation = JsonDocument.Parse(await invalidCapacityResponse.Content.ReadAsStringAsync()))
@@ -156,21 +150,6 @@ public sealed class RoomManagementTests(RoomsApiFixture fixture) : IClassFixture
         true,
         [ProjectorId],
         [new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0))]);
-
-    private static string CreateToken(string role)
-    {
-        var now = DateTime.UtcNow;
-        var token = new JwtSecurityToken(
-            issuer: "SmartCampus.Identity",
-            audience: "SmartCampus",
-            claims: [new Claim("role", role)],
-            notBefore: now,
-            expires: now.AddMinutes(5),
-            signingCredentials: new SigningCredentials(
-                new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(RoomsApiFixture.SigningKey)),
-                SecurityAlgorithms.HmacSha256));
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
 
     private static async Task<TMessage> ReadEventForRoomAsync<TMessage>(
         ChannelReader<TMessage> events,

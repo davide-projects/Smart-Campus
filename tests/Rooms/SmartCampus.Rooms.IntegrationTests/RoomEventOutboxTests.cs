@@ -53,19 +53,19 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
 
         try
         {
-            fixture.AuthorizeAsStaff();
+            fixture.AuthorizeAsRole("Staff");
             await fixture.RabbitMq.PauseAsync();
             var createResponse = await fixture.Client.PostAsJsonAsync(
                 "/api/rooms/",
                 new RoomWriteRequest(
-                        BuildingAId,
-                        "Integration room",
-                        RoomType.Classroom,
-                        20,
-                        1,
-                        true,
-                        [],
-                        [new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0))]));
+                    BuildingAId,
+                    "Integration room",
+                    RoomType.Classroom,
+                    20,
+                    1,
+                    true,
+                    [],
+                    [new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0))]));
 
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var createdBody = await createResponse.Content.ReadFromJsonAsync<CreatedRoomResponse>();
@@ -127,7 +127,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
     [Fact]
     public async Task CreateRoom_WithNameAlreadyUsedInBuilding_ReturnsConflict()
     {
-        fixture.AuthorizeAsStaff();
+        fixture.AuthorizeAsRole("Staff");
         var response = await fixture.Client.PostAsJsonAsync(
             "/api/rooms/",
             new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, [], []));
@@ -141,7 +141,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
     [Fact]
     public async Task UpdateRoom_WithNameAlreadyUsedInBuilding_ReturnsConflictWithoutChangingRoom()
     {
-        fixture.AuthorizeAsStaff();
+        fixture.AuthorizeAsRole("Staff");
         var createResponse = await fixture.Client.PostAsJsonAsync(
             "/api/rooms/",
             new RoomWriteRequest(BuildingAId, "Room for duplicate test", RoomType.Classroom, 20, 1, true, [], []));
