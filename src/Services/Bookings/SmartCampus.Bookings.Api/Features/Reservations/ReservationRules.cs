@@ -1,4 +1,5 @@
 using SmartCampus.Bookings.Api.Entities;
+using SmartCampus.Bookings.Api.Entities.Enums;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -110,6 +111,39 @@ public static class ReservationRules
 
     public static ReservationRejection UserLockTimeout() =>
         new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Hai un'altra prenotazione in corso, riprova tra qualche secondo.");
+
+    // Cancellazione (US-08): l'ordine dei controlli è quello del design della change 25-cancella-prenotazione, decisione 2.
+    // 1. chi può cancellare: prima di tutto, così un estraneo riceve sempre 403 e non scopre lo stato della prenotazione;
+    // 2. già cancellata: nessuna modifica (idempotenza), anche se nel frattempo l'inizio è passato;
+    // 3. limite di tempo (assunzione A5): si cancella solo prima dell'inizio, Staff compreso.
+    public static CancellationDecision ValidateCancellation(
+        Reservation reservation,
+        Guid userId,
+        bool isStaff,
+        DateTimeOffset now)
+    {
+        if (reservation.OrganizerId != userId && !isStaff)
+        {
+            return CancellationDecision.Reject(new ReservationRejection(
+                StatusCodes.Status403Forbidden,
+                "Cancellazione non consentita",
+                "Non puoi cancellare questa prenotazione."));
+        }
+
+        if (reservation.Status == ReservationStatus.Cancelled)
+        {
+            return CancellationDecision.AlreadyCancelled;
+        }
+
+        if (reservation.Start <= now)
+        {
+            return CancellationDecision.Reject(Unprocessable(
+                "Cancellazione non consentita",
+                "Non è possibile cancellare una prenotazione già iniziata o passata."));
+        }
+
+        return CancellationDecision.Allowed;
+    }
 
     private static bool IsOnSlotBoundary(DateTimeOffset value) =>
         value.TimeOfDay.Ticks % SlotLength.Ticks == 0;

@@ -1,4 +1,5 @@
 using SmartCampus.Bookings.Api.Entities;
+using SmartCampus.Bookings.Api.Entities.Enums;
 using SmartCampus.Bookings.Api.Features.Reservations;
 
 namespace SmartCampus.Bookings.UnitTests;
@@ -124,6 +125,139 @@ public sealed class ReservationRulesTests
         var rejection = ReservationRules.ValidateAgainstRoom(Request(Tuesday, "10:00", "11:00"), room, Rome);
 
         Assert.Equal("Spazio non prenotabile", rejection?.Title);
+    }
+
+    // --- Cancellazione ---
+
+    private static readonly Guid Organizer = Guid.NewGuid();
+    private static readonly Guid Member = Guid.NewGuid();
+    private static readonly Guid Stranger = Guid.NewGuid();
+    private static readonly Guid StaffUser = Guid.NewGuid();
+
+    [Fact]
+    public void ValidateCancellation_OrganizerOnFutureReservation_IsAllowed()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), Organizer, isStaff: false, Now);
+
+        Assert.Equal(CancellationOutcome.Allowed, decision.Outcome);
+    }
+
+    [Fact]
+    public void ValidateCancellation_Member_IsForbidden()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), Member, isStaff: false, Now);
+
+        AssertForbidden(decision);
+    }
+
+    [Fact]
+    public void ValidateCancellation_Stranger_IsForbidden()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), Stranger, isStaff: false, Now);
+
+        AssertForbidden(decision);
+    }
+
+    [Fact]
+    public void ValidateCancellation_StaffOnSomeoneElsesReservation_IsAllowed()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), StaffUser, isStaff: true, Now);
+
+        Assert.Equal(CancellationOutcome.Allowed, decision.Outcome);
+    }
+
+    [Fact]
+    public void ValidateCancellation_AlreadyCancelledForOrganizer_ChangesNothing()
+    {
+        var decision = ReservationRules.ValidateCancellation(
+            Booking(Now.AddDays(1), ReservationStatus.Cancelled), Organizer, isStaff: false, Now);
+
+        Assert.Equal(CancellationOutcome.AlreadyCancelled, decision.Outcome);
+        Assert.Null(decision.Rejection);
+    }
+
+    [Fact]
+    public void ValidateCancellation_AlreadyCancelledForStranger_IsForbidden()
+    {
+        var decision = ReservationRules.ValidateCancellation(
+            Booking(Now.AddDays(1), ReservationStatus.Cancelled), Stranger, isStaff: false, Now);
+
+        AssertForbidden(decision);
+    }
+
+    [Fact]
+    public void ValidateCancellation_PastForStranger_IsForbidden()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(-1)), Stranger, isStaff: false, Now);
+
+        AssertForbidden(decision);
+    }
+
+    [Fact]
+    public void ValidateCancellation_StartEqualToNow_IsRejected()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now), Organizer, isStaff: false, Now);
+
+        AssertStarted(decision);
+    }
+
+    [Fact]
+    public void ValidateCancellation_OneTickBeforeStart_IsAllowed()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddTicks(1)), Organizer, isStaff: false, Now);
+
+        Assert.Equal(CancellationOutcome.Allowed, decision.Outcome);
+    }
+
+    [Fact]
+    public void ValidateCancellation_Past_IsRejected()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(-1)), Organizer, isStaff: false, Now);
+
+        AssertStarted(decision);
+    }
+
+    [Fact]
+    public void ValidateCancellation_StaffOnStartedReservation_IsRejected()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddMinutes(-15)), StaffUser, isStaff: true, Now);
+
+        AssertStarted(decision);
+    }
+
+    private static void AssertForbidden(CancellationDecision decision)
+    {
+        Assert.Equal(CancellationOutcome.Rejected, decision.Outcome);
+        Assert.Equal(403, decision.Rejection?.StatusCode);
+        Assert.Equal("Cancellazione non consentita", decision.Rejection?.Title);
+        Assert.Equal("Non puoi cancellare questa prenotazione.", decision.Rejection?.Detail);
+    }
+
+    private static void AssertStarted(CancellationDecision decision)
+    {
+        Assert.Equal(CancellationOutcome.Rejected, decision.Outcome);
+        Assert.Equal(422, decision.Rejection?.StatusCode);
+        Assert.Equal("Cancellazione non consentita", decision.Rejection?.Title);
+        Assert.Equal("Non è possibile cancellare una prenotazione già iniziata o passata.", decision.Rejection?.Detail);
+    }
+
+    // Prenotazione di un'ora di Organizer, di gruppo con Member.
+    private static Reservation Booking(DateTimeOffset start, ReservationStatus status = ReservationStatus.Confirmed)
+    {
+        var id = Guid.NewGuid();
+        return new Reservation
+        {
+            Id = id,
+            RoomId = Guid.NewGuid(),
+            OrganizerId = Organizer,
+            Start = start,
+            End = start.AddHours(1),
+            Participants = 2,
+            Status = status,
+            CreatedAt = Now.AddDays(-7),
+            CancelledAt = status == ReservationStatus.Cancelled ? Now.AddHours(-1) : null,
+            Members = [new ReservationMember { ReservationId = id, UserId = Member }]
+        };
     }
 
     // --- Dati di prova ---

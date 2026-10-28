@@ -16,6 +16,9 @@ public static class ReservationEndpoints
     // Lunghezza massima di DisplayName in Identity e della colonna OrganizerName.
     public const int MaxUserNameLength = 128;
 
+    // Valore del claim "role" del personale del campus emesso da Identity (Roles.Staff esiste solo nel Gateway).
+    public const string StaffRole = "Staff";
+
     private static readonly TimeZoneInfo CampusTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
 
     public static IEndpointRouteBuilder MapReservationEndpoints(this IEndpointRouteBuilder api)
@@ -36,6 +39,17 @@ public static class ReservationEndpoints
             .WithTags("Reservations")
             .Produces<MyReservationsResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        // DELETE /api/bookings/{id}: cambio di stato, la riga resta (storico per «Cancellate» e report).
+        // Con un id non GUID la route non corrisponde e risponde 404 il routing.
+        api.MapDelete("/{id:guid}", CancelReservationAsync)
+            .WithName("CancelReservation")
+            .WithTags("Reservations")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         api.MapGet("/rooms/{roomId:guid}/future-reservations-count", CountFutureAsync)
             .WithName("CountFutureReservations")
@@ -251,6 +265,76 @@ public static class ReservationEndpoints
                 .ToList());
 
         return Results.Ok(response);
+    }
+
+    // Cancellazione di una prenotazione (US-08). Ordine dei controlli e concorrenza: design della change
+    // 25-cancella-prenotazione, decisioni 2 e 4.
+    private static async Task<IResult> CancelReservationAsync(
+        Guid id,
+        ClaimsPrincipal user,
+        BookingDbContext db,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        // 1. Token valido ma senza un "sub" che sia un GUID: non identifica nessun utente.
+        if (!Guid.TryParse(user.FindFirstValue(JwtClaimNames.Subject), out var userId))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Accesso richiesto",
+                detail: "Effettua l'accesso per cancellare la prenotazione.");
+        }
+
+        // Il ruolo è il claim "role" del token così com'è (RoleClaimType = "role").
+        var isStaff = user.IsInRole(StaffRole);
+        var now = timeProvider.GetUtcNow();
+
+        // Il ciclo termina al più al secondo giro: un UPDATE con 0 righe vuol dire che un'altra richiesta
+        // ha già portato la prenotazione a Cancelled (INV-7: non torna più Confirmed), quindi la rilettura
+        // dà 204 o 403, oppure 404/422; non può più dare "consentita" con lo stesso "adesso".
+        while (true)
+        {
+            // 2. Lettura senza tracking: la scrittura è un comando a parte.
+            var reservation = await db.Reservations
+                .AsNoTracking()
+                .SingleOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+            if (reservation is null)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Prenotazione non trovata",
+                    detail: "La prenotazione richiesta non esiste.");
+            }
+
+            // 3-5. Chi può cancellare, già cancellata, limite di tempo.
+            var decision = ReservationRules.ValidateCancellation(reservation, userId, isStaff, now);
+
+            switch (decision.Outcome)
+            {
+                case CancellationOutcome.Rejected:
+                    return ToProblem(decision.Rejection!);
+                case CancellationOutcome.AlreadyCancelled:
+                    return Results.NoContent();
+            }
+
+            // 6. Un solo UPDATE condizionato: SQL Server valuta la WHERE in modo atomico sulla riga, quindi
+            // con richieste parallele al massimo una porta la prenotazione a Cancelled. Istruzione singola,
+            // senza transazione esplicita: un nuovo tentativo di EnableRetryOnFailure trova 0 righe e rilegge.
+            var updated = await db.Reservations
+                .Where(r => r.Id == id && r.Status == ReservationStatus.Confirmed && r.Start > now)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(r => r.Status, ReservationStatus.Cancelled)
+                    .SetProperty(r => r.CancelledAt, now),
+                    cancellationToken);
+
+            if (updated == 1)
+            {
+                return Results.NoContent();
+            }
+
+            // 0 righe: la prenotazione è cambiata tra la lettura e l'UPDATE. Si rilegge e si decide di nuovo.
+        }
     }
 
     // Nome visualizzato emesso da Identity. Null se il claim manca, è vuoto o è più lungo della colonna.
