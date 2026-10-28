@@ -1,0 +1,26 @@
+.room {
+  margin: 0;
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-title-medium);
+}
+
+.building {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.time {
+  margin: 12px 0 0;
+  color: var(--mat-sys-on-surface);
+}
+
+.error {
+  margin: 16px 0 0;
+  color: var(--mat-sys-error);
+}
+
+// Su schermi stretti i pulsanti vanno a capo invece di uscire dal dialog.
+mat-dialog-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -6,6 +6,10 @@ import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
+import { MatDialog } from '@angular/material/dialog';
+import { MatDialogHarness } from '@angular/material/dialog/testing';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSnackBarHarness } from '@angular/material/snack-bar/testing';
 import { MatProgressBarHarness } from '@angular/material/progress-bar/testing';
 import { MatTabGroupHarness } from '@angular/material/tabs/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -88,14 +92,17 @@ describe('MyBookings', () => {
   let fixture: ComponentFixture<MyBookings>;
   let element: HTMLElement;
   let loader: HarnessLoader;
+  // Dialog e snackbar stanno nell'overlay, fuori dal componente.
+  let rootLoader: HarnessLoader;
   let getMine: ReturnType<typeof vi.fn<() => Observable<MyReservationsResponse>>>;
+  let cancel: ReturnType<typeof vi.fn<(id: string) => Observable<void>>>;
 
   async function render(): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [MyBookings],
       providers: [
         provideRouter([{ path: 'rooms', component: EmptyPage }]),
-        { provide: BookingsService, useValue: { getMine } },
+        { provide: BookingsService, useValue: { getMine, cancel } },
         // Senza animazioni il contenuto della scheda cambia subito dopo la selezione.
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
@@ -104,6 +111,7 @@ describe('MyBookings', () => {
     fixture = TestBed.createComponent(MyBookings);
     element = fixture.nativeElement;
     loader = TestbedHarnessEnvironment.loader(fixture);
+    rootLoader = TestbedHarnessEnvironment.documentRootLoader(fixture);
     await fixture.whenStable();
   }
 
@@ -139,8 +147,31 @@ describe('MyBookings', () => {
     return loader.getHarnessOrNull(MatButtonHarness.with({ text: 'Cerca uno spazio' }));
   }
 
+  // Pulsanti «Cancella» della scheda aperta (il testo esatto esclude «Cancella prenotazione»).
+  async function cancelButtons(): Promise<MatButtonHarness[]> {
+    return loader.getAllHarnesses(MatButtonHarness.with({ text: 'Cancella' }));
+  }
+
+  // Titoli delle voci della scheda aperta che mostrano «Cancella».
+  function cancellableTitles(): string[] {
+    return [...element.querySelectorAll('mat-card')]
+      .filter((card) => card.querySelector('mat-card-actions button') !== null)
+      .map((card) => text(card, 'mat-card-title')!);
+  }
+
+  // Ora del dispositivo controllata: il 1° novembre 2026 alle 12:00Z.
+  const NOW = new Date('2026-11-01T12:00:00Z');
+
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
     getMine = vi.fn(() => of(response()));
+    cancel = vi.fn(() => of(undefined));
+  });
+
+  afterEach(() => {
+    TestBed.inject(MatDialog).closeAll();
+    vi.useRealTimers();
   });
 
   describe('tabs', () => {
@@ -369,6 +400,242 @@ describe('MyBookings', () => {
     });
   });
 
+  describe('cancel button', () => {
+    it('is shown on the upcoming reservations of the organizer', async () => {
+      await render();
+
+      expect(cancellableTitles()).toEqual(['Aula A1', 'Sala studio B2']);
+      const button = element.querySelector('mat-card-actions button')!;
+      expect(button.textContent!.trim()).toBe('Cancella');
+      expect(button.getAttribute('aria-label')).toBe(
+        'Cancella la prenotazione di Aula A1, giovedì 5 novembre 2026, 10:00–11:00',
+      );
+    });
+
+    it('is not shown on a reservation where the user is only a member', async () => {
+      getMine.mockReturnValue(
+        of(
+          response({
+            upcoming: [
+              reservation({ id: 'f1', isGroup: true, isOrganizer: false, organizerName: 'Mario' }),
+              reservation({ id: 'f2', roomName: 'Sala studio B2' }),
+            ],
+          }),
+        ),
+      );
+      await render();
+
+      expect(cancellableTitles()).toEqual(['Sala studio B2']);
+    });
+
+    it('is not shown on a reservation of the organizer that has already started', async () => {
+      // Le 10:30 del campus, a metà della prenotazione dalle 10:00 alle 11:00.
+      vi.setSystemTime(new Date('2026-11-05T09:30:00Z'));
+      await render();
+
+      expect(cancellableTitles()).toEqual(['Sala studio B2']);
+    });
+
+    it('is not shown on the Passate and Cancellate tabs', async () => {
+      await render();
+
+      await selectTab('Passate');
+      expect(titles()).toEqual(['Laboratorio C3']);
+      expect(await cancelButtons()).toEqual([]);
+
+      await selectTab('Cancellate');
+      expect(titles()).toEqual(['Aula D4']);
+      expect(await cancelButtons()).toEqual([]);
+    });
+  });
+
+  describe('cancelling', () => {
+    // Risposta dopo la cancellazione dell'«Aula A1».
+    const AFTER_CANCEL = response({
+      upcoming: [UPCOMING[1]],
+      cancelled: [UPCOMING[0], ...CANCELLED],
+    });
+
+    async function openDialog(index = 0): Promise<MatButtonHarness> {
+      const button = (await cancelButtons())[index];
+      await button.focus();
+      await button.click();
+      await fixture.whenStable();
+      return button;
+    }
+
+    async function confirmInDialog(): Promise<void> {
+      await (
+        await rootLoader.getHarness(MatButtonHarness.with({ text: 'Cancella prenotazione' }))
+      ).click();
+      await fixture.whenStable();
+    }
+
+    async function selectedLabel(): Promise<string> {
+      return (await (await tabs()).getSelectedTab()).getLabel();
+    }
+
+    function futureTabLabel(): HTMLElement {
+      const label = element.querySelector<HTMLElement>('[role="tab"]')!;
+      expect(label.textContent).toContain('Future');
+      return label;
+    }
+
+    it('opens the dialog with the summary of the reservation', async () => {
+      await render();
+
+      await openDialog(1);
+
+      const dialog = await rootLoader.getHarness(MatDialogHarness);
+      expect(await dialog.getTitleText()).toBe('Cancellare la prenotazione?');
+      expect(await dialog.getContentText()).toContain('Sala studio B2');
+      expect(await dialog.getContentText()).toContain('venerdì 6 novembre 2026, 14:00–15:30');
+    });
+
+    it('reloads the list and shows the reservation in Cancellate after the confirmation', async () => {
+      getMine.mockReturnValueOnce(of(response())).mockReturnValueOnce(of(AFTER_CANCEL));
+      await render();
+
+      await openDialog();
+      await confirmInDialog();
+
+      expect(cancel).toHaveBeenCalledExactlyOnceWith('f1');
+      expect(getMine).toHaveBeenCalledTimes(2);
+      expect(await rootLoader.hasHarness(MatDialogHarness)).toBe(false);
+      expect(await selectedLabel()).toBe('Future');
+      expect(titles()).toEqual(['Sala studio B2']);
+
+      await selectTab('Cancellate');
+      expect(cards()[0]).toEqual({
+        title: 'Aula A1',
+        subtitle: 'Edificio A',
+        time: 'giovedì 5 novembre 2026, 10:00–11:00',
+        group: null,
+        organizer: null,
+      });
+      expect(titles()).toEqual(['Aula A1', 'Aula D4']);
+    });
+
+    it('shows the empty Future tab after cancelling the last upcoming reservation', async () => {
+      getMine
+        .mockReturnValueOnce(of(response({ upcoming: [UPCOMING[0]] })))
+        .mockReturnValueOnce(of(response({ upcoming: [], cancelled: [UPCOMING[0]] })));
+      await render();
+
+      await openDialog();
+      await confirmInDialog();
+
+      expect(await selectedLabel()).toBe('Future');
+      expect(element.querySelector('[role="status"]')!.textContent).toContain(
+        'Non hai prenotazioni future.',
+      );
+      expect(await searchLink()).not.toBeNull();
+    });
+
+    it('keeps the tabs and the previous items while reloading', async () => {
+      const pending = new Subject<MyReservationsResponse>();
+      getMine.mockReturnValueOnce(of(response())).mockReturnValueOnce(pending);
+      await render();
+
+      await openDialog();
+      await confirmInDialog();
+
+      expect(getMine).toHaveBeenCalledTimes(2);
+      expect(await loader.hasHarness(MatTabGroupHarness)).toBe(true);
+      expect(await loader.hasHarness(MatProgressBarHarness)).toBe(false);
+      expect(await selectedLabel()).toBe('Future');
+      expect(titles()).toEqual(['Aula A1', 'Sala studio B2']);
+
+      pending.next(AFTER_CANCEL);
+      pending.complete();
+      await fixture.whenStable();
+      expect(titles()).toEqual(['Sala studio B2']);
+    });
+
+    it('shows a snackbar without actions configured for 5 seconds', async () => {
+      getMine.mockReturnValueOnce(of(response())).mockReturnValueOnce(of(AFTER_CANCEL));
+      await render();
+      const open = vi.spyOn(TestBed.inject(MatSnackBar), 'open');
+
+      await openDialog();
+      await confirmInDialog();
+
+      expect(open).toHaveBeenCalledExactlyOnceWith('Prenotazione cancellata.', undefined, {
+        duration: 5000,
+      });
+      const snackBar = await rootLoader.getHarness(MatSnackBarHarness);
+      expect(await snackBar.getMessage()).toBe('Prenotazione cancellata.');
+      expect(await snackBar.hasAction()).toBe(false);
+    });
+
+    it('closes the snackbar by itself after 5 seconds', async () => {
+      vi.useFakeTimers({
+        toFake: ['Date', 'setTimeout', 'clearTimeout'],
+        shouldAdvanceTime: true,
+      });
+      vi.setSystemTime(NOW);
+      getMine.mockReturnValueOnce(of(response())).mockReturnValueOnce(of(AFTER_CANCEL));
+      await render();
+
+      await openDialog();
+      await confirmInDialog();
+      expect(await rootLoader.hasHarness(MatSnackBarHarness)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(4000);
+      await fixture.whenStable();
+      expect(await rootLoader.hasHarness(MatSnackBarHarness)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await fixture.whenStable();
+      expect(await rootLoader.hasHarness(MatSnackBarHarness)).toBe(false);
+    });
+
+    it('moves the focus to the Future tab label', async () => {
+      getMine.mockReturnValueOnce(of(response())).mockReturnValueOnce(of(AFTER_CANCEL));
+      await render();
+
+      await openDialog();
+      await confirmInDialog();
+
+      expect(document.activeElement).toBe(futureTabLabel());
+    });
+
+    it('keeps tabs and items and shows an alert above the tabs when the reload fails', async () => {
+      getMine
+        .mockReturnValueOnce(of(response()))
+        .mockReturnValueOnce(
+          throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
+        );
+      await render();
+
+      await openDialog();
+      await confirmInDialog();
+
+      const alert = element.querySelector('[role="alert"]')!;
+      expect(alert.textContent!.trim()).toBe(
+        'Non è stato possibile caricare le prenotazioni. Riprova più tardi.',
+      );
+      expect(alert.nextElementSibling!.tagName).toBe('MAT-TAB-GROUP');
+      expect(await selectedLabel()).toBe('Future');
+      expect(titles()).toEqual(['Aula A1', 'Sala studio B2']);
+      expect(await loader.hasHarness(MatProgressBarHarness)).toBe(false);
+    });
+
+    it('does not reload and gives the focus back to Cancella when closed with Annulla', async () => {
+      await render();
+
+      const button = await openDialog();
+      await (await rootLoader.getHarness(MatButtonHarness.with({ text: 'Annulla' }))).click();
+      await fixture.whenStable();
+
+      expect(await rootLoader.hasHarness(MatDialogHarness)).toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+      expect(getMine).toHaveBeenCalledTimes(1);
+      expect(await button.isFocused()).toBe(true);
+      expect(titles()).toEqual(['Aula A1', 'Sala studio B2']);
+    });
+  });
+
   describe('loading and errors', () => {
     it('shows a progress bar while loading', async () => {
       const pending = new Subject<MyReservationsResponse>();
@@ -441,6 +708,59 @@ describe('MyBookings with an expired session', () => {
     request.flush(null, { status: 401, statusText: 'Unauthorized' });
     await harness.fixture.whenStable();
 
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(TestBed.inject(Router).url).toBe('/login?reason=expired&returnUrl=%2Fmy-bookings');
+    http.verify();
+  });
+
+  it('closes the dialog and goes back to the login on 401 when cancelling', async () => {
+    sessionStorage.setItem('smartcampus.session', JSON.stringify(SESSION));
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'login', component: EmptyPage },
+          { path: 'my-bookings', component: MyBookings },
+        ]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
+      ],
+    });
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+    const harness = await RouterTestingHarness.create('/my-bookings');
+    const loader = TestbedHarnessEnvironment.documentRootLoader(harness.fixture);
+
+    // Qui l'ora del dispositivo è quella reale: prenotazione sintetica lontana nel futuro.
+    const upcoming: MyReservationItem = {
+      id: 'f1',
+      roomId: 'r1',
+      roomName: 'Aula A1',
+      buildingName: 'Edificio A',
+      start: '2099-11-05T09:00:00+00:00',
+      end: '2099-11-05T10:00:00+00:00',
+      isGroup: false,
+      organizerName: null,
+      isOrganizer: true,
+    };
+    http.expectOne('/api/bookings/mine').flush({ upcoming: [upcoming], past: [], cancelled: [] });
+    await harness.fixture.whenStable();
+
+    await (await loader.getHarness(MatButtonHarness.with({ text: 'Cancella' }))).click();
+    await harness.fixture.whenStable();
+    await (
+      await loader.getHarness(MatButtonHarness.with({ text: 'Cancella prenotazione' }))
+    ).click();
+    await harness.fixture.whenStable();
+
+    const request = http.expectOne('/api/bookings/f1');
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 401, statusText: 'Unauthorized' });
+    await harness.fixture.whenStable();
+
+    expect(await loader.hasHarness(MatDialogHarness)).toBe(false);
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(await loader.hasHarness(MatSnackBarHarness)).toBe(false);
     expect(auth.isLoggedIn()).toBe(false);
     expect(TestBed.inject(Router).url).toBe('/login?reason=expired&returnUrl=%2Fmy-bookings');
     http.verify();

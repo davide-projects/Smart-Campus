@@ -8,12 +8,17 @@
       Non è stato possibile caricare le prenotazioni. Riprova più tardi.
     </p>
   } @else if (tabs().length > 0) {
+    @if (reloadFailed()) {
+      <p class="message" role="alert">
+        Non è stato possibile caricare le prenotazioni. Riprova più tardi.
+      </p>
+    }
     <mat-tab-group>
       @for (tab of tabs(); track tab.label) {
         <mat-tab [label]="tab.label">
           @if (tab.items.length > 0) {
             <ul class="reservations">
-              @for (item of tab.items; track item.id) {
+              @for (item of tab.items; track item.item.id) {
                 <li>
                   <mat-card appearance="outlined">
                     <mat-card-header>
@@ -27,6 +32,18 @@
                         <p class="organizer">{{ item.organizer }}</p>
                       }
                     </mat-card-content>
+                    @if (item.canCancel) {
+                      <mat-card-actions align="end">
+                        <button
+                          matButton="outlined"
+                          type="button"
+                          [attr.aria-label]="item.cancelLabel"
+                          (click)="openCancelDialog(item.item)"
+                        >
+                          Cancella
+                        </button>
+                      </mat-card-actions>
+                    }
                   </mat-card>
                 </li>
               }

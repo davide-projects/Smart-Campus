@@ -1,0 +1,29 @@
+<h2 mat-dialog-title>Cancellare la prenotazione?</h2>
+<mat-dialog-content>
+  <p class="room">{{ roomName }}</p>
+  <p class="building">{{ buildingName }}</p>
+  <p class="time">{{ time }}</p>
+  @if (errorMessage(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button
+    matButton="outlined"
+    type="button"
+    [disabled]="pending()"
+    disabledInteractive
+    (click)="cancel()"
+  >
+    Annulla
+  </button>
+  <button
+    matButton="filled"
+    type="button"
+    [disabled]="pending()"
+    disabledInteractive
+    (click)="confirm()"
+  >
+    Cancella prenotazione
+  </button>
+</mat-dialog-actions>

@@ -21,4 +21,9 @@ export class BookingsService {
       .set('date', date);
     return this.http.get<DailyAvailability>('/api/bookings/availability', { params });
   }
+
+  // Cancella una prenotazione: la riga resta, con stato «cancellata». Risposta 204 senza corpo.
+  cancel(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/bookings/${encodeURIComponent(id)}`);
+  }
 }

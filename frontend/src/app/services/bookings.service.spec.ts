@@ -95,4 +95,14 @@ describe('BookingsService', () => {
     expect(result?.isOpen).toBe(false);
     expect(result?.slots).toEqual([]);
   });
+
+  it('cancels a reservation with DELETE /api/bookings/{id}', async () => {
+    const result = new Promise<void>((resolve) => service.cancel('p1').subscribe(() => resolve()));
+
+    const request = http.expectOne('/api/bookings/p1');
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+
+    await result;
+  });
 });
