@@ -50,6 +50,16 @@ public sealed class RoomDetailsTests(RoomsApiFixture fixture) : IClassFixture<Ro
     }
 
     [Fact]
+    public async Task EquipmentData_IsRemovedFromSqlAndAvailableFromMongo()
+    {
+        Assert.Equal(0, await fixture.GetEquipmentSqlTableCountAsync());
+
+        var room = await GetRoomAsync(ClassroomA1Id);
+
+        Assert.Equal(["Lavagna", "Proiettore"], room.Equipment.Select(item => item.Name));
+    }
+
+    [Fact]
     public async Task Details_ForNonBookableRoom_IndicatesItCannotBeBooked()
     {
         var room = await GetRoomAsync(ReadingRoomId);

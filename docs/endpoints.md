@@ -53,7 +53,7 @@ Base pubblica: `/api/rooms`
 
 | Metodo | Percorso | Accesso | Parametri | Descrizione |
 |---|---|---|---|---|
-| `GET` | `/api/rooms/` | anonimo | Query opzionali: `type`, `minCapacity`, `buildingId` | Cerca gli spazi attivi; i filtri possono essere combinati. |
+| `GET` | `/api/rooms/` | anonimo | Query opzionali: `type`, `minCapacity`, `buildingId`, `equipmentIds` (ripetibile) | Cerca gli spazi attivi; i filtri possono essere combinati. Con più `equipmentIds` lo spazio deve avere tutte le attrezzature richieste. Ogni risultato include `equipment` con ID e nome di ciascuna attrezzatura assegnata. |
 | `GET` | `/api/rooms/{id}` | anonimo | `id`: GUID dello spazio | Restituisce il dettaglio di uno spazio attivo, incluse attrezzature e orari; risponde `404` se non esiste o è dismesso. |
 | `POST` | `/api/rooms/` | Staff | Body: `RoomWriteRequest` | Crea uno spazio attivo e pubblica `RoomCreated` tramite outbox; risponde `409` se il nome è già usato nell'edificio. |
 | `PUT` | `/api/rooms/{id}` | Staff | `id`: GUID; body: `RoomWriteRequest` | Aggiorna i dati e gli orari, quindi pubblica `RoomUpdated` tramite outbox; risponde `404` se lo spazio non esiste o è dismesso e `409` se il nome è già usato nell'edificio. |
@@ -62,7 +62,7 @@ Base pubblica: `/api/rooms`
 Esempio di ricerca filtrata:
 
 ```text
-GET http://localhost:5000/api/rooms/?type=Classroom&minCapacity=30&buildingId=11111111-1111-1111-1111-111111111111
+GET http://localhost:5000/api/rooms/?type=Classroom&minCapacity=30&buildingId=11111111-1111-1111-1111-111111111111&equipmentIds=e1000000-0000-0000-0000-000000000001
 ```
 
 ### Health check
@@ -72,7 +72,7 @@ Questi endpoint sono esposti direttamente dai servizi per controlli di disponibi
 | Metodo | Percorso | Descrizione |
 |---|---|---|
 | `GET` | `/health/live` | Indica se il processo del servizio è attivo. |
-| `GET` | `/health/ready` | Indica se il servizio è pronto; per Rooms e Identity verifica anche il database. |
+| `GET` | `/health/ready` | Indica se il servizio è pronto; per Rooms verifica SQL Server e MongoDB, per Identity il database SQL. |
 
 ## Endpoint pianificati
 

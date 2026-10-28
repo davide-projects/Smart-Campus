@@ -24,6 +24,4 @@ public class Room
     public bool IsActive { get; set; } = true;
 
     public ICollection<OpeningHours> OpeningHours { get; set; } = [];
-
-    public ICollection<RoomEquipment> RoomEquipment { get; set; } = [];
 }

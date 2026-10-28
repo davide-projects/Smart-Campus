@@ -16,6 +16,7 @@ using SmartCampus.Contracts;
 using SmartCampus.Rooms.Data;
 
 using Testcontainers.MsSql;
+using Testcontainers.MongoDb;
 using Testcontainers.RabbitMq;
 
 namespace SmartCampus.Rooms.IntegrationTests;
@@ -25,6 +26,9 @@ public sealed class RoomsApiFixture : IAsyncLifetime
     private const string JwtSigningKey = "rooms-integration-signing-key-with-at-least-32-bytes";
 
     private readonly MsSqlContainer _database = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+        .Build();
+
+    private readonly MongoDbContainer _mongoDb = new MongoDbBuilder("mongo:7.0")
         .Build();
 
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder("rabbitmq:4-management")
@@ -75,6 +79,7 @@ public sealed class RoomsApiFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _database.StartAsync();
+        await _mongoDb.StartAsync();
         await _rabbitMq.StartAsync();
         await StartSeedReceiverAsync();
 
@@ -83,6 +88,8 @@ public sealed class RoomsApiFixture : IAsyncLifetime
             {
                 builder.UseEnvironment("Development");
                 builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString());
+                builder.UseSetting("Mongo:ConnectionString", _mongoDb.GetConnectionString());
+                builder.UseSetting("Mongo:DatabaseName", $"RoomsIntegration_{Guid.NewGuid():N}");
                 builder.UseSetting("Jwt:Issuer", "SmartCampus.Identity");
                 builder.UseSetting("Jwt:Audience", "SmartCampus");
                 builder.UseSetting("Jwt:SigningKey", JwtSigningKey);
@@ -142,6 +149,23 @@ public sealed class RoomsApiFixture : IAsyncLifetime
         return await db.RoomSeedEventDispatches.CountAsync();
     }
 
+    public async Task<int> GetEquipmentSqlTableCountAsync()
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<RoomsDbContext>();
+        await db.Database.OpenConnectionAsync();
+        try
+        {
+            await using var command = db.Database.GetDbConnection().CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('Equipment', 'RoomEquipment')";
+            return Convert.ToInt32(await command.ExecuteScalarAsync());
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
     public async Task DisposeAsync()
     {
         if (_factory is not null)
@@ -156,6 +180,7 @@ public sealed class RoomsApiFixture : IAsyncLifetime
         }
 
         await _rabbitMq.DisposeAsync();
+        await _mongoDb.DisposeAsync();
         await _database.DisposeAsync();
     }
 }

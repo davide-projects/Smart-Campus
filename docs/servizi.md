@@ -52,7 +52,7 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 **Storie collegate:** US-09.
 
 ## Rooms: spazi
-**Cosa fa:** è l'**anagrafica del campus**: edifici (`Building`), aule, laboratori e sale studio (`Room`), attrezzature (`Equipment`) e orari di apertura (`OpeningHours`), con capienza e indicazione se sono prenotabili. Gli studenti la consultano per cercare, il personale la aggiorna.
+**Cosa fa:** è l'**anagrafica del campus**: edifici (`Building`), aule, laboratori e sale studio (`Room`), attrezzature (`Equipment`) e orari di apertura (`OpeningHours`), con capienza e indicazione se sono prenotabili. Spazi e orari sono in SQL Server, il catalogo e le assegnazioni delle attrezzature in MongoDB. Gli studenti la consultano per cercare, il personale la aggiorna.
 **Cosa NON fa:** non sa se uno spazio è libero o occupato: questo è compito di Bookings.
 **Quando cambia qualcosa:** avvisa Bookings (es. "l'Aula A1 ora ha 40 posti") con un **messaggio** (vedi sotto).
 **Storie collegate:** US-01, US-02, US-10, US-11.
@@ -106,7 +106,7 @@ I messaggi sono definiti in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`
 | `src/BuildingBlocks/SmartCampus.Contracts/` | Solo i messaggi scambiati tra servizi |
 | `tests/<Servizio>/` | Test di quel servizio: *UnitTests* per le regole, *IntegrationTests* con il database vero |
 | `tests/SmartCampus.EndToEnd.Tests/` | Test che attraversano più servizi, come farebbe un utente |
-| `docker-compose.yml` | Avvia tutto (servizi, database SQL Server, RabbitMQ) con un comando |
+| `docker-compose.yml` | Avvia tutto (servizi, SQL Server, MongoDB, RabbitMQ) con un comando |
 
 ## Regola d'oro
 

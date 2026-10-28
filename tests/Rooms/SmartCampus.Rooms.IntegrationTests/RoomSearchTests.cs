@@ -17,6 +17,8 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
 
     private static readonly Guid BuildingAId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid LibraryId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid ProjectorId = Guid.Parse("e1000000-0000-0000-0000-000000000001");
+    private static readonly Guid WhiteboardId = Guid.Parse("e1000000-0000-0000-0000-000000000003");
 
     [Fact]
     public async Task Search_WithoutFilters_ReturnsSeededActiveRooms()
@@ -71,6 +73,46 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     }
 
     [Fact]
+    public async Task Search_ByEquipment_ReturnsOnlyRoomsWithThatEquipment()
+    {
+        var rooms = await SearchAsync($"/api/rooms/?equipmentIds={ProjectorId}");
+
+        Assert.Equal(4, rooms.Count);
+        Assert.Equal(
+            ["Aula A1", "Aula A3", "Laboratorio Informatica 1", "Aula B1"],
+            rooms.Select(room => room.Name));
+
+        var classroom = Assert.Single(rooms, room => room.Name == "Aula A1");
+        Assert.Contains(classroom.Equipment, item => item.Id == ProjectorId && item.Name == "Proiettore");
+        Assert.Contains(classroom.Equipment, item => item.Id == WhiteboardId && item.Name == "Lavagna");
+    }
+
+    [Fact]
+    public async Task Search_ByMultipleEquipmentRequiresEveryRequestedItem()
+    {
+        var rooms = await SearchAsync($"/api/rooms/?equipmentIds={ProjectorId}&equipmentIds={WhiteboardId}");
+
+        Assert.Equal(["Aula A1", "Aula A3", "Aula B1"], rooms.Select(room => room.Name));
+    }
+
+    [Fact]
+    public async Task Search_WithEquipmentAndOtherFiltersAppliesEveryFilter()
+    {
+        var rooms = await SearchAsync(
+            $"/api/rooms/?type=Classroom&minCapacity=30&buildingId={BuildingAId}&equipmentIds={ProjectorId}");
+
+        Assert.Equal(["Aula A1", "Aula A3"], rooms.Select(room => room.Name));
+    }
+
+    [Fact]
+    public async Task Search_ByUnknownEquipmentReturnsNoRooms()
+    {
+        var rooms = await SearchAsync($"/api/rooms/?equipmentIds={Guid.NewGuid()}");
+
+        Assert.Empty(rooms);
+    }
+
+    [Fact]
     public async Task Search_WhenRoomIsNotBookable_IncludesItAndMarksIt()
     {
         var rooms = await SearchAsync("/api/rooms/");
@@ -115,6 +157,14 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
     public async Task Search_WithInvalidBuildingId_ReturnsBadRequest()
     {
         var response = await fixture.Client.GetAsync($"/api/rooms/?buildingId={Guid.Empty}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_WithInvalidEquipmentId_ReturnsBadRequest()
+    {
+        var response = await fixture.Client.GetAsync($"/api/rooms/?equipmentIds={Guid.Empty}");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

@@ -16,7 +16,7 @@ Prodotto per **trovare e prenotare gli spazi del campus senza impegni incompatib
 | Rooms | `src/Services/Rooms/` | 5102 | *Quali spazi esistono e come sono fatti?* | Edifici, aule, attrezzature, orari |
 | Bookings | `src/Services/Bookings/` | 5103 | *Chi userà quale spazio e quando? Lo ha usato davvero?* | Prenotazioni singole e di gruppo senza conflitti, disponibilità, check-in, report |
 
-Ogni servizio ha **il proprio database SQL Server** e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale).
+Ogni servizio possiede i propri dati e comunica con gli altri solo tramite API o eventi (RabbitMQ in locale). Identity e Bookings usano SQL Server; Rooms usa SQL Server per spazi e orari e MongoDB per catalogo e assegnazioni delle attrezzature.
 
 - **Cosa fa ogni servizio, spiegato semplice:** [docs/servizi.md](docs/servizi.md)
 - **Catalogo endpoint HTTP** (route attive, pianificate e istruzioni per aggiungerne): [docs/endpoints.md](docs/endpoints.md)
@@ -60,13 +60,14 @@ docker compose up --build
 ### Sviluppo (servizi in locale, infrastruttura in Docker)
 
 ```bash
-docker compose up -d sqlserver rabbitmq
+docker compose up -d sqlserver rabbitmq mongodb
+dotnet user-secrets set "Mongo:ConnectionString" "mongodb://localhost:27018" --project src/Services/Rooms/SmartCampus.Rooms.Api
 dotnet run --project src/Services/Rooms/SmartCampus.Rooms.Api
 dotnet run --project src/Gateway/SmartCampus.Gateway
 cd frontend && npm install && npm start
 ```
 
-Ogni servizio usa un database dedicato, anche quando i database risiedono sulla stessa istanza SQL Server. Per lo sviluppo locale, configura la connection string negli **user-secrets del singolo progetto**: tutti usano la chiave `ConnectionStrings:Database`, ma ciascuno punta al proprio database. Non inserire credenziali in `appsettings.json` e non committarle.
+Ogni servizio usa un database dedicato, anche quando più database risiedono sulla stessa istanza SQL Server. Rooms richiede inoltre MongoDB: in Compose è disponibile su `localhost:27018` (porta container `27017`), senza autenticazione. In MongoDB Compass connettiti a `mongodb://localhost:27018/SmartCampus_Rooms`, quindi apri le raccolte `Equipment` e `RoomEquipment`. Per altri ambienti configura `Mongo:ConnectionString` e `Mongo:DatabaseName` tramite user-secrets o variabili d'ambiente. Non inserire credenziali in `appsettings.json` e non committarle.
 
 Per SQL Server locale avviato con Docker Compose (`localhost,1433`, utente `sa`), imposta la connection string per ogni progetto. Sostituisci `<password>` con la password locale di SQL Server; se usi un altro server o utente, aggiorna i relativi campi. Gli ID degli user-secrets sono definiti nei progetti, quindi non serve eseguire `dotnet user-secrets init`.
 
@@ -99,7 +100,7 @@ dotnet user-secrets set "RabbitMq:Password" "<password>" --project src/Services/
 
 Senza queste impostazioni i servizi provano a collegarsi con `guest`/`guest`, ma il container RabbitMQ usa l'utente configurato da `RABBITMQ_USER`; la connessione locale fallisce. In Docker Compose host e credenziali sono già passati ai servizi tramite variabili d'ambiente (`RabbitMq__Host`, `RabbitMq__Port`, `RabbitMq__VirtualHost`, `RabbitMq__Username`, `RabbitMq__Password`).
 
-Gli user-secrets sono separati per progetto: se lavori su più servizi, esegui i comandi per ognuno. In Docker Compose gli host dei database sono `sqlserver` e le tre connection string con database distinti sono già configurate in `docker-compose.yml`; per avviare lo stack completo imposta in `.env` le credenziali locali richieste da `.env.example`. La password `MSSQL_SA_PASSWORD` deve avere almeno 8 caratteri e includere almeno 3 categorie tra lettere maiuscole, minuscole, numeri e simboli, altrimenti SQL Server si arresta durante l'inizializzazione. Compose controlla che SQL Server accetti una query prima di avviare Identity, Rooms e Bookings.
+Gli user-secrets sono separati per progetto: se lavori su più servizi, esegui i comandi per ognuno. In Docker Compose gli host dei database sono `sqlserver` e `mongodb`; le connection string SQL Server con database distinti e la configurazione Mongo di Rooms sono già impostate in `docker-compose.yml`. Per avviare lo stack completo imposta in `.env` le credenziali locali richieste da `.env.example`. La password `MSSQL_SA_PASSWORD` deve avere almeno 8 caratteri e includere almeno 3 categorie tra lettere maiuscole, minuscole, numeri e simboli, altrimenti SQL Server si arresta durante l'inizializzazione. Compose verifica SQL Server prima di avviare i servizi e MongoDB prima di avviare Rooms.
 
 Attualmente Rooms e Bookings leggono `ConnectionStrings:Database` e applicano le migrazioni EF Core all'avvio. Identity userà la stessa chiave quando verrà implementata la sua persistenza.
 
@@ -110,7 +111,7 @@ dotnet tool restore
 dotnet ef migrations add NomeMigrazione --project src/Services/Rooms/SmartCampus.Rooms.Api --output-dir Data/Migrations
 ```
 
-Il tool `dotnet-ef` è versionato in `.config/dotnet-tools.json`: `dotnet tool restore` lo installa per il repository, senza installazioni globali. La migrazione iniziale di Rooms include anche i dati sintetici di sviluppo (edifici, spazi, attrezzature, orari).
+Le migrazioni SQL di Rooms includono i dati sintetici di edifici, spazi e orari; il catalogo e le assegnazioni di attrezzature sono inizializzati idempotentemente in MongoDB.
 
 In sviluppo Angular inoltra `/api/*` al gateway tramite `frontend/proxy.conf.json`.
 
@@ -121,7 +122,7 @@ dotnet test SmartCampus.slnx
 cd frontend && npx ng test --watch=false
 ```
 
-Ogni servizio ha i propri unit test (regole di dominio) e test di integrazione (API + SQL Server reale con Testcontainers). `SmartCampus.EndToEnd.Tests` verifica i flussi tra più servizi.
+Ogni servizio ha i propri unit test (regole di dominio) e test di integrazione (API + database reali con Testcontainers: SQL Server e MongoDB per Rooms). Per avviare Rooms in locale devono essere attivi SQL Server, MongoDB e RabbitMQ; `/health/ready` verifica entrambi i database. `SmartCampus.EndToEnd.Tests` verifica i flussi tra più servizi.
 
 ## Contribuire
 

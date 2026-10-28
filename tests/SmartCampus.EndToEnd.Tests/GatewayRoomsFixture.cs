@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using SmartCampus.Rooms.Data;
 
 using Testcontainers.MsSql;
+using Testcontainers.MongoDb;
 using Testcontainers.RabbitMq;
 
 using Yarp.ReverseProxy.Forwarder;
@@ -20,6 +21,9 @@ namespace SmartCampus.EndToEnd.Tests;
 public sealed class GatewayRoomsFixture : IAsyncLifetime
 {
     private readonly MsSqlContainer _database = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+        .Build();
+
+    private readonly MongoDbContainer _mongoDb = new MongoDbBuilder("mongo:7.0")
         .Build();
 
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder("rabbitmq:4-management")
@@ -35,12 +39,15 @@ public sealed class GatewayRoomsFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _database.StartAsync();
+        await _mongoDb.StartAsync();
         await _rabbitMq.StartAsync();
 
         _roomsFactory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");
+                builder.UseSetting("Mongo:ConnectionString", _mongoDb.GetConnectionString());
+                builder.UseSetting("Mongo:DatabaseName", $"RoomsEndToEnd_{Guid.NewGuid():N}");
                 builder.UseSetting("Jwt:Issuer", "SmartCampus.Identity");
                 builder.UseSetting("Jwt:Audience", "SmartCampus");
                 builder.UseSetting("Jwt:SigningKey", "rooms-end-to-end-signing-key-with-at-least-32-bytes");
@@ -104,6 +111,7 @@ public sealed class GatewayRoomsFixture : IAsyncLifetime
         }
 
         await _rabbitMq.DisposeAsync();
+        await _mongoDb.DisposeAsync();
         await _database.DisposeAsync();
     }
 

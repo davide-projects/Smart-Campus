@@ -18,11 +18,12 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 
 ### Rooms
 - **Responsabilità:** anagrafica di ciò che esiste ed è prenotabile.
-- **Dati:** `Building`, `Room` (`Type`, `Capacity`, `Floor`, `IsBookable`, `IsActive`), `Equipment`, `OpeningHours`.
-- **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=` restituisce solo gli spazi attivi. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
-- **Gestione:** `POST /api/rooms` e `PUT /api/rooms/{id}` sono riservati al ruolo `Staff`; aggiornano anche attrezzature e orari.
+- **Dati:** `Building`, `Room` (`Type`, `Capacity`, `Floor`, `IsBookable`, `IsActive`) e `OpeningHours` in SQL Server; catalogo `Equipment` e associazioni `RoomEquipment` in MongoDB.
+- **Ricerca:** `GET /api/rooms?type=&minCapacity=&buildingId=&equipmentIds=` restituisce solo gli spazi attivi e, per ogni spazio, le attrezzature assegnate con ID e nome. `equipmentIds` è ripetibile e con più valori richiede tutte le attrezzature selezionate. `IsActive = false` significa dismesso: resta in archivio ma non compare mai nella ricerca. `IsBookable = false` resta invece visibile, ma non prenotabile.
+- **Gestione:** `POST /api/rooms` e `PUT /api/rooms/{id}` sono riservati al ruolo `Staff`; dati dello spazio e orari sono scritti in SQL Server, attrezzature in MongoDB.
+- **Scelta MongoDB:** `Equipment` è il catalogo e `RoomEquipment` conserva, per ogni spazio, l'elenco degli ID delle attrezzature. La forma documentale supporta la sostituzione atomica dell'assegnazione e il filtro con indice multikey, mantenendo SQL Server per i dati relazionali e l'outbox.
 - **Orari:** nel primo incremento è prevista una fascia per spazio e giorno; i giorni chiusi sono assenti e le chiusure straordinarie fuori ambito. `RoomCreated` e `RoomUpdated` includono lo snapshot degli orari.
-- **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. All'avvio Rooms ne pubblica gli eventi una sola volta tramite outbox.
+- **Seed e migrazione:** i dati sintetici di edifici, spazi e orari sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. Le attrezzature di esempio sono seed idempotenti in MongoDB. Durante il passaggio dal vecchio schema, Rooms copia prima catalogo e associazioni dalle tabelle SQL in MongoDB e solo dopo le rimuove con una migrazione. All'avvio Rooms pubblica gli eventi una sola volta tramite outbox.
 - **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`, `BuildingName`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati. `BuildingName` è il nome dell'edificio dello spazio al momento dell'accodamento: Rooms lo valorizza sempre (creazione, modifica e pubblicazione seed), ma nel contratto è facoltativo e vale `null` negli eventi che non lo contengono.
 
 ### Bookings
@@ -58,15 +59,6 @@ Instrada `/api/{service}/**`, valida i JWT e applica le policy di accesso delle 
 ### Frontend
 SPA Angular che comunica solo con il gateway.
 
-## Opzione da valutare: audit dei check-in su MongoDB
-
-> **Stato: con riserva, non implementato.** Non è ancora deciso se realizzarlo.
-
-- **Idea:** registrare su MongoDB uno storico degli eventi di check-in (*audit*), separato dal database SQL Server di Bookings.
-- **Da decidere prima di implementarlo:** cosa si registra, chi lo consulta, quale valore aggiunge rispetto a `AttendanceRecord` su SQL Server.
-- **Impatto se adottato:** un container MongoDB in `docker-compose.yml`, una seconda tecnologia di persistenza da configurare, testare e documentare.
-- **Vincolo della traccia:** la doppia persistenza non è imposta e ogni scelta va motivata rispetto al bisogno.
-
 ## Principi cloud-ready
 
 | Principio | Applicazione |
@@ -74,7 +66,7 @@ SPA Angular che comunica solo con il gateway.
 | Container | Un `Dockerfile` per ogni servizio; servizi stateless |
 | Configurazione esterna | Variabili d'ambiente / user-secrets; nessun segreto versionato |
 | Autenticazione | Identity emette i JWT; Gateway, Rooms e Bookings condividono `AddSmartCampusJwtBearer` in `ServiceDefaults`; Rooms rivalida il token sulle route Staff e Bookings su tutte le sue route |
-| Database per servizio | 3 database SQL Server separati (`SmartCampus_Identity`, `SmartCampus_Rooms`, `SmartCampus_Bookings`) |
+| Database per servizio | Identity e Bookings usano SQL Server; Rooms usa SQL Server per edifici, spazi, orari e outbox, e MongoDB per catalogo e assegnazioni delle attrezzature |
 | Messaggistica | MassTransit 8.5.12 in Rooms e Bookings: versione unica scelta per mantenere l'allineamento e usare la licenza open source; RabbitMQ in locale, Azure Service Bus in cloud |
 | Eventi affidabili | Outbox pattern (MassTransit + EF Core) in Rooms |
 | Health check | `/health/live`, `/health/ready` |
@@ -85,6 +77,7 @@ SPA Angular che comunica solo con il gateway.
 |---|---|
 | Container dei servizi e del gateway | Azure Container Apps |
 | SQL Server in container | Azure SQL Database (uno per servizio, serverless o elastic pool) |
+| MongoDB in container | MongoDB Atlas (cluster gestito, ad esempio su Azure) |
 | RabbitMQ | Azure Service Bus |
 | `.env` / user-secrets | Azure Key Vault + Managed Identity |
 | Frontend nginx | Azure Static Web Apps |
