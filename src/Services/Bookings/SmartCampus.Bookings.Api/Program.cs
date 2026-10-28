@@ -86,10 +86,7 @@ app.MapDefaultEndpoints();
 // Gli endpoint di salute (/health/*) restano fuori dal gruppo e quindi anonimi.
 var api = app.MapGroup("/api/bookings").RequireAuthorization();
 api.MapReservationEndpoints();
-
-api.MapGet("/", () => Results.Ok(new { service = "bookings", status = "ok" }))
-    .WithName("InfoBookings");
-
+api.MapReservationListEndpoints();
 api.MapAvailabilityEndpoints();
 
 app.Run();
