@@ -6,12 +6,12 @@ Ordine: gruppo 1 (#90) → gruppo 2 (#23, dopo il merge di #90) → gruppo 3 (#2
 
 Area: `svc:rooms`.
 
-- [ ] 1.1 Aggiungere `BuildingName` come proprietà `init` di tipo `string?` (predefinito `null`) a `RoomCreated` e `RoomUpdated` in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`; verificare che `dotnet build SmartCampus.slnx` passi senza modificare i costruttori esistenti.
-- [ ] 1.2 Aggiungere `RoomEventFactory.ToUpdatedEvent` e far passare da `RoomEventFactory` entrambi gli eventi, valorizzando `BuildingName` con il nome dell'edificio dello spazio; verificare con la build e con i test esistenti di Rooms.
-- [ ] 1.3 In `RoomEndpoints` (creazione e modifica) leggere il nome dell'edificio dove oggi si controlla solo che esista, senza cambiare risposte e messaggi d'errore; verificare che i test di `RoomManagementTests` passino invariati.
-- [ ] 1.4 In `RoomSeedEventPublisher` includere l'edificio nella query degli spazi; verificare con un test che gli eventi seed contengano il nome dell'edificio.
-- [ ] 1.5 Test di integrazione (Testcontainers): `RoomCreated` alla creazione e `RoomUpdated` alla modifica, con e senza cambio di edificio, contengono il nome dell'edificio; `dotnet test tests/Rooms/SmartCampus.Rooms.IntegrationTests` verde.
-- [ ] 1.6 Aggiornare `docs/architettura.md` (campi pubblicati da Rooms) e `docs/handoff-architettura.md` 6.1 (eventi pubblicati); verificare che i campi elencati coincidano con `Events.cs`.
+- [x] 1.1 Aggiungere `BuildingName` come proprietà `init` di tipo `string?` (predefinito `null`) a `RoomCreated` e `RoomUpdated` in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`; verificare che `dotnet build SmartCampus.slnx` passi senza modificare i costruttori esistenti.
+- [x] 1.2 Aggiungere `RoomEventFactory.ToUpdatedEvent` e far passare da `RoomEventFactory` entrambi gli eventi, valorizzando `BuildingName` con il nome dell'edificio dello spazio; verificare con la build e con i test esistenti di Rooms.
+- [x] 1.3 In `RoomEndpoints` (creazione e modifica) leggere il nome dell'edificio dove oggi si controlla solo che esista, senza cambiare risposte e messaggi d'errore; verificare che i test di `RoomManagementTests` passino invariati.
+- [x] 1.4 In `RoomSeedEventPublisher` includere l'edificio nella query degli spazi; verificare con un test che gli eventi seed contengano il nome dell'edificio.
+- [x] 1.5 Test di integrazione (Testcontainers): `RoomCreated` alla creazione e `RoomUpdated` alla modifica, con e senza cambio di edificio, contengono il nome dell'edificio; `dotnet test tests/Rooms/SmartCampus.Rooms.IntegrationTests` verde.
+- [x] 1.6 Aggiornare `docs/architettura.md` (campi pubblicati da Rooms) e `docs/handoff-architettura.md` 6.1 (eventi pubblicati); verificare che i campi elencati coincidano con `Events.cs`.
 
 ## 2. Bookings: API delle mie prenotazioni (#23)
 

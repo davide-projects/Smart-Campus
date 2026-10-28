@@ -29,6 +29,7 @@ internal sealed class RoomSeedEventPublisher(
             }
 
             var rooms = await db.Rooms
+                .Include(room => room.Building)
                 .Include(room => room.OpeningHours)
                 .ToListAsync(cancellationToken);
 
@@ -36,7 +37,7 @@ internal sealed class RoomSeedEventPublisher(
             {
                 if (room.IsActive)
                 {
-                    await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room), cancellationToken);
+                    await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room, room.Building.Name), cancellationToken);
                 }
                 else
                 {

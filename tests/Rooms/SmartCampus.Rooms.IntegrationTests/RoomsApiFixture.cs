@@ -2,7 +2,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.Channels;
 
+using MassTransit;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 
+using SmartCampus.Contracts;
 using SmartCampus.Rooms.Data;
 
 using Testcontainers.MsSql;
@@ -31,7 +34,13 @@ public sealed class RoomsApiFixture : IAsyncLifetime
 
     private WebApplicationFactory<Program>? _factory;
 
+    private ServiceProvider? _seedReceiverProvider;
+
     public HttpClient Client { get; private set; } = null!;
+
+    // RoomCreated ricevuti dal momento in cui il fixture si collega al broker, prima dell'avvio
+    // di Rooms: comprendono quindi quelli della pubblicazione iniziale degli spazi seed.
+    public Channel<RoomCreated> SeedRoomCreatedEvents { get; } = Channel.CreateUnbounded<RoomCreated>();
 
     public RabbitMqContainer RabbitMq => _rabbitMq;
 
@@ -55,6 +64,7 @@ public sealed class RoomsApiFixture : IAsyncLifetime
     {
         await _database.StartAsync();
         await _rabbitMq.StartAsync();
+        await StartSeedReceiverAsync();
 
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -94,6 +104,34 @@ public sealed class RoomsApiFixture : IAsyncLifetime
         });
     }
 
+    private async Task StartSeedReceiverAsync()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(SeedRoomCreatedEvents);
+        services.AddMassTransit(configure =>
+        {
+            configure.AddConsumer<SeedRoomCreatedConsumer>();
+            configure.UsingRabbitMq((context, rabbitMq) =>
+            {
+                rabbitMq.Host(
+                    "localhost",
+                    _rabbitMq.GetMappedPublicPort(5672),
+                    "/",
+                    host =>
+                    {
+                        host.Username("rooms-integration");
+                        host.Password("rooms-integration");
+                    });
+
+                rabbitMq.ReceiveEndpoint($"rooms-seed-events-{Guid.NewGuid():N}", endpoint =>
+                    endpoint.ConfigureConsumer<SeedRoomCreatedConsumer>(context));
+            });
+        });
+
+        _seedReceiverProvider = services.BuildServiceProvider();
+        await _seedReceiverProvider.GetRequiredService<IBusControl>().StartAsync();
+    }
+
     public async Task<int> GetSeedDispatchCountAsync()
     {
         await using var scope = _factory!.Services.CreateAsyncScope();
@@ -108,7 +146,22 @@ public sealed class RoomsApiFixture : IAsyncLifetime
             await _factory.DisposeAsync();
         }
 
+        if (_seedReceiverProvider is not null)
+        {
+            await _seedReceiverProvider.GetRequiredService<IBusControl>().StopAsync();
+            await _seedReceiverProvider.DisposeAsync();
+        }
+
         await _rabbitMq.DisposeAsync();
         await _database.DisposeAsync();
+    }
+}
+
+internal sealed class SeedRoomCreatedConsumer(Channel<RoomCreated> events) : IConsumer<RoomCreated>
+{
+    public Task Consume(ConsumeContext<RoomCreated> context)
+    {
+        events.Writer.TryWrite(context.Message);
+        return Task.CompletedTask;
     }
 }
