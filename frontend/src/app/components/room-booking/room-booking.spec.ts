@@ -224,7 +224,8 @@ describe('RoomBooking', () => {
 
     it('offers only half hours inside the opening hours of the chosen day', async () => {
       await render();
-      await chooseDay(5);
+      // Giovedì 12: un giorno futuro, l'inizio parte dall'apertura.
+      await chooseDay(12);
 
       const starts = await optionTexts('Ora di inizio');
       const ends = await optionTexts('Ora di fine');
@@ -239,6 +240,36 @@ describe('RoomBooking', () => {
         expect(time).toMatch(/^\d{2}:(00|30)$/);
       }
       expect(element().textContent).toContain('Aperto dalle 08:00 alle 20:00');
+    });
+
+    it('offers today only the half hours after the campus time', async () => {
+      // 09:10 di giovedì 5 novembre 2026 a Roma.
+      vi.setSystemTime(new Date('2026-11-05T08:10:00Z'));
+      await render();
+      await chooseDay(5);
+
+      const starts = await optionTexts('Ora di inizio');
+
+      expect(starts[0]).toBe('09:30');
+      expect(starts.at(-1)).toBe('19:30');
+      expect(starts).toHaveLength(21);
+    });
+
+    it('does not offer today the half hour that is the current campus time', async () => {
+      // NOW: 09:00 di Roma.
+      await render();
+      await chooseDay(5);
+
+      expect((await optionTexts('Ora di inizio'))[0]).toBe('09:30');
+    });
+
+    it('offers today the half hours after the campus time when the device is in UTC', async () => {
+      env['TZ'] = 'UTC';
+      vi.setSystemTime(new Date('2026-11-05T08:10:00Z'));
+      await render();
+      await chooseDay(5);
+
+      expect((await optionTexts('Ora di inizio'))[0]).toBe('09:30');
     });
 
     it('clears the times that are outside the opening hours of the new day', async () => {
@@ -318,7 +349,7 @@ describe('RoomBooking', () => {
 
       await chooseDay(5);
       expect(await input.getValue()).not.toBe('');
-      expect(await optionTexts('Ora di inizio')).toContain('08:00');
+      expect(await optionTexts('Ora di inizio')).toContain('10:00');
     });
 
     it('keeps the calendar toggle reachable from the keyboard', async () => {

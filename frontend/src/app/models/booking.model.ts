@@ -87,6 +87,20 @@ export function campusToday(now: Date = new Date()): Date {
   return new Date(part('year'), part('month') - 1, part('day'));
 }
 
+const CLOCK_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: CAMPUS_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+// Ora attuale del campus come «HH:mm», es. «09:10».
+export function campusTime(now: Date = new Date()): string {
+  const parts = CLOCK_FORMAT.formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)!.value;
+  return `${part('hour')}:${part('minute')}`;
+}
+
 // Data-ora ISO 8601 con lo scostamento del campus per il giorno scelto (letto come data del
 // calendario, senza fuso) e l'ora «HH:mm» del campus. Es. 5 novembre 2026, «10:00» →
 // «2026-11-05T10:00:00+01:00»; a giugno lo scostamento è +02:00 per l'ora legale.
@@ -126,7 +140,7 @@ function formatOffset(offsetMinutes: number): string {
   return `${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
 }
 
-function pad(value: number, length = 2): string {
+export function pad(value: number, length = 2): string {
   return String(value).padStart(length, '0');
 }
 

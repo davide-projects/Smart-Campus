@@ -31,10 +31,12 @@ import {
   ReservationResponse,
   addDays,
   campusDateTime,
+  campusTime,
   campusToday,
+  pad,
   reservationTimeLabel,
 } from '../../models/booking.model';
-import { DayOfWeek, OpeningHours, RoomDetail } from '../../models/room.model';
+import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
 import { BookingsService } from '../../services/bookings.service';
 import { RoomsService } from '../../services/rooms.service';
 
@@ -49,17 +51,6 @@ export const MAX_PURPOSE_LENGTH = 200;
 export const ROOM_CONFLICT_DETAIL = 'Lo spazio è già prenotato in questa fascia.';
 
 export const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
-
-// Ordine di Date.getDay(): 0 è domenica.
-const DAYS_OF_WEEK: DayOfWeek[] = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
 
 interface BookingForm {
   day: FormControl<Date | null>;
@@ -138,11 +129,22 @@ export class RoomBooking implements OnInit {
     return room && day ? openingHoursOn(room, day) : null;
   });
 
-  // Inizio fino a mezz'ora prima della chiusura, fine da mezz'ora dopo l'apertura e, scelto
-  // l'inizio, solo dopo l'inizio. Il limite delle 4 ore resta del servizio.
+  // Inizio fino a mezz'ora prima della chiusura e, oggi, solo dopo l'ora attuale del campus; fine
+  // da mezz'ora dopo l'apertura e, scelto l'inizio, solo dopo l'inizio. Il limite delle 4 ore e
+  // l'ora che passa mentre la pagina è aperta restano del servizio.
   protected readonly startOptions = computed(() => {
     const hours = this.dayHours();
-    return hours ? halfHourSlots(hours).slice(0, -1) : [];
+    const day = this.selectedDay();
+    if (!hours || !day) {
+      return [];
+    }
+    const starts = halfHourSlots(hours).slice(0, -1);
+    if (day.getTime() !== campusToday().getTime()) {
+      return starts;
+    }
+    // Gli orari «HH:mm» si confrontano come testo.
+    const now = campusTime();
+    return starts.filter((time) => time > now);
   });
   protected readonly endOptions = computed(() => {
     const hours = this.dayHours();
@@ -295,8 +297,10 @@ function rejectionMessage(error: unknown): string | null {
 }
 
 // Orario di apertura nel giorno della settimana della data scelta (data del calendario).
+// WEEK_DAYS parte dal lunedì, Date.getDay() dalla domenica (0).
 function openingHoursOn(room: RoomDetail, day: Date): OpeningHours | null {
-  const hours = room.openingHours.find((h) => h.dayOfWeek === DAYS_OF_WEEK[day.getDay()]);
+  const weekDay = WEEK_DAYS[(day.getDay() + 6) % 7];
+  const hours = room.openingHours.find((h) => h.dayOfWeek === weekDay);
   if (!hours || hours.isClosed || !hours.opensAt || !hours.closesAt) {
     return null;
   }
@@ -318,8 +322,4 @@ function halfHourSlots(hours: OpeningHours): string[] {
 function toMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
 }

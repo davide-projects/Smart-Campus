@@ -1,4 +1,4 @@
-import { campusDateTime, campusToday, reservationTimeLabel } from './booking.model';
+import { campusDateTime, campusTime, campusToday, reservationTimeLabel } from './booking.model';
 
 // Variabile d'ambiente del fuso del processo di test, per simulare un dispositivo in un altro fuso.
 const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } })
@@ -56,6 +56,24 @@ describe('campus time helpers', () => {
 
       expect([today.getFullYear(), today.getMonth(), today.getDate()]).toEqual([2026, 10, 5]);
       expect([today.getHours(), today.getMinutes()]).toEqual([0, 0]);
+    });
+  });
+
+  describe('campusTime', () => {
+    it('returns the time of Rome in winter and in summer', () => {
+      expect(campusTime(new Date('2026-11-05T08:10:00Z'))).toBe('09:10');
+      expect(campusTime(new Date('2026-06-05T08:10:00Z'))).toBe('10:10');
+    });
+
+    it('writes the hour after midnight as 00', () => {
+      expect(campusTime(new Date('2026-11-04T23:30:00Z'))).toBe('00:30');
+    });
+
+    it('does not depend on the time zone of the device', () => {
+      for (const zone of ['UTC', 'America/New_York', 'Asia/Tokyo']) {
+        env['TZ'] = zone;
+        expect(campusTime(new Date('2026-11-05T08:10:00Z'))).toBe('09:10');
+      }
     });
   });
 
