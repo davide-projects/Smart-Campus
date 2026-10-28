@@ -33,15 +33,19 @@ La pagina `/rooms/:id/book` SHALL essere riservata agli utenti autenticati. Un v
 - **THEN** la pagina mostra «Spazio non trovato» e non mostra il modulo
 
 ### Requirement: Giorni e orari proposti nel modulo
-Il giorno SHALL essere scelto solo tra oggi e oggi + 14 giorni (date dell'ora del campus); i giorni in cui lo spazio è chiuso MUST NOT essere selezionabili. Ora di inizio e di fine SHALL essere scelte solo all'ora esatta o alla mezz'ora e solo dentro l'orario di apertura dello spazio nel giorno scelto, letto da `GET /api/rooms/{id}`. L'ora di fine SHALL proporre solo orari successivi all'ora di inizio scelta; se l'ora di inizio cambia e la fine scelta non è più successiva, l'ora di fine MUST essere azzerata. Il giorno SHALL potersi scegliere solo dal calendario: il campo «Giorno» MUST NOT accettare testo scritto a mano. Le regole restano verificate dal servizio: un rifiuto `422` SHALL comunque essere mostrato.
+Il giorno SHALL essere scelto solo tra oggi e oggi + 14 giorni (date dell'ora del campus); i giorni in cui lo spazio è chiuso MUST NOT essere selezionabili. Ora di inizio e di fine SHALL essere scelte solo all'ora esatta o alla mezz'ora e solo dentro l'orario di apertura dello spazio nel giorno scelto, letto da `GET /api/rooms/{id}`. Nel giorno corrente (data di `Europe/Rome`) l'ora di inizio SHALL proporre solo le mezz'ore successive all'ora attuale del campus; le mezz'ore già passate, compresa quella che coincide con l'ora attuale, MUST NOT essere proposte. L'ora di fine SHALL proporre solo orari successivi all'ora di inizio scelta; se l'ora di inizio cambia e la fine scelta non è più successiva, l'ora di fine MUST essere azzerata. Il giorno SHALL potersi scegliere solo dal calendario: il campo «Giorno» MUST NOT accettare testo scritto a mano. Le regole restano verificate dal servizio: un rifiuto `422` SHALL comunque essere mostrato.
 
 #### Scenario: Orari selezionabili
 - **WHEN** lo studente apre la scelta dell'ora di inizio o di fine
 - **THEN** ogni orario proposto termina in «:00» o «:30»
 
 #### Scenario: Orari dentro l'apertura
-- **WHEN** l'«Aula A1» è aperta il giovedì dalle 08:00 alle 20:00 e lo studente sceglie giovedì 5 novembre 2026, prima di scegliere l'ora di inizio
+- **WHEN** l'«Aula A1» è aperta il giovedì dalle 08:00 alle 20:00 e lo studente sceglie giovedì 12 novembre 2026, prima di scegliere l'ora di inizio
 - **THEN** l'ora di inizio va da 08:00 a 19:30, l'ora di fine da 08:30 a 20:00, e non sono proposti orari fuori da questo intervallo
+
+#### Scenario: Mezz'ore passate nel giorno corrente
+- **WHEN** oggi è giovedì 5 novembre 2026, a Roma sono le 09:10, l'«Aula A1» è aperta dalle 08:00 alle 20:00 e lo studente sceglie il 5 novembre 2026
+- **THEN** l'ora di inizio va da 09:30 a 19:30 e non sono proposte le mezz'ore precedenti, qualunque sia il fuso del dispositivo
 
 #### Scenario: Fine dopo l'inizio
 - **WHEN** l'«Aula A1» è aperta giovedì 5 novembre 2026 dalle 08:00 alle 20:00 e lo studente sceglie l'ora di inizio 10:00
