@@ -13,9 +13,14 @@ public static class CurrentUser
             ? userId
             : null;
 
-    // Nome visualizzato emesso da Identity. Null se il claim manca o è vuoto.
+    // Lunghezza massima di DisplayName in Identity e della colonna OrganizerName.
+    public const int MaxUserNameLength = 128;
+
+    // Nome visualizzato emesso da Identity. Null se il claim manca, è vuoto o è più lungo della colonna.
     public static string? TryGetUserName(HttpRequest request) =>
-        TryReadClaim(request, "name") is { } name && !string.IsNullOrWhiteSpace(name)
+        TryReadClaim(request, "name") is { } name
+        && !string.IsNullOrWhiteSpace(name)
+        && name.Length <= MaxUserNameLength
             ? name
             : null;
 

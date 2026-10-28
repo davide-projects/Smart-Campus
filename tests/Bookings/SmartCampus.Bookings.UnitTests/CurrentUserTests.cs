@@ -36,6 +36,27 @@ public sealed class CurrentUserTests
     }
 
     [Fact]
+    public void TryGetUserName_ClaimAtMaxLength_ReturnsTheName()
+    {
+        var name = new string('a', CurrentUser.MaxUserNameLength);
+        var request = RequestWithPayload(new { sub = Guid.NewGuid().ToString(), name });
+
+        Assert.Equal(name, CurrentUser.TryGetUserName(request));
+    }
+
+    [Fact]
+    public void TryGetUserName_ClaimTooLong_ReturnsNull()
+    {
+        var request = RequestWithPayload(new
+        {
+            sub = Guid.NewGuid().ToString(),
+            name = new string('a', CurrentUser.MaxUserNameLength + 1)
+        });
+
+        Assert.Null(CurrentUser.TryGetUserName(request));
+    }
+
+    [Fact]
     public void TryGetUserName_WithoutAuthorizationHeader_ReturnsNull()
     {
         Assert.Null(CurrentUser.TryGetUserName(new DefaultHttpContext().Request));
@@ -56,6 +77,23 @@ public sealed class CurrentUserTests
         var request = RequestWithPayload(new { sub = "non-un-guid", name = "Mario Rossi" });
 
         Assert.Null(CurrentUser.TryGetUserId(request));
+    }
+
+    [Fact]
+    public void TryGetUserId_SubNotAString_ReturnsNull()
+    {
+        var request = RequestWithPayload(new { sub = 42, name = "Mario Rossi" });
+
+        Assert.Null(CurrentUser.TryGetUserId(request));
+    }
+
+    [Fact]
+    public void TryGetUserId_PayloadNotAnObject_ReturnsNull()
+    {
+        var request = RequestWithPayload(new[] { "sub", "name" });
+
+        Assert.Null(CurrentUser.TryGetUserId(request));
+        Assert.Null(CurrentUser.TryGetUserName(request));
     }
 
     // Token di prova: la firma è finta perché CurrentUser non la verifica (lo fa il Gateway).

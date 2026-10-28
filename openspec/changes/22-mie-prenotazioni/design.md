@@ -54,6 +54,8 @@ In Rooms la costruzione dei due eventi passa da `RoomEventFactory` (si aggiunge 
 - *Scartata:* chiedere il nome a Identity a ogni lettura. Identity non ha un'API per cercare altri utenti e servirebbe una chiamata tra servizi.
 - *Scartata:* copia locale degli utenti alimentata da eventi di Identity. Identity non pubblica eventi; sarebbe un'infrastruttura nuova per un solo campo.
 - Claim `name` assente o vuoto: la `POST` risponde `401` con lo stesso titolo e messaggio della #86 per `sub` mancante («Accesso richiesto», «Effettua l'accesso per prenotare.»), prima di qualsiasi lock. Identity emette sempre il claim, quindi il caso riguarda solo token non emessi da Identity.
+- Claim `name` oltre 128 caratteri (lunghezza di `DisplayName` e della colonna): stesso `401` (decisione dell'utente durante #23). Senza questo controllo il salvataggio fallirebbe con un `500`.
+  - *Scartata:* troncare il nome. Salverebbe un nome diverso da quello del token senza segnalarlo.
 
 ### 4. Una migrazione EF in Bookings
 

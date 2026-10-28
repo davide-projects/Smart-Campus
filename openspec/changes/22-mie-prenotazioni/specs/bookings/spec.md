@@ -123,7 +123,7 @@ Se l'utente non è organizzatore né membro di alcuna prenotazione, l'endpoint S
 - **THEN** la risposta è `200` con `upcoming`, `past` e `cancelled` vuote
 
 ### Requirement: Nome dell'organizzatore salvato alla creazione
-`POST /api/bookings` MUST salvare con la prenotazione il nome dell'organizzatore letto dal claim `name` del token; il nome resta quello del momento della creazione. Se il claim manca o è vuoto, la richiesta MUST essere rifiutata con `401` come quando manca `sub`, senza creare la prenotazione. Richiesta e risposta `201` non cambiano.
+`POST /api/bookings` MUST salvare con la prenotazione il nome dell'organizzatore letto dal claim `name` del token; il nome resta quello del momento della creazione. Se il claim manca, è vuoto o supera i 128 caratteri, la richiesta MUST essere rifiutata con `401` come quando manca `sub`, senza creare la prenotazione. Richiesta e risposta `201` non cambiano.
 
 #### Scenario: Nome presente nel token
 - **WHEN** l'utente con claim `name` = «Mario Rossi» crea una prenotazione con `POST /api/bookings`
@@ -131,6 +131,10 @@ Se l'utente non è organizzatore né membro di alcuna prenotazione, l'endpoint S
 
 #### Scenario: Claim name assente o vuoto
 - **WHEN** l'utente invia `POST /api/bookings` con un token che ha un `sub` valido ma non ha il claim `name`, oppure lo ha vuoto
+- **THEN** la risposta è `401` con titolo «Accesso richiesto» e messaggio «Effettua l'accesso per prenotare.» e nessuna prenotazione viene creata
+
+#### Scenario: Claim name troppo lungo
+- **WHEN** l'utente invia `POST /api/bookings` con un token che ha un `sub` valido e un claim `name` di 129 caratteri
 - **THEN** la risposta è `401` con titolo «Accesso richiesto» e messaggio «Effettua l'accesso per prenotare.» e nessuna prenotazione viene creata
 
 ### Requirement: Edificio nella copia locale degli spazi

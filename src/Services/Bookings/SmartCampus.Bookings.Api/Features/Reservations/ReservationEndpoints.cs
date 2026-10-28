@@ -182,7 +182,9 @@ public static class ReservationEndpoints
     }
 
     // Le prenotazioni in cui l'utente è organizzatore o membro, divise in future, passate e cancellate.
-    // Nessuna paginazione: le future sono poche per costruzione (A2, INV-8).
+    // Nessuna paginazione, per scelta (design della change 22-mie-prenotazioni, decisione 5): le future sono
+    // poche per costruzione (A2, INV-8), mentre passate e cancellate crescono nel tempo.
+    // A parità di inizio l'Id rende l'ordine stabile tra una chiamata e l'altra.
     private static async Task<IResult> GetMineAsync(
         HttpRequest httpRequest,
         BookingDbContext db,
@@ -230,16 +232,19 @@ public static class ReservationEndpoints
                 .Where(reservation => reservation.Item.End > now)
                 .Select(reservation => reservation.Item)
                 .OrderBy(item => item.Start)
+                .ThenBy(item => item.Id)
                 .ToList(),
             Past: confirmed
                 .Where(reservation => reservation.Item.End <= now)
                 .Select(reservation => reservation.Item)
                 .OrderByDescending(item => item.Start)
+                .ThenBy(item => item.Id)
                 .ToList(),
             Cancelled: reservations
                 .Where(reservation => reservation.Status == ReservationStatus.Cancelled)
                 .Select(reservation => reservation.Item)
                 .OrderByDescending(item => item.Start)
+                .ThenBy(item => item.Id)
                 .ToList());
 
         return Results.Ok(response);

@@ -143,6 +143,21 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
     }
 
     [Fact]
+    public async Task Create_NameClaimTooLong_Returns401AndCreatesNothing()
+    {
+        var roomId = await SeedRoomAsync();
+        var name = new string('a', CurrentUser.MaxUserNameLength + 1);
+
+        var response = await ClientFor(Guid.NewGuid(), name).PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Accesso richiesto", body);
+        Assert.Contains("Effettua l'accesso per prenotare.", body);
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
+    [Fact]
     public async Task Create_UnknownRoom_Returns404()
     {
         var response = await ClientFor(Guid.NewGuid()).PostAsJsonAsync("/api/bookings", Request(Guid.NewGuid(), "10:00", "11:00"));
