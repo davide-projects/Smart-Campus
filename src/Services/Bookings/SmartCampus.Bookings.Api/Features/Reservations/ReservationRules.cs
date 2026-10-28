@@ -13,6 +13,8 @@ public static class ReservationRules
     public static readonly TimeSpan MaxDuration = TimeSpan.FromHours(4);
     public static readonly TimeSpan MaxAdvance = TimeSpan.FromDays(14);
 
+    public const int MaxPurposeLength = 200;
+
     // Gruppo 1: regole sulla sola richiesta. Si controllano prima della transazione:
     // se la richiesta è sbagliata non serve prendere nessun lock.
     public static ReservationRejection? ValidateRequest(CreateReservationRequest request, DateTimeOffset now)
@@ -33,6 +35,12 @@ public static class ReservationRules
         if (!IsOnSlotBoundary(request.Start) || !IsOnSlotBoundary(request.End))
         {
             return Unprocessable("Orario non valido", "Le prenotazioni iniziano e finiscono all'ora esatta o alla mezz'ora.");
+        }
+
+        // Il motivo è facoltativo, ma la colonna nel database ha al massimo 200 caratteri.
+        if (request.Purpose?.Length > MaxPurposeLength)
+        {
+            return Unprocessable("Motivo troppo lungo", "Il motivo può contenere al massimo 200 caratteri.");
         }
 
         // A2
