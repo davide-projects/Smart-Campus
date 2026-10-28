@@ -1,0 +1,38 @@
+# Tasks
+
+Ordine: gruppo 1 (#90) → gruppo 2 (#23, dopo il merge di #90) → gruppo 3 (#24).
+
+## 1. Rooms: edificio negli eventi degli spazi (#90)
+
+Area: `svc:rooms`.
+
+- [ ] 1.1 Aggiungere `BuildingName` come proprietà `init` di tipo `string?` (predefinito `null`) a `RoomCreated` e `RoomUpdated` in `src/BuildingBlocks/SmartCampus.Contracts/Events.cs`; verificare che `dotnet build SmartCampus.slnx` passi senza modificare i costruttori esistenti.
+- [ ] 1.2 Aggiungere `RoomEventFactory.ToUpdatedEvent` e far passare da `RoomEventFactory` entrambi gli eventi, valorizzando `BuildingName` con il nome dell'edificio dello spazio; verificare con la build e con i test esistenti di Rooms.
+- [ ] 1.3 In `RoomEndpoints` (creazione e modifica) leggere il nome dell'edificio dove oggi si controlla solo che esista, senza cambiare risposte e messaggi d'errore; verificare che i test di `RoomManagementTests` passino invariati.
+- [ ] 1.4 In `RoomSeedEventPublisher` includere l'edificio nella query degli spazi; verificare con un test che gli eventi seed contengano il nome dell'edificio.
+- [ ] 1.5 Test di integrazione (Testcontainers): `RoomCreated` alla creazione e `RoomUpdated` alla modifica, con e senza cambio di edificio, contengono il nome dell'edificio; `dotnet test tests/Rooms/SmartCampus.Rooms.IntegrationTests` verde.
+- [ ] 1.6 Aggiornare `docs/architettura.md` (campi pubblicati da Rooms) e `docs/handoff-architettura.md` 6.1 (eventi pubblicati); verificare che i campi elencati coincidano con `Events.cs`.
+
+## 2. Bookings: API delle mie prenotazioni (#23)
+
+Area: `svc:bookings`. Parte dopo il merge di #90; riusa `POST /api/bookings` e `CurrentUser` della PR #86, già su `main`.
+
+- [ ] 2.1 Aggiungere `BookableRoom.BuildingName` (`string?`, max 100) e `Reservation.OrganizerName` (`string?`, max 128) con la configurazione EF e una sola migrazione, senza riempire le righe esistenti; verificare con un test di integrazione che la migrazione, applicata a un database già migrato fino alla versione precedente e con spazi e prenotazioni presenti, lasci quelle righe con `NULL`.
+- [ ] 2.2 Salvare `BuildingName` in `RoomEventsConsumer` per `RoomCreated` e `RoomUpdated` solo se l'evento lo contiene (con `null` resta quello già salvato), lasciandolo invariato su `RoomDeactivated`; estendere `RoomEventsConsumerTests` (creazione, aggiornamento con cambio di edificio, evento senza il campo che non cancella l'edificio già noto, evento duplicato, dismissione) e verificarli verdi.
+- [ ] 2.3 Leggere il claim `name` accanto a `CurrentUser.TryGetUserId` e salvarlo in `OrganizerName` nella `POST /api/bookings`; se il claim manca o è vuoto rispondere `401` «Accesso richiesto» / «Effettua l'accesso per prenotare.» senza creare nulla. Unit test sulla lettura del claim (presente, assente, vuoto) e test di integrazione sulla `POST` (nome salvato con `201` invariato; `401` senza `name`).
+- [ ] 2.4 Implementare `GET /api/bookings/mine`: risposta `{ upcoming, past, cancelled }` con voci `id`, `roomId`, `roomName`, `buildingName`, `start`, `end`, `isGroup`, `organizerName`, `isOrganizer`; `upcoming` per inizio crescente, `past` e `cancelled` per inizio decrescente; nessuna paginazione; `401` «Accesso richiesto» / «Effettua l'accesso per vedere le tue prenotazioni.» senza `sub`. Verificare con i test 2.5.
+- [ ] 2.5 Test di integrazione su SQL Server reale con `TimeProvider` controllato: l'utente non vede prenotazioni di cui non è organizzatore né membro (criterio del task); il membro vede la prenotazione di gruppo con `isGroup` = `true`, l'organizzatore e `isOrganizer` = `false`; `upcoming` in ordine crescente con quella in corso inclusa; fine uguale all'istante corrente in `past`; `past` e `cancelled` per inizio decrescente; cancellate future e passate solo in `cancelled`; `buildingName` e `organizerName` `null` per righe senza valore; elenco vuoto con `200`; 60 prenotazioni passate restituite tutte, senza paginazione; prenotazione di gruppo vista dall'organizzatore in una sola voce; `401` senza token. `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` verde.
+- [ ] 2.6 Aggiornare `docs/endpoints.md` (riga di `GET /api/bookings/mine` con accesso, forma della risposta e codici; nota sul `401` della `POST` senza claim `name`), `docs/architettura.md` (campi di `Reservation` e `BookableRoom`, limiti noti: nome dell'organizzatore come snapshot, rinomina degli edifici non propagata, valori `null` per i dati precedenti), `docs/handoff-architettura.md` 6.2 e `docs/servizi.md` (copia locale con l'edificio); aggiungere alla prova manuale di `docs/gateway.md` un passo per `GET /api/bookings/mine` con token (`200`) e senza token (`401` dal Gateway), ed eseguirlo riportando l'esito nella PR. Verificare che la route documentata coincida con quella mappata.
+
+## 3. Frontend: pagina "Le mie prenotazioni" (#24)
+
+Area: `frontend`. Parte dopo il merge di #23.
+
+- [ ] 3.1 Aggiungere il modello della risposta in `models/booking.model.ts` e `BookingsService.getMine()` in `services/bookings.service.ts`; test Vitest del servizio con `HttpTestingController` (URL `/api/bookings/mine`).
+- [ ] 3.2 Creare la pagina in `components/my-bookings/` con la rotta `/my-bookings` protetta da `authGuard` e titolo «Le mie prenotazioni»; aggiungere la voce «Le mie prenotazioni» a `LINKS` con `access: 'user'`. Test: un utente non autenticato viene portato al login con `returnUrl`; la voce compare a `Student` e `Staff` e non a chi non ha fatto l'accesso.
+- [ ] 3.3 Mostrare giorno e orario nell'ora di `Europe/Rome` con `Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', ... })`, senza registrare la locale `it` di Angular, nel formato «giovedì 5 novembre 2026, 10:00–11:00»; test che il formato sia questo e che non cambi con il fuso del dispositivo.
+- [ ] 3.4 Mostrare le tre schede «Future», «Passate», «Cancellate» in un `mat-tab-group`, con «Future» selezionata all'arrivo, le voci nell'ordine dell'API con spazio, edificio («—» se `null`), giorno e orario; test con `MatTabGroupHarness` sulla scheda iniziale, sul cambio di scheda e sull'ordine e contenuto delle voci.
+- [ ] 3.5 Su voci con `isGroup` mostrare «Prenotazione di gruppo» e «Organizzatore: Tu» / «Organizzatore: <nome>» / «Organizzatore non disponibile»; nessun organizzatore sulle voci singole. Test dei quattro casi.
+- [ ] 3.6 Messaggi per scheda vuota («Non hai prenotazioni future.» con il collegamento «Cerca uno spazio» a `/rooms`, «Non hai prenotazioni passate.», «Non hai prenotazioni cancellate.»), indicatore di caricamento e messaggio d'errore «Non è stato possibile caricare le prenotazioni. Riprova più tardi.» con `role="alert"`; test di ogni stato, compreso «future vuote ma passate presenti» e un `401` su `/api/bookings/mine` che chiude la sessione e porta al login.
+- [ ] 3.7 Verificare a mano tastiera (Tab, frecce, Invio, Spazio) e larghezza 375px senza scorrimento orizzontale, e riportarlo nella PR; `npx ng test --watch=false` verde.
+- [ ] 3.8 Verificare con `docker compose up --build` i casi della storia riproducibili con prenotazioni singole create da `POST /api/bookings` (future in ordine, prenotazioni altrui assenti, messaggi delle schede vuote) e riportarne l'esito nella PR, dichiarando che gruppi, passate e cancellate sono coperti solo dai test 2.5, 3.4 e 3.5: oggi nessuna API crea membri (US-05) o cancella prenotazioni (US-08) e le passate richiedono di attendere la fine di una prenotazione.
