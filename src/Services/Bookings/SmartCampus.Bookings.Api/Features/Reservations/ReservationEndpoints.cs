@@ -1,8 +1,10 @@
+using System.Security.Claims;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -11,6 +13,9 @@ public sealed record FutureReservationsCountResponse(Guid RoomId, int Count);
 public static class ReservationEndpoints
 {
     // Il campus lavora in ora locale italiana (domanda aperta I-11).
+    // Lunghezza massima di DisplayName in Identity e della colonna OrganizerName.
+    public const int MaxUserNameLength = 128;
+
     private static readonly TimeZoneInfo CampusTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
 
     public static IEndpointRouteBuilder MapReservationEndpoints(this IEndpointRouteBuilder api)
@@ -43,17 +48,17 @@ public static class ReservationEndpoints
 
     private static async Task<IResult> CreateReservationAsync(
         CreateReservationRequest request,
-        HttpRequest httpRequest,
+        ClaimsPrincipal user,
         BookingDbContext db,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        // 1. Chi prenota: dal token inoltrato dal Gateway. Il nome si salva con la prenotazione
-        // così com'è adesso (snapshot): un cambio successivo in Identity non lo aggiorna.
-        var organizerId = CurrentUser.TryGetUserId(httpRequest);
-        var organizerName = CurrentUser.TryGetUserName(httpRequest);
+        // 1. Chi prenota: l'utente del token, già verificato (firma, scadenza...) da AddSmartCampusJwtBearer.
+        // Il nome si salva con la prenotazione così com'è adesso (snapshot): un cambio successivo in Identity non lo aggiorna.
+        // Un token valido ma senza un "sub" che sia un GUID, o senza un nome utilizzabile, non identifica nessun utente.
+        var organizerName = TryGetUserName(user);
 
-        if (organizerId is null || organizerName is null)
+        if (!Guid.TryParse(user.FindFirstValue(JwtClaimNames.Subject), out var organizerId) || organizerName is null)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status401Unauthorized,
@@ -154,7 +159,7 @@ public static class ReservationEndpoints
             {
                 Id = Guid.NewGuid(),
                 RoomId = room.RoomId,
-                OrganizerId = organizerId.Value,
+                OrganizerId = organizerId,
                 OrganizerName = organizerName,
                 Start = request.Start,
                 End = request.End,
@@ -186,14 +191,12 @@ public static class ReservationEndpoints
     // poche per costruzione (A2, INV-8), mentre passate e cancellate crescono nel tempo.
     // A parità di inizio l'Id rende l'ordine stabile tra una chiamata e l'altra.
     private static async Task<IResult> GetMineAsync(
-        HttpRequest httpRequest,
+        ClaimsPrincipal user,
         BookingDbContext db,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var userId = CurrentUser.TryGetUserId(httpRequest);
-
-        if (userId is null)
+        if (!Guid.TryParse(user.FindFirstValue(JwtClaimNames.Subject), out var userId))
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status401Unauthorized,
@@ -249,6 +252,14 @@ public static class ReservationEndpoints
 
         return Results.Ok(response);
     }
+
+    // Nome visualizzato emesso da Identity. Null se il claim manca, è vuoto o è più lungo della colonna.
+    private static string? TryGetUserName(ClaimsPrincipal user) =>
+        user.FindFirstValue(JwtClaimNames.Name) is { } name
+        && !string.IsNullOrWhiteSpace(name)
+        && name.Length <= MaxUserNameLength
+            ? name
+            : null;
 
     private static IResult ToProblem(ReservationRejection rejection) =>
         Results.Problem(statusCode: rejection.StatusCode, title: rejection.Title, detail: rejection.Detail);

@@ -14,7 +14,7 @@ context: |
   - Backend .NET 10, un microservizio per contesto: Identity, Rooms, Bookings; gateway YARP (src/Gateway).
   - Un database SQL Server per servizio (EF Core, migrazioni); MongoDB previsto per le attrezzature di Rooms (#76).
   - Eventi tra servizi con MassTransit 8.5.12 su RabbitMQ, outbox EF Core in Rooms; contratti in src/BuildingBlocks/SmartCampus.Contracts.
-  - Autenticazione: Identity emette JWT; Gateway e Rooms li validano con AddSmartCampusJwtBearer (ServiceDefaults).
+  - Autenticazione: Identity emette JWT; Gateway, Rooms e Bookings li validano con AddSmartCampusJwtBearer (ServiceDefaults).
   - Frontend Angular 22 con Angular Material 3, solo chiamate a /api/... sul gateway.
     Cartelle in frontend/src/app: components/<nome>/ (pagine), components/shared/ (solo componenti comuni), models/, services/.
   - Test: xUnit con Testcontainers (backend), Vitest con harness di Angular Material (frontend).

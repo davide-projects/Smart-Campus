@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.WebUtilities; 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
@@ -126,6 +128,42 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         Assert.Equal("Mario Rossi", saved.OrganizerName);
     }
 
+    [Fact]
+    public async Task Create_WithTokenSignedWithAnotherKey_Returns401AndCreatesNothing()
+    {
+        var roomId = await SeedRoomAsync();
+        var token = BookingsApiFixture.CreateToken(Guid.NewGuid().ToString(), signingKey: BookingsApiFixture.OtherSigningKey);
+
+        var response = await PostWithTokenAsync(token, roomId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
+    [Fact]
+    public async Task Create_WithUnsignedToken_Returns401AndCreatesNothing()
+    {
+        // Prima la firma non veniva verificata: bastava un token "alg: none" con un sub qualsiasi per prenotare a nome di altri.
+        var roomId = await SeedRoomAsync();
+
+        var response = await PostWithTokenAsync(UnsignedToken(Guid.NewGuid()), roomId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
+    [Fact]
+    public async Task Create_WithExpiredToken_Returns401AndCreatesNothing()
+    {
+        var roomId = await SeedRoomAsync();
+        var token = BookingsApiFixture.CreateToken(Guid.NewGuid().ToString(), lifetime: TimeSpan.FromMinutes(-10));
+
+        var response = await PostWithTokenAsync(token, roomId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -146,7 +184,7 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
     public async Task Create_NameClaimTooLong_Returns401AndCreatesNothing()
     {
         var roomId = await SeedRoomAsync();
-        var name = new string('a', CurrentUser.MaxUserNameLength + 1);
+        var name = new string('a', ReservationEndpoints.MaxUserNameLength + 1);
 
         var response = await ClientFor(Guid.NewGuid(), name).PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
 
@@ -154,6 +192,20 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Accesso richiesto", body);
         Assert.Contains("Effettua l'accesso per prenotare.", body);
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("non-e-un-guid")]
+    public async Task Create_WithValidTokenButNoUserId_Returns401AndCreatesNothing(string? subject)
+    {
+        // Token firmato correttamente, ma senza un "sub" che identifichi un utente.
+        var roomId = await SeedRoomAsync();
+
+        var response = await PostWithTokenAsync(BookingsApiFixture.CreateToken(subject), roomId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal(0, await CountReservationsAsync(roomId));
     }
 
@@ -199,11 +251,24 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         return await db.Reservations.CountAsync(reservation => reservation.RoomId == roomId);
     }
 
-    private HttpClient ClientFor(Guid userId, string? name = "Studente di prova")
+    // Client con un token valido, firmato con la chiave che Bookings usa nei test.
+    private HttpClient ClientFor(Guid userId, string? name = BookingsApiFixture.DefaultUserName) => fixture.CreateClientFor(userId, name);
+
+    private async Task<HttpResponseMessage> PostWithTokenAsync(string token, Guid roomId)
     {
         var client = fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.For(userId, name));
-        return client;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        return await client.PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
+    }
+
+    // Token senza firma ("alg": "none"): per un controllo serio non deve essere accettato.
+    private static string UnsignedToken(Guid userId)
+    {
+        static string Encode(object value) =>
+            Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
+
+        return $"{Encode(new { alg = "none", typ = "JWT" })}.{Encode(new { sub = userId.ToString(), role = "Student" })}.test";
     }
 
     private static CreateReservationRequest Request(Guid roomId, string start, string end) =>

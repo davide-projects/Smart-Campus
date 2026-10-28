@@ -210,16 +210,30 @@ public sealed class MyReservationsTests : IDisposable
     [Fact]
     public async Task Mine_WithoutToken_Returns401()
     {
+        // Lo rifiuta l'autenticazione (RequireAuthorization sul gruppo), prima ancora dell'endpoint.
         var response = await _fixture.Factory.CreateClient().GetAsync("/api/bookings/mine");
 
-        await AssertUnauthorizedAsync(response);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task Mine_WithTokenWithoutValidSub_Returns401()
+    public async Task Mine_WithTokenSignedWithAnotherKey_Returns401()
     {
         var client = _fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "non.un-token.valido");
+        var token = BookingsApiFixture.CreateToken(Guid.NewGuid().ToString(), signingKey: BookingsApiFixture.OtherSigningKey);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync("/api/bookings/mine");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mine_WithValidTokenWithoutValidSub_Returns401()
+    {
+        // Token firmato correttamente, ma senza un "sub" che identifichi un utente: risponde l'endpoint.
+        var client = _fixture.Factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", BookingsApiFixture.CreateToken(subject: null));
 
         var response = await client.GetAsync("/api/bookings/mine");
 
@@ -266,12 +280,8 @@ public sealed class MyReservationsTests : IDisposable
         return (await response.Content.ReadFromJsonAsync<MyReservationsResponse>(Json))!;
     }
 
-    private HttpClient ClientFor(Guid userId, string? name = "Studente di prova")
-    {
-        var client = _fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.For(userId, name));
-        return client;
-    }
+    private HttpClient ClientFor(Guid userId, string? name = BookingsApiFixture.DefaultUserName) =>
+        _fixture.CreateClientFor(userId, name);
 
     private async Task<BookableRoom> SeedRoomAsync(
         string name = "Aula test",

@@ -17,6 +17,8 @@ Questo documento è l'elenco condiviso degli endpoint HTTP di SmartCampus. Aggio
 
 Base pubblica: `/api/bookings`
 
+Bookings verifica da sé il token (firma, issuer, audience, scadenza): tutte le route qui sotto rispondono `401` senza un token valido anche se il servizio viene chiamato direttamente, senza passare dal Gateway. Gli endpoint di salute restano anonimi.
+
 | Metodo | Percorso | Accesso | Parametri | Descrizione |
 |---|---|---|---|---|
 | `GET` | `/api/bookings/` | autenticato | — | Endpoint informativo; conferma che il servizio Bookings risponde. |
