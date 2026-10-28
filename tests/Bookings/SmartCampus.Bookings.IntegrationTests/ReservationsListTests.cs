@@ -17,7 +17,7 @@ public sealed class ReservationsListTests(BookingsApiFixture fixture)
     private static readonly TimeSpan CampusOffset = TimeSpan.FromHours(2);
     private static readonly DateOnly Day = new(2031, 6, 10);
 
-    private readonly HttpClient _client = fixture.Factory.CreateClient();
+    private readonly HttpClient _client = fixture.CreateClientFor(Guid.NewGuid(), role: "Staff");
 
     // Inserisce i dati di prova direttamente nel database del test.
     private async Task SeedAsync(Func<BookingDbContext, Task> action)
