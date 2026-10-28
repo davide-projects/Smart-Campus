@@ -29,6 +29,7 @@ import { MatSelectModule } from '@angular/material/select';
 // Servizi e modelli
 import {
   ReservationResponse,
+  addDays,
   campusDateTime,
   campusToday,
   reservationTimeLabel,
@@ -321,8 +322,4 @@ function toMinutes(time: string): number {
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
-}
-
-function addDays(day: Date, days: number): Date {
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate() + days);
 }
