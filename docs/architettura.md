@@ -41,7 +41,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
   1. `SELECT ... FROM BookableRooms WITH (UPDLOCK, ROWLOCK) WHERE Id = @roomId`, che serializza le prenotazioni dello stesso spazio;
   2. verifica delle sovrapposizioni (`Start < @end AND End > @start`);
   3. `INSERT` e commit; in caso di conflitto restituisce `409 Conflict`.
-- **Prevenzione conflitti sulle persone:** il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi diversi nello stesso istante. **Meccanismo da definire.**
+- **Prevenzione conflitti sulle persone:** il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi diversi nello stesso istante. Nella stessa transazione, dopo il lock sullo spazio, Bookings prende un lock `sp_getapplock` sulla persona (risorsa `user:{id}`, `@LockOwner = 'Transaction'`): si libera da solo al commit o al rollback e, se non arriva entro 10 secondi, la richiesta termina con `409`. Dettagli e alternative scartate in [servizi.md](servizi.md#come-bookings-evita-le-sovrapposizioni-inv-1-e-inv-8).
 - **Prova:** test di integrazione con richieste parallele sullo stesso slot contro SQL Server reale (Testcontainers): ne deve riuscire esattamente una.
 - **Check-in:** consentito all'organizzatore e ai membri; basta un check-in per segnare la prenotazione come usata.
 - **Regola di interpretazione dei report:** distinguono *prenotato e usato*, *prenotato e non usato*, *nessuna informazione*. L'assenza di dati non indica che lo spazio fosse libero.

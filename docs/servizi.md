@@ -68,7 +68,6 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 **Storie collegate:** US-03, US-04, US-05, US-06, US-07, US-08, US-12, US-13, US-14, US-15, US-16, US-17.
 
 ### Come Bookings evita le sovrapposizioni (INV-1 e INV-8)
-*Decisione proposta in #13, da confermare con il team.*
 
 Ogni nuova prenotazione viene creata dentro una transazione che prende **due lock** prima dei controlli:
 
