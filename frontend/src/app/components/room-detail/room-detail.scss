@@ -24,7 +24,7 @@
   max-width: 600px;
   margin: 2rem auto;
   padding: 1rem;
-  border-left: 4px solid var(--mat-sys-error);
+  border-left: 4px solid var(--mat-sys-error, #ba1a1a);
 
   mat-icon {
     color: var(--mat-sys-error);
@@ -76,7 +76,7 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1.25rem;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  border-bottom: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
 
   .info-item {
     display: flex;
@@ -98,13 +98,13 @@
     .info-value {
       display: block;
       font-weight: 500;
+      font-size: 1rem;
     }
   }
 }
 
-.equipment-section,
-.hours-section,
-.availability-section {
+// Sezione Attrezzature
+.equipment-section {
   margin-top: 1.5rem;
 
   h3 {
@@ -113,25 +113,35 @@
     margin-bottom: 0.75rem;
     color: var(--mat-sys-on-surface);
   }
-}
 
-.empty-text {
-  font-style: italic;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.875rem;
+  .empty-text {
+    font-style: italic;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.875rem;
+  }
 }
 
 // Sezione Orari settimanali
-.hours-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.hours-section {
+  margin-top: 1.5rem;
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+
+  .hours-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
 
   .hours-row {
     display: flex;
     justify-content: space-between;
     padding: 0.5rem 0;
-    border-bottom: 1px dashed var(--mat-sys-outline-variant);
+    border-bottom: 1px dashed var(--mat-sys-outline-variant, #e0e0e0);
     font-size: 0.875rem;
 
     .day-name {
@@ -142,62 +152,101 @@
       color: var(--mat-sys-on-surface-variant);
 
       .closed-label {
-        color: var(--mat-sys-error);
+        color: var(--mat-sys-error, #ba1a1a);
         font-weight: 500;
       }
     }
   }
 }
 
-// Sezione Disponibilità giornaliera
-.availability-section {
+// Piè di pagina con pulsanti di azione
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  border-top: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+
+  .booking-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
 }
 
-.date-picker-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+// Sezione Disponibilità giornaliera
+.availability-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
 
-  .date-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
+  h3 {
+    font-size: 1rem;
     font-weight: 500;
-    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    color: var(--mat-sys-on-surface);
+  }
+}
+
+// Avviso per visitatori non autenticati
+.login-required-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container, #f3edf7);
+  border: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+  margin-top: 0.75rem;
+
+  mat-icon {
+    color: var(--mat-sys-primary);
   }
 
-  .date-input {
-    font: inherit;
-    font-size: 0.875rem;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--mat-sys-outline);
-    border-radius: 4px;
-    background: var(--mat-sys-surface);
-    color: var(--mat-sys-on-surface);
-    outline: none;
+  .login-required-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    min-width: 220px;
 
-    &:focus {
-      border-color: var(--mat-sys-primary);
+    strong {
+      color: var(--mat-sys-on-surface);
+      font-size: 0.95rem;
+    }
+
+    span {
+      font-size: 0.85rem;
+      color: var(--mat-sys-on-surface-variant);
     }
   }
 }
 
-.availability-loading,
-.availability-error {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 0;
+.date-picker-bar {
+  margin-bottom: 0.5rem;
+
+  .date-field {
+    width: 220px;
+  }
 }
 
 .availability-loading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
   color: var(--mat-sys-on-surface-variant);
 }
 
 .availability-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   background: var(--mat-sys-error-container);
@@ -214,9 +263,9 @@
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-radius: 8px;
-  background: var(--mat-sys-surface-variant);
+  background: var(--mat-sys-surface-variant, #f4f0f4);
   color: var(--mat-sys-on-surface-variant);
-  border-left: 4px solid var(--mat-sys-error);
+  border-left: 4px solid var(--mat-sys-error, #ba1a1a);
 
   mat-icon {
     color: var(--mat-sys-error);
@@ -253,17 +302,13 @@
   gap: 0.4rem;
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid var(--mat-sys-outline-variant);
+  border: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
   background: var(--mat-sys-surface);
 
-  .slot-time,
-  .slot-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
   .slot-time {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.875rem;
     font-weight: 500;
 
@@ -276,6 +321,9 @@
   }
 
   .slot-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -302,29 +350,11 @@
 
   &.is-occupied {
     opacity: 0.75;
-    background: var(--mat-sys-surface-container-high);
+    background: var(--mat-sys-surface-container-high, #ece6f0);
 
     .slot-badge {
-      background: var(--mat-sys-surface-container-highest);
+      background: var(--mat-sys-surface-container-highest, #e6e0e9);
       color: var(--mat-sys-on-surface-variant);
     }
-  }
-}
-
-// Piè di pagina con pulsanti di azione
-.card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--mat-sys-outline-variant);
-
-  .booking-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
   }
 }

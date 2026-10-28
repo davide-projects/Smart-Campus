@@ -1,23 +1,30 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, ElementRef, OnInit, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subject, catchError, of, switchMap, tap } from 'rxjs';
 
 // Componenti di Angular Material
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 // Servizio e Modelli
-import { AuthService } from '../../services/auth.service';
-import { RoomsService } from '../../services/rooms.service';
-import { BookingsService } from '../../services/bookings.service';
 import { DailyAvailability } from '../../models/availability.model';
+import { addDays, campusToday, toIsoDate } from '../../models/booking.model';
 import {
   RoomDetail as RoomDetailData,
-  roomTypeLabel,
   dayOfWeekLabel,
+  roomTypeLabel,
 } from '../../models/room.model';
+import { AuthService } from '../../services/auth.service';
+import { BookingsService } from '../../services/bookings.service';
+import { RoomsService } from '../../services/rooms.service';
 
 @Component({
   imports: [
@@ -27,18 +34,29 @@ import {
     MatIconModule,
     MatChipsModule,
     MatProgressSpinnerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatDatepickerModule,
   ],
+  providers: [provideNativeDateAdapter(), { provide: MAT_DATE_LOCALE, useValue: 'it-IT' }],
   selector: 'app-room-detail',
   styleUrl: './room-detail.scss',
   templateUrl: './room-detail.html',
 })
 export class RoomDetail implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly roomsService = inject(RoomsService);
   private readonly bookingsService = inject(BookingsService);
+  private readonly authService = inject(AuthService);
 
-  // Il pulsante «Modifica» compare solo al personale.
-  protected readonly isStaff = inject(AuthService).isStaff;
+  // Riferimento viewChild alla sezione disponibilità per scroll fluido
+  private readonly availabilitySection = viewChild<ElementRef<HTMLElement>>('availabilitySection');
+
+  // Stato autenticazione e ruoli
+  protected readonly isStaff = this.authService.isStaff;
+  protected readonly isLoggedIn = this.authService.isLoggedIn;
+  protected readonly currentUrl = this.router.url;
 
   // Esposte al template HTML
   protected readonly roomTypeLabel = roomTypeLabel;
@@ -50,13 +68,52 @@ export class RoomDetail implements OnInit {
   protected readonly isNotFound = signal<boolean>(false);
   protected readonly errorMessage = signal<string | null>(null);
 
-  // Data odierna in formato YYYY-MM-DD come valore iniziale
-  protected readonly selectedDate = signal<string>(new Date().toISOString().slice(0, 10));
+  // Limiti date nel fuso orario del campus (Europe/Rome): oggi fino a 14 giorni avanti
+  protected readonly minDate = campusToday();
+  protected readonly maxDate = addDays(this.minDate, 14);
+  protected readonly selectedDate = signal<Date>(this.minDate);
 
   // Stato della disponibilità per il giorno scelto
   protected readonly availability = signal<DailyAvailability | null>(null);
   protected readonly isLoadingAvailability = signal<boolean>(false);
   protected readonly availabilityErrorMessage = signal<string | null>(null);
+
+  // Pipeline reattiva per il caricamento disponibilità con switchMap
+  private readonly dateRequests = new Subject<Date>();
+
+  constructor() {
+    this.dateRequests
+      .pipe(
+        tap(() => {
+          this.isLoadingAvailability.set(true);
+          this.availabilityErrorMessage.set(null);
+        }),
+        // switchMap: se l'utente cambia data rapidamente, la richiesta precedente viene annullata
+        switchMap((date) => {
+          const currentRoom = this.room();
+          if (!currentRoom || !this.isLoggedIn()) {
+            return of(null);
+          }
+          return this.bookingsService
+            .getDailyAvailability(currentRoom.id, toIsoDate(date))
+            .pipe(
+              catchError(() => {
+                this.availabilityErrorMessage.set(
+                  'Impossibile caricare la disponibilità per la data selezionata.',
+                );
+                return of(null);
+              }),
+            );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((data) => {
+        this.isLoadingAvailability.set(false);
+        if (data) {
+          this.availability.set(data);
+        }
+      });
+  }
 
   ngOnInit(): void {
     const roomId = this.route.snapshot.paramMap.get('id');
@@ -79,7 +136,9 @@ export class RoomDetail implements OnInit {
       next: (data) => {
         this.room.set(data);
         this.isLoading.set(false);
-        this.loadAvailability(data.id, this.selectedDate());
+        if (this.isLoggedIn()) {
+          this.dateRequests.next(this.selectedDate());
+        }
       },
       error: (err) => {
         this.isLoading.set(false);
@@ -87,7 +146,7 @@ export class RoomDetail implements OnInit {
           this.isNotFound.set(true);
         } else {
           this.errorMessage.set(
-            'Si è verificato un errore durante il caricamento dei dettagli dello spazio.'
+            'Si è verificato un errore durante il caricamento dei dettagli dello spazio.',
           );
         }
       },
@@ -99,40 +158,18 @@ export class RoomDetail implements OnInit {
     return isoDateTime.slice(11, 16);
   }
 
-  // Scarica la disponibilità per la stanza e la data indicate
-  protected loadAvailability(roomId: string, date: string): void {
-    this.isLoadingAvailability.set(true);
-    this.availabilityErrorMessage.set(null);
-
-    this.bookingsService.getDailyAvailability(roomId, date).subscribe({
-      next: (data) => {
-        this.availability.set(data);
-        this.isLoadingAvailability.set(false);
-      },
-      error: () => {
-        this.isLoadingAvailability.set(false);
-        this.availabilityErrorMessage.set(
-          'Impossibile caricare la disponibilità per la data selezionata.'
-        );
-      },
-    });
-  }
-
-  // Chiamato dall'HTML quando l'utente sceglie un nuovo giorno dall'input data
-  protected onDateChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const newDate = input.value;
-    const currentRoom = this.room();
-
-    if (newDate && currentRoom) {
+  // Invocato quando l'utente sceglie una nuova data dal MatDatepicker
+  protected onDateChange(newDate: Date | null): void {
+    if (newDate) {
       this.selectedDate.set(newDate);
-      this.loadAvailability(currentRoom.id, newDate);
+      if (this.isLoggedIn()) {
+        this.dateRequests.next(newDate);
+      }
     }
   }
 
-  // Scorre la pagina dolcemente fino alla sezione della disponibilità
+  // Scorre la pagina dolcemente fino alla sezione della disponibilità tramite viewChild
   protected scrollToAvailability(): void {
-    const element = document.getElementById('availability-section');
-    element?.scrollIntoView({ behavior: 'smooth' });
+    this.availabilitySection()?.nativeElement.scrollIntoView({ behavior: 'smooth' });
   }
 }
