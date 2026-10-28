@@ -22,5 +22,9 @@ internal sealed class BookableRoomConfiguration : IEntityTypeConfiguration<Booka
         // Stessa lunghezza di Building.Name in Rooms.
         builder.Property(room => room.BuildingName)
             .HasMaxLength(100);
+
+        // Nome di RoomType in Rooms: "Classroom", "Laboratory" o "StudyRoom".
+        builder.Property(room => room.Type)
+            .HasMaxLength(30);
     }
 }

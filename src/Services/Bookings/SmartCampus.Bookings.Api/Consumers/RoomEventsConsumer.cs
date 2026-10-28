@@ -14,11 +14,11 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
     IConsumer<RoomDeactivated>
 {
     public Task Consume(ConsumeContext<RoomCreated> context) =>
-        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.BuildingName, context.Message.Capacity,
+        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.BuildingName, context.Message.Type, context.Message.Capacity,
             context.Message.IsBookable, isActive: true, context.Message.OpeningHours, context.CancellationToken);
 
     public Task Consume(ConsumeContext<RoomUpdated> context) =>
-        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.BuildingName, context.Message.Capacity,
+        UpsertAsync(context.Message.RoomId, context.Message.Name, context.Message.BuildingName, context.Message.Type, context.Message.Capacity,
             context.Message.IsBookable, context.Message.IsActive, context.Message.OpeningHours, context.CancellationToken);
 
     public async Task Consume(ConsumeContext<RoomDeactivated> context)
@@ -41,6 +41,7 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
         Guid roomId,
         string name,
         string? buildingName,
+        string? type,
         int capacity,
         bool isBookable,
         bool isActive,
@@ -63,6 +64,12 @@ public sealed class RoomEventsConsumer(BookingDbContext db, ILogger<RoomEventsCo
         if (buildingName is not null)
         {
             room.BuildingName = buildingName;
+        }
+
+        // Stesso criterio per il tipo: un evento che non lo contiene non cancella quello già noto.
+        if (type is not null)
+        {
+            room.Type = type;
         }
 
         room.Capacity = capacity;

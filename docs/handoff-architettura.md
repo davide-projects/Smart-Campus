@@ -148,7 +148,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 |---|---|
 | `Reservation` | Id, RoomId, OrganizerId, OrganizerName *(snapshot del claim `name` alla creazione; `null` per le prenotazioni precedenti)*, Start, End, Participants, Purpose *(opz.)*, Status (`Confirmed`/`Cancelled`), CreatedAt, CancelledAt, RowVersion |
 | `ReservationMember` | ReservationId, UserId: gli altri studenti di una prenotazione di gruppo |
-| `BookableRoom` | RoomId, Name, BuildingName *(da `RoomCreated`/`RoomUpdated`; invariato se l'evento non lo contiene)*, Capacity, IsBookable, IsActive, OpeningHours — copia aggiornata dagli eventi del servizio Rooms |
+| `BookableRoom` | RoomId, Name, BuildingName *(da `RoomCreated`/`RoomUpdated`; invariato se l'evento non lo contiene)*, Type *(nome di `RoomType`, da `RoomCreated`/`RoomUpdated`; invariato se l'evento non lo contiene)*, Capacity, IsBookable, IsActive, OpeningHours — copia aggiornata dagli eventi del servizio Rooms |
 | `AttendanceRecord` | Id, ReservationId, Type (`CheckIn`/`NoShow`), RecordedAt, RecordedBy |
 
 **API previste**
