@@ -1,9 +1,11 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { RoomDetail } from './room-detail';
+import { AuthService } from '../../services/auth.service';
 import { RoomsService } from '../../services/rooms.service';
 import { RoomDetail as RoomDetailData } from '../../models/room.model';
 
@@ -30,9 +32,11 @@ describe('RoomDetail', () => {
   let fixture: ComponentFixture<RoomDetail>;
   let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn> };
   let currentParamId: string | null = 'room-1';
+  const isStaff = signal(false);
 
   beforeEach(async () => {
     currentParamId = 'room-1';
+    isStaff.set(false);
     mockRoomsService = {
       getRoomById: vi.fn().mockReturnValue(of(mockRoom)),
     };
@@ -42,6 +46,7 @@ describe('RoomDetail', () => {
       providers: [
         provideRouter([]),
         { provide: RoomsService, useValue: mockRoomsService },
+        { provide: AuthService, useValue: { isStaff } },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -166,5 +171,26 @@ describe('RoomDetail', () => {
     expect(compiled.textContent).toContain(
       'Si è verificato un errore durante il caricamento dei dettagli dello spazio.'
     );
+  });
+
+  // Il personale può aprire il modulo di modifica, gli altri no.
+  it('dovrebbe mostrare il pulsante Modifica solo al personale', () => {
+    isStaff.set(true);
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a[href="/staff/rooms/room-1/edit"]',
+    );
+    expect(link?.textContent).toContain('Modifica');
+  });
+
+  it('dovrebbe nascondere il pulsante Modifica a chi non è del personale', () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('a[href="/staff/rooms/room-1/edit"]')).toBeNull();
   });
 });

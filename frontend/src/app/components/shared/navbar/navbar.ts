@@ -20,6 +20,7 @@ export interface NavLink {
 const LINKS: NavLink[] = [
   { path: '/rooms', label: 'Cerca spazi' },
   { path: '/my-bookings', label: 'Le mie prenotazioni', access: 'user' },
+  { path: '/staff/rooms/new', label: 'Nuovo spazio', access: 'staff' },
 ];
 
 // Ognuno vede solo le voci delle pagine che può aprire.

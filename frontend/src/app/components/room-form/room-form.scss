@@ -1,0 +1,95 @@
+.room-form {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 16px;
+
+  h1 {
+    font: var(--mat-sys-headline-small);
+  }
+
+  h2 {
+    font: var(--mat-sys-title-medium);
+  }
+}
+
+.message-card {
+  margin: 24px 0;
+}
+
+// Su mobile i campi stanno uno sotto l'altro, su schermi più larghi si affiancano.
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  column-gap: 16px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.hint {
+  margin: 4px 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.form-error,
+.day-error {
+  margin: 0 0 12px;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-medium);
+}
+
+.hours {
+  margin: 24px 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    padding: 0;
+    font: var(--mat-sys-title-medium);
+  }
+}
+
+.days {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  .day-name {
+    min-width: 140px;
+  }
+
+  .time {
+    width: 150px;
+  }
+
+  .closed {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .day-error {
+    flex-basis: 100%;
+    margin: 0 0 8px;
+  }
+}
+
+.equipment {
+  margin: 24px 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0 16px;
+}
