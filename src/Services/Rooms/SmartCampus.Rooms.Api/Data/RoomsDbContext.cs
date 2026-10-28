@@ -11,11 +11,7 @@ public class RoomsDbContext(DbContextOptions<RoomsDbContext> options) : DbContex
 
     public DbSet<Room> Rooms => Set<Room>();
 
-    public DbSet<Equipment> Equipment => Set<Equipment>();
-
     public DbSet<OpeningHours> OpeningHours => Set<OpeningHours>();
-
-    public DbSet<RoomEquipment> RoomEquipment => Set<RoomEquipment>();
 
     public DbSet<RoomSeedEventDispatch> RoomSeedEventDispatches => Set<RoomSeedEventDispatch>();
 

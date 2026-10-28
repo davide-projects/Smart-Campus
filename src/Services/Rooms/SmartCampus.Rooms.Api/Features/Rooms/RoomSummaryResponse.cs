@@ -11,4 +11,7 @@ public sealed record RoomSummaryResponse(
     int Floor,
     bool IsBookable,
     Guid BuildingId,
-    string BuildingName);
+    string BuildingName)
+{
+    public IReadOnlyList<RoomEquipmentResponse> Equipment { get; init; } = [];
+}

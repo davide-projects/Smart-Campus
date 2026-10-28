@@ -249,52 +249,6 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Models.Equipment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("Equipment", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("e1000000-0000-0000-0000-000000000001"),
-                            Name = "Proiettore"
-                        },
-                        new
-                        {
-                            Id = new Guid("e1000000-0000-0000-0000-000000000002"),
-                            Name = "PC"
-                        },
-                        new
-                        {
-                            Id = new Guid("e1000000-0000-0000-0000-000000000003"),
-                            Name = "Lavagna"
-                        },
-                        new
-                        {
-                            Id = new Guid("e1000000-0000-0000-0000-000000000004"),
-                            Name = "Stampante 3D"
-                        },
-                        new
-                        {
-                            Id = new Guid("e1000000-0000-0000-0000-000000000005"),
-                            Name = "Oscilloscopio"
-                        });
-                });
-
             modelBuilder.Entity("SmartCampus.Rooms.Models.OpeningHours", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1053,93 +1007,6 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Models.RoomEquipment", b =>
-                {
-                    b.Property<Guid>("RoomId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("EquipmentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("RoomId", "EquipmentId");
-
-                    b.HasIndex("EquipmentId");
-
-                    b.ToTable("RoomEquipment", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000001"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000001")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000001"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000003")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000002"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000003")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000003"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000001")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000003"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000003")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000005"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000002")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000005"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000001")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000006"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000002")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("a1000000-0000-0000-0000-000000000006"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000004")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("b1000000-0000-0000-0000-000000000001"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000001")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("b1000000-0000-0000-0000-000000000001"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000003")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("b1000000-0000-0000-0000-000000000002"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000003")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("b1000000-0000-0000-0000-000000000003"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000005")
-                        },
-                        new
-                        {
-                            RoomId = new Guid("b1000000-0000-0000-0000-000000000003"),
-                            EquipmentId = new Guid("e1000000-0000-0000-0000-000000000002")
-                        });
-                });
-
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
                 {
                     b.HasOne("MassTransit.EntityFrameworkCoreIntegration.OutboxState", null)
@@ -1174,31 +1041,7 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
                     b.Navigation("Building");
                 });
 
-            modelBuilder.Entity("SmartCampus.Rooms.Models.RoomEquipment", b =>
-                {
-                    b.HasOne("SmartCampus.Rooms.Models.Equipment", "Equipment")
-                        .WithMany("Rooms")
-                        .HasForeignKey("EquipmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartCampus.Rooms.Models.Room", "Room")
-                        .WithMany("RoomEquipment")
-                        .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Equipment");
-
-                    b.Navigation("Room");
-                });
-
             modelBuilder.Entity("SmartCampus.Rooms.Models.Building", b =>
-                {
-                    b.Navigation("Rooms");
-                });
-
-            modelBuilder.Entity("SmartCampus.Rooms.Models.Equipment", b =>
                 {
                     b.Navigation("Rooms");
                 });
@@ -1206,8 +1049,6 @@ namespace SmartCampus.Rooms.Api.Data.Migrations
             modelBuilder.Entity("SmartCampus.Rooms.Models.Room", b =>
                 {
                     b.Navigation("OpeningHours");
-
-                    b.Navigation("RoomEquipment");
                 });
 #pragma warning restore 612, 618
         }

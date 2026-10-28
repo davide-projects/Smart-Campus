@@ -38,20 +38,20 @@ Il gruppo è in grado di produrre una prima versione di Product Backlog ordinabi
 | Health check `/health/live`, `/health/ready` | ✅ |
 | Contratti eventi (`SmartCampus.Contracts`) | ✅ Rooms pubblica gli eventi di ciclo di vita con gli orari; Bookings aggiorna la copia locale |
 | Frontend Angular 22 con proxy verso il gateway | ✅ shell con ricerca degli spazi |
-| docker-compose (SQL Server, RabbitMQ, servizi, web) | ✅ configurazione valida; build immagini da verificare con Docker attivo |
+| docker-compose (SQL Server, MongoDB, RabbitMQ, servizi, web) | ✅ configurazione valida; build immagini da verificare con Docker attivo |
 | CI GitHub Actions | ✅ eseguita e verde sul commit precedente alla rebase; da rieseguire sul branch aggiornato |
-| Database, EF Core, migrazioni, seed | ✅ Identity, Rooms e Bookings hanno persistenza e migrazioni |
+| Database, EF Core, migrazioni, seed | ✅ Identity, Rooms e Bookings hanno persistenza SQL; Rooms usa anche MongoDB per le attrezzature |
 | Autenticazione JWT | ✅ Identity emette i token; Rooms applica l'autorizzazione Staff |
 | Messaggistica (MassTransit + outbox) | ✅ versione 8.5.12 condivisa; Rooms usa RabbitMQ e outbox EF Core; Bookings consuma gli eventi |
 | Test di concorrenza prenotazioni | ❌ da fare (prova chiave del progetto) |
 
 ### Vincoli che le storie devono rispettare
-- **Stack:** backend C# / ASP.NET Core, frontend Angular, database SQL Server.
+- **Stack:** backend C# / ASP.NET Core, frontend Angular, SQL Server e MongoDB (attrezzature di Rooms).
 - **Dati:** solo sintetici, prodotti dal gruppo. Nessun dato personale reale.
 - **Segreti:** mai in repository, log, screenshot, prompt.
 - **Cloud:** progettazione cloud-ready; il deploy è facoltativo e senza spese. La demo è locale.
 - **Fuori perimetro:** sensori reali, infrastrutture di produzione, scenario Big Data.
-- **Prove:** concorrenza e persistenza vanno dimostrate su **SQL Server reale**, non con mock o provider in-memory.
+- **Prove:** persistenza e concorrenza vanno dimostrate con i database reali tramite Testcontainers: SQL Server e MongoDB per le attrezzature Rooms, non con provider in-memory.
 
 ---
 
@@ -120,13 +120,13 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 |---|---|---|
 | `Building` | Id, Name, Address/Code | |
 | `Room` | Id, BuildingId, Name, Type (`Classroom`/`Lab`/`StudyRoom`), Capacity, Floor, IsBookable, IsActive | `IsActive=false` = dismesso, non cancellato fisicamente |
-| `Equipment` | Id, Name | Relazione N:M con `Room` |
+| `Equipment` | Id, Name | Catalogo MongoDB; le assegnazioni sono documenti `RoomEquipment` indicizzati per ID attrezzatura. Relazione concettuale N:M con `Room`. |
 | `OpeningHours` | RoomId, DayOfWeek, OpensAt, ClosesAt | Decisione I-3: una sola fascia per spazio e giorno; i giorni chiusi non hanno righe. Le chiusure straordinarie non sono modellate nel primo incremento. |
 
 **API previste**
 | Metodo | Route | Ruolo | Scopo |
 |---|---|---|---|
-| GET | `/api/rooms?type=&minCapacity=&buildingId=&equipment=` | tutti | Ricerca |
+| GET | `/api/rooms?type=&minCapacity=&buildingId=&equipmentIds=` | tutti | Ricerca; `equipmentIds` è ripetibile e applica una condizione AND |
 | GET | `/api/rooms/{id}` | tutti | Dettaglio |
 | POST | `/api/rooms` | Staff | Crea |
 | PUT | `/api/rooms/{id}` | Staff | Modifica |
@@ -185,7 +185,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 - Il check-in può farlo l'organizzatore o un membro; una prenotazione ha al massimo un check-in, valido per tutto il gruppo.
 - Il report mostra per ogni spazio/periodo: ore prenotate, ore con check-in, no-show, **prenotazioni senza informazione**, e cancellazioni.
 - Il report **non** afferma che uno spazio sia "inutilizzato" se mancano informazioni; lo dichiara esplicitamente.
-- *(Opzione con riserva)* storico dei check-in su MongoDB: vedi [architettura.md](architettura.md#opzione-da-valutare-audit-dei-check-in-su-mongodb).
+- *(Opzione con riserva)* storico dei check-in su MongoDB: non implementato; MongoDB è già usato da Rooms per il catalogo e le assegnazioni delle attrezzature (vedi [architettura](architettura.md#rooms)).
 
 **Codici di errore da rendere comprensibili in UI**
 | Caso | HTTP | Messaggio utente proposto |

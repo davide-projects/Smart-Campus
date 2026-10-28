@@ -1,6 +1,9 @@
 using System.Text.Json.Serialization;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using MongoDB.Driver;
 using SmartCampus.Rooms.Data;
 using SmartCampus.Rooms.Features.Rooms;
 using SmartCampus.ServiceDefaults;
@@ -16,6 +19,16 @@ builder.Services.AddDbContext<RoomsDbContext>((provider, options) =>
     options.UseSqlServer(
         provider.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
         sql => sql.EnableRetryOnFailure()));
+
+var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
+    ?? throw new InvalidOperationException("Mongo:ConnectionString non configurata.");
+var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"]
+    ?? throw new InvalidOperationException("Mongo:DatabaseName non configurato.");
+builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoConnectionString));
+builder.Services.AddSingleton(provider =>
+    provider.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+builder.Services.AddSingleton<EquipmentStore>();
+builder.Services.AddScoped<LegacyEquipmentDataImporter>();
 
 builder.Services.AddSmartCampusJwtBearer(builder.Configuration);
 
@@ -49,7 +62,8 @@ builder.Services.AddScoped<RoomSeedEventPublisher>();
 
 // La readiness include la disponibilità del database, per le probe di orchestrazione.
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<RoomsDbContext>("database");
+    .AddDbContextCheck<RoomsDbContext>("database")
+    .AddCheck<MongoDbHealthCheck>("mongodb");
 
 // Il tipo di spazio viaggia come stringa ("StudyRoom") e non come numero: più leggibile per il frontend.
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -69,12 +83,31 @@ else
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<RoomsDbContext>();
+    var migrationIds = db.Database.GetMigrations().ToArray();
+    var equipmentMigrationIndex = Array.FindIndex(
+        migrationIds,
+        migrationId => migrationId.EndsWith("_MoveEquipmentToMongoDb", StringComparison.Ordinal));
+    var pendingMigrations = (await db.Database.GetPendingMigrationsAsync()).ToHashSet(StringComparer.Ordinal);
+
+    // Migrazione in passi per le attrezzature (storia #76): la migrazione MoveEquipmentToMongoDb
+    // elimina le tabelle SQL Equipment e RoomEquipment, quindi l'import verso MongoDB deve
+    // avvenire PRIMA che venga applicata. Si migra così fino alla migrazione precedente, si
+    // copiano i dati legacy e solo dopo si completa la migrazione dello schema.
+    if (equipmentMigrationIndex > 0 && pendingMigrations.Contains(migrationIds[equipmentMigrationIndex]))
+    {
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(migrationIds[equipmentMigrationIndex - 1], CancellationToken.None);
+        await scope.ServiceProvider
+            .GetRequiredService<LegacyEquipmentDataImporter>()
+            .ImportAsync(CancellationToken.None);
+    }
 
     await db.Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<EquipmentStore>().EnsureSeededAsync(CancellationToken.None);
     await scope.ServiceProvider
         .GetRequiredService<RoomSeedEventPublisher>()
         .PublishOnceAsync(CancellationToken.None);
-    app.Logger.LogInformation("Database Rooms allineato con le migrazioni.");
+    app.Logger.LogInformation("Database Rooms e raccolte MongoDB allineati.");
 }
 
 app.UseAuthentication();

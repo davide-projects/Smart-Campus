@@ -28,4 +28,13 @@ public static class RoomSearch
 
         return query;
     }
+
+    public static IQueryable<Room> ApplyEquipmentFilter(
+        IQueryable<Room> rooms,
+        IReadOnlyCollection<Guid>? matchingRoomIds)
+    {
+        return matchingRoomIds is null
+            ? rooms
+            : rooms.Where(room => matchingRoomIds.Contains(room.Id));
+    }
 }

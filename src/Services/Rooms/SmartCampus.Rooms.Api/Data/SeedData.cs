@@ -29,12 +29,6 @@ internal static class SeedData
     private static readonly Guid LibraryStudyRoomId = Guid.Parse("c1000000-0000-0000-0000-000000000001");
     private static readonly Guid ReadingRoomId = Guid.Parse("c1000000-0000-0000-0000-000000000002");
 
-    private static readonly Guid ProjectorId = Guid.Parse("e1000000-0000-0000-0000-000000000001");
-    private static readonly Guid PersonalComputerId = Guid.Parse("e1000000-0000-0000-0000-000000000002");
-    private static readonly Guid WhiteboardId = Guid.Parse("e1000000-0000-0000-0000-000000000003");
-    private static readonly Guid Printer3DId = Guid.Parse("e1000000-0000-0000-0000-000000000004");
-    private static readonly Guid OscilloscopeId = Guid.Parse("e1000000-0000-0000-0000-000000000005");
-
     private static readonly Building[] Buildings =
     [
         new() { Id = BuildingAId, Name = "Edificio A", Code = "A" },
@@ -113,39 +107,10 @@ internal static class SeedData
         }
     ];
 
-    private static readonly Equipment[] EquipmentCatalog =
-    [
-        new() { Id = ProjectorId, Name = "Proiettore" },
-        new() { Id = PersonalComputerId, Name = "PC" },
-        new() { Id = WhiteboardId, Name = "Lavagna" },
-        new() { Id = Printer3DId, Name = "Stampante 3D" },
-        new() { Id = OscilloscopeId, Name = "Oscilloscopio" }
-    ];
-
-    private static readonly RoomEquipment[] RoomEquipmentLinks =
-    [
-        new() { RoomId = ClassroomA1Id, EquipmentId = ProjectorId },
-        new() { RoomId = ClassroomA1Id, EquipmentId = WhiteboardId },
-        new() { RoomId = ClassroomA2Id, EquipmentId = WhiteboardId },
-        new() { RoomId = ClassroomA3Id, EquipmentId = ProjectorId },
-        new() { RoomId = ClassroomA3Id, EquipmentId = WhiteboardId },
-        new() { RoomId = ComputerLab1Id, EquipmentId = PersonalComputerId },
-        new() { RoomId = ComputerLab1Id, EquipmentId = ProjectorId },
-        new() { RoomId = ComputerLab2Id, EquipmentId = PersonalComputerId },
-        new() { RoomId = ComputerLab2Id, EquipmentId = Printer3DId },
-        new() { RoomId = ClassroomB1Id, EquipmentId = ProjectorId },
-        new() { RoomId = ClassroomB1Id, EquipmentId = WhiteboardId },
-        new() { RoomId = ClassroomB2Id, EquipmentId = WhiteboardId },
-        new() { RoomId = ElectronicsLabId, EquipmentId = OscilloscopeId },
-        new() { RoomId = ElectronicsLabId, EquipmentId = PersonalComputerId }
-    ];
-
     public static void Apply(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Building>().HasData(Buildings);
         modelBuilder.Entity<Room>().HasData(Rooms);
-        modelBuilder.Entity<Equipment>().HasData(EquipmentCatalog);
-        modelBuilder.Entity<RoomEquipment>().HasData(RoomEquipmentLinks);
         modelBuilder.Entity<OpeningHours>().HasData(BuildOpeningHours());
     }
 

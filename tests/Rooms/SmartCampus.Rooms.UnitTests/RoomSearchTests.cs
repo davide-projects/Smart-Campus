@@ -78,8 +78,18 @@ public sealed class RoomSearchTests
         Assert.Empty(result);
     }
 
-    private static List<Room> Search(RoomFilter filter) =>
-        RoomSearch.Apply(Rooms.AsQueryable(), filter).ToList();
+    [Fact]
+    public void Search_WithEquipmentRoomIds_ComposesWithExistingFilters()
+    {
+        var matchingRoomIds = new[] { Rooms[0].Id, Rooms[2].Id, Rooms[5].Id };
+        var result = Search(new RoomFilter(RoomType.Classroom, MinCapacity: 30, BuildingId: BuildingAId), matchingRoomIds);
+
+        var room = Assert.Single(result);
+        Assert.Equal("Aula A1", room.Name);
+    }
+
+    private static List<Room> Search(RoomFilter filter, IReadOnlyCollection<Guid>? matchingRoomIds = null) =>
+        RoomSearch.ApplyEquipmentFilter(RoomSearch.Apply(Rooms.AsQueryable(), filter), matchingRoomIds).ToList();
 
     private static Room CreateRoom(
         string name,

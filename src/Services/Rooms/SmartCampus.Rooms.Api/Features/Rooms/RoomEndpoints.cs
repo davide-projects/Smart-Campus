@@ -53,6 +53,7 @@ public static class RoomEndpoints
     private static async Task<IResult> CreateAsync(
         RoomWriteRequest request,
         RoomsDbContext db,
+        EquipmentStore equipmentStore,
         IPublishEndpoint publishEndpoint,
         CancellationToken cancellationToken)
     {
@@ -85,11 +86,8 @@ public static class RoomEndpoints
             });
         }
 
-        var equipmentIds = await db.Equipment
-            .Where(item => request.EquipmentIds.Contains(item.Id))
-            .Select(item => item.Id)
-            .ToListAsync(cancellationToken);
-        if (equipmentIds.Count != request.EquipmentIds.Count)
+        var equipment = await equipmentStore.GetByIdsAsync(request.EquipmentIds, cancellationToken);
+        if (equipment.Count != request.EquipmentIds.Count)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -108,15 +106,16 @@ public static class RoomEndpoints
             Floor = request.Floor,
             IsBookable = request.IsBookable,
             IsActive = true,
-            OpeningHours = CreateOpeningHours(request.OpeningHours),
-            RoomEquipment = request.EquipmentIds
-                .Select(equipmentId => new RoomEquipment { RoomId = roomId, EquipmentId = equipmentId })
-                .ToList()
+            OpeningHours = CreateOpeningHours(request.OpeningHours)
         };
 
         db.Rooms.Add(room);
         await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room, buildingName), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        // Le attrezzature vanno su MongoDB solo dopo il salvataggio SQL: se MongoDB non risponde
+        // lo spazio resta comunque registrato. Le due scritture non sono atomiche (limitazione
+        // dichiarata nella descrizione della PR).
+        await equipmentStore.SetRoomEquipmentAsync(roomId, equipment, cancellationToken);
 
         return Results.Created($"/api/rooms/{room.Id}", new { room.Id });
     }
@@ -125,6 +124,7 @@ public static class RoomEndpoints
         Guid id,
         RoomWriteRequest request,
         RoomsDbContext db,
+        EquipmentStore equipmentStore,
         IPublishEndpoint publishEndpoint,
         CancellationToken cancellationToken)
     {
@@ -136,7 +136,6 @@ public static class RoomEndpoints
 
         var room = await db.Rooms
             .Include(existing => existing.OpeningHours)
-            .Include(existing => existing.RoomEquipment)
             .SingleOrDefaultAsync(existing => existing.Id == id && existing.IsActive, cancellationToken);
 
         if (room is null)
@@ -172,11 +171,8 @@ public static class RoomEndpoints
             });
         }
 
-        var equipmentIds = await db.Equipment
-            .Where(item => request.EquipmentIds.Contains(item.Id))
-            .Select(item => item.Id)
-            .ToListAsync(cancellationToken);
-        if (equipmentIds.Count != request.EquipmentIds.Count)
+        var equipment = await equipmentStore.GetByIdsAsync(request.EquipmentIds, cancellationToken);
+        if (equipment.Count != request.EquipmentIds.Count)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -192,22 +188,10 @@ public static class RoomEndpoints
         room.IsBookable = request.IsBookable;
         UpdateOpeningHours(room, request.OpeningHours, db);
 
-        var requestedEquipmentIds = request.EquipmentIds.ToHashSet();
-        foreach (var existingLink in room.RoomEquipment.ToArray())
-        {
-            if (!requestedEquipmentIds.Remove(existingLink.EquipmentId))
-            {
-                db.RoomEquipment.Remove(existingLink);
-            }
-        }
-
-        foreach (var equipmentId in requestedEquipmentIds)
-        {
-            db.RoomEquipment.Add(new RoomEquipment { RoomId = room.Id, EquipmentId = equipmentId });
-        }
-
         await publishEndpoint.Publish(RoomEventFactory.ToUpdatedEvent(room, buildingName), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        // Come in CreateAsync: prima SQL, poi MongoDB. Le due scritture non sono atomiche.
+        await equipmentStore.SetRoomEquipmentAsync(room.Id, equipment, cancellationToken);
 
         return Results.NoContent();
     }
@@ -337,6 +321,7 @@ public static class RoomEndpoints
     private static async Task<IResult> GetByIdAsync(
         Guid id,
         RoomsDbContext db,
+        EquipmentStore equipmentStore,
         CancellationToken cancellationToken)
     {
         var room = await db.Rooms
@@ -344,8 +329,6 @@ public static class RoomEndpoints
             .Where(room => room.Id == id && room.IsActive)
             .Include(room => room.Building)
             .Include(room => room.OpeningHours)
-            .Include(room => room.RoomEquipment)
-                .ThenInclude(link => link.Equipment)
             .SingleOrDefaultAsync(cancellationToken);
 
         if (room is null)
@@ -363,8 +346,8 @@ public static class RoomEndpoints
                 : new OpeningHoursResponse(day, null, null, IsClosed: true))
             .ToList();
 
-        var equipment = room.RoomEquipment
-            .Select(link => new RoomEquipmentResponse(link.Equipment.Id, link.Equipment.Name))
+        var equipment = (await equipmentStore.GetForRoomAsync(room.Id, cancellationToken))
+            .Select(item => new RoomEquipmentResponse(item.Id, item.Name))
             .OrderBy(item => item.Name)
             .ToList();
 
@@ -386,7 +369,9 @@ public static class RoomEndpoints
         [FromQuery] RoomType? type,
         [FromQuery] int? minCapacity,
         [FromQuery] Guid? buildingId,
+        [FromQuery] Guid[]? equipmentIds,
         RoomsDbContext db,
+        EquipmentStore equipmentStore,
         CancellationToken cancellationToken)
     {
         if (minCapacity is <= 0)
@@ -405,8 +390,22 @@ public static class RoomEndpoints
             });
         }
 
+        if (equipmentIds?.Any(id => id == Guid.Empty) == true)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["equipmentIds"] = ["Gli identificativi delle attrezzature non sono validi."]
+            });
+        }
+
+        var matchingRoomIds = equipmentIds is null || equipmentIds.Length == 0
+            ? null
+            : await equipmentStore.FindRoomIdsWithAllEquipmentAsync(equipmentIds, cancellationToken);
+
         var rooms = await RoomSearch
-            .Apply(db.Rooms.AsNoTracking(), new RoomFilter(type, minCapacity, buildingId))
+            .ApplyEquipmentFilter(
+                RoomSearch.Apply(db.Rooms.AsNoTracking(), new RoomFilter(type, minCapacity, buildingId)),
+                matchingRoomIds?.ToArray())
             .OrderBy(room => room.Building.Name)
             .ThenBy(room => room.Name)
             .Select(room => new RoomSummaryResponse(
@@ -420,6 +419,18 @@ public static class RoomEndpoints
                 room.Building.Name))
             .ToListAsync(cancellationToken);
 
-        return Results.Ok(rooms);
+        var equipmentByRoom = await equipmentStore.GetForRoomsAsync(
+            rooms.Select(room => room.Id).ToArray(),
+            cancellationToken);
+        var results = rooms
+            .Select(room => room with
+            {
+                Equipment = equipmentByRoom.TryGetValue(room.Id, out var equipment)
+                    ? equipment.Select(item => new RoomEquipmentResponse(item.Id, item.Name)).OrderBy(item => item.Name).ToArray()
+                    : []
+            })
+            .ToArray();
+
+        return Results.Ok(results);
     }
 }

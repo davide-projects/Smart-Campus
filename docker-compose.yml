@@ -28,6 +28,21 @@ services:
       - "5672:5672"
       - "15672:15672"
 
+  mongodb:
+    # Stessa versione usata dai test (mongo:7.0, scelta per la compatibilità con il
+    # kernel Linux): tenerla allineata evita che lo stack locale fallisca dove i test passano.
+    image: mongo:7.0
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   identity:
     build: { context: ., dockerfile: src/Services/Identity/SmartCampus.Identity.Api/Dockerfile }
     environment:
@@ -42,6 +57,8 @@ services:
   rooms:
     build: { context: ., dockerfile: src/Services/Rooms/SmartCampus.Rooms.Api/Dockerfile }
     environment:
+      Mongo__ConnectionString: mongodb://mongodb:27017
+      Mongo__DatabaseName: SmartCampus_Rooms
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Imposta JWT_SIGNING_KEY nel file .env}
       RabbitMq__Host: rabbitmq
       RabbitMq__Port: 5672
@@ -54,6 +71,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_started
+      mongodb:
+        condition: service_healthy
 
   bookings:
     build: { context: ., dockerfile: src/Services/Bookings/SmartCampus.Bookings.Api/Dockerfile }
@@ -89,3 +108,4 @@ services:
 
 volumes:
   sqlserver-data:
+  mongodb-data:
