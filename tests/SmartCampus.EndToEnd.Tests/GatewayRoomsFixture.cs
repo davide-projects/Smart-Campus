@@ -16,7 +16,7 @@ using Yarp.ReverseProxy.Forwarder;
 namespace SmartCampus.EndToEnd.Tests;
 
 // Prova il percorso reale dell'utente: client -> gateway -> servizio Rooms -> SQL Server.
-// Il gateway non apre porte: le sue destinazioni vengono dirottate sul TestServer di Rooms
+// Il gateway non apre porte: le destinazioni vengono inoltrate al TestServer di Rooms tramite un forwarder in memoria.
 public sealed class GatewayRoomsFixture : IAsyncLifetime
 {
     private readonly MsSqlContainer _database = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
@@ -41,9 +41,6 @@ public sealed class GatewayRoomsFixture : IAsyncLifetime
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");
-                builder.UseSetting("Jwt:Issuer", "SmartCampus.Identity");
-                builder.UseSetting("Jwt:Audience", "SmartCampus");
-                builder.UseSetting("Jwt:SigningKey", "rooms-end-to-end-signing-key-with-at-least-32-bytes");
                 builder.UseSetting("RabbitMq:Host", "localhost");
                 builder.UseSetting("RabbitMq:Port", _rabbitMq.GetMappedPublicPort(5672).ToString());
                 builder.UseSetting("RabbitMq:Username", "rooms-end-to-end");

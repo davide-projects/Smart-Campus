@@ -110,7 +110,7 @@ public static class RoomEndpoints
         };
 
         db.Rooms.Add(room);
-        await publishEndpoint.Publish(RoomSeedEventPublisher.ToCreatedEvent(room), cancellationToken);
+        await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.Created($"/api/rooms/{room.Id}", new { room.Id });
@@ -198,7 +198,7 @@ public static class RoomEndpoints
 
         var roomUpdated = new RoomUpdated(room.Id, room.Name, room.Capacity, room.IsBookable, room.IsActive)
         {
-            OpeningHours = RoomSeedEventPublisher.ToOpeningHours(room)
+            OpeningHours = RoomEventFactory.ToOpeningHours(room)
         };
         await publishEndpoint.Publish(roomUpdated, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

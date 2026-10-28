@@ -12,8 +12,8 @@ using SmartCampus.Rooms.Data;
 namespace SmartCampus.Rooms.Api.Data.Migrations
 {
     [DbContext(typeof(RoomsDbContext))]
-    [Migration("20261027152447_AlignMassTransitOutbox")]
-    partial class AlignMassTransitOutbox
+    [Migration("20261028094240_AddRoomsOutboxAndSeedEventDispatch")]
+    partial class AddRoomsOutboxAndSeedEventDispatch
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
