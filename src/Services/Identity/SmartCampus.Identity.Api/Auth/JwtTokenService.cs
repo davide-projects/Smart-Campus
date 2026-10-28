@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using SmartCampus.Identity.Api.Domain;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Identity.Api.Auth;
 

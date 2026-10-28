@@ -9,6 +9,8 @@ namespace SmartCampus.ServiceDefaults;
 
 public static class JwtClaimNames
 {
+    public const string Subject = "sub";
+    public const string Username = "preferred_username";
     public const string Name = "name";
     public const string Role = "role";
 }
@@ -30,7 +32,7 @@ public static class JwtAuthenticationExtensions
             {
                 var settings = jwt.Value;
 
-                // Keep JWT claim names unchanged so authorization policies read the original role claim.
+                // Mantiene invariati i nomi dei claim, così le policy leggono il ruolo originale del token.
                 bearer.MapInboundClaims = false;
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -61,6 +63,7 @@ public sealed class SmartCampusJwtOptions
     public string Issuer { get; set; } = string.Empty;
     public string Audience { get; set; } = string.Empty;
     public string SigningKey { get; set; } = string.Empty;
+    public int ExpirationMinutes { get; set; } = 60;
 }
 
 public sealed class SmartCampusJwtOptionsValidator : IValidateOptions<SmartCampusJwtOptions>
@@ -82,7 +85,13 @@ public sealed class SmartCampusJwtOptionsValidator : IValidateOptions<SmartCampu
         if (Encoding.UTF8.GetByteCount(options.SigningKey) < SmartCampusJwtOptions.MinimumSigningKeyBytes)
         {
             failures.Add(
-                $"Jwt:SigningKey è obbligatoria e deve avere almeno {SmartCampusJwtOptions.MinimumSigningKeyBytes} byte.");
+                $"Jwt:SigningKey è obbligatoria e deve avere almeno {SmartCampusJwtOptions.MinimumSigningKeyBytes} byte " +
+                "(impostala negli user-secrets o nella variabile d'ambiente Jwt__SigningKey).");
+        }
+
+        if (options.ExpirationMinutes is < 1 or > 1440)
+        {
+            failures.Add("Jwt:ExpirationMinutes deve essere compreso tra 1 e 1440.");
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);

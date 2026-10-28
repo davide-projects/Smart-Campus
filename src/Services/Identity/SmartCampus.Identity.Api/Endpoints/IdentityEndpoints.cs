@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartCampus.Identity.Api.Auth;
 using SmartCampus.Identity.Api.Domain;
 using SmartCampus.Identity.Api.Infrastructure;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Identity.Api.Endpoints;
 

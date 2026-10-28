@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 
 using SmartCampus.Identity.Api.Auth;
 using SmartCampus.Identity.Api.Domain;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Identity.UnitTests;
 
