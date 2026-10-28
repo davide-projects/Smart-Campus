@@ -4,7 +4,7 @@ using SmartCampus.Rooms.Models;
 namespace SmartCampus.Rooms.Data;
 
 // Unico punto in cui si costruiscono RoomCreated e RoomUpdated, così il contenuto degli eventi
-// (compreso il nome dell'edificio) è lo stesso in creazione, modifica e pubblicazione seed.
+// (compresi il nome dell'edificio e il tipo) è lo stesso in creazione, modifica e pubblicazione seed.
 internal static class RoomEventFactory
 {
     public static RoomCreated ToCreatedEvent(Room room, string buildingName) => new(
@@ -14,7 +14,8 @@ internal static class RoomEventFactory
         room.IsBookable)
     {
         OpeningHours = ToOpeningHours(room),
-        BuildingName = buildingName
+        BuildingName = buildingName,
+        Type = room.Type.ToString()
     };
 
     public static RoomUpdated ToUpdatedEvent(Room room, string buildingName) => new(
@@ -25,7 +26,8 @@ internal static class RoomEventFactory
         room.IsActive)
     {
         OpeningHours = ToOpeningHours(room),
-        BuildingName = buildingName
+        BuildingName = buildingName,
+        Type = room.Type.ToString()
     };
 
     private static IReadOnlyList<RoomOpeningHours> ToOpeningHours(Room room) => room.OpeningHours

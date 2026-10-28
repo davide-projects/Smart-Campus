@@ -104,6 +104,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             Assert.Equal(new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0)),
                 Assert.Single(createdEvent.OpeningHours));
             Assert.Equal("Edificio B", createdEvent.BuildingName);
+            Assert.Equal("Classroom", createdEvent.Type);
 
             var updateResponse = await fixture.Client.PutAsJsonAsync(
                 $"/api/rooms/{createdEvent.RoomId}",
@@ -128,6 +129,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
             Assert.True(updatedEvent.IsActive);
             Assert.Equal(DayOfWeek.Tuesday, Assert.Single(updatedEvent.OpeningHours).DayOfWeek);
             Assert.Equal("Edificio B", updatedEvent.BuildingName);
+            Assert.Equal("Classroom", updatedEvent.Type);
 
             var deactivateResponse = await fixture.Client.PostAsync(
                 $"/api/rooms/{createdEvent.RoomId}/deactivate",
