@@ -54,3 +54,31 @@ export function organizerLabel(
     ? 'Organizzatore non disponibile'
     : `Organizzatore: ${item.organizerName}`;
 }
+
+const DATE_PARTS_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: CAMPUS_TIME_ZONE,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+});
+
+// Restituisce la data odierna nel fuso orario del campus (Europe/Rome) a mezzanotte locale (ideale per MatDatepicker)
+export function campusToday(now: Date = new Date()): Date {
+  const parts = DATE_PARTS_FORMAT.formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)!.value);
+  return new Date(part('year'), part('month') - 1, part('day'));
+}
+
+// Converte un oggetto Date nel formato "YYYY-MM-DD" richiesto come parametro query dall'API
+export function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Aggiunge un numero di giorni a una data (es. per calcolare la finestra massima di 14 giorni)
+export function addDays(day: Date, days: number): Date {
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate() + days);
+}

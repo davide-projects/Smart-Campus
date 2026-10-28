@@ -123,6 +123,90 @@
             }
           </ul>
         </div>
+
+        <div class="availability-section" id="availability-section" #availabilitySection>
+          <h3>Disponibilità giornaliera</h3>
+
+          @if (!isLoggedIn()) {
+            <div class="login-required-notice">
+              <mat-icon fontSet="material-symbols-outlined">lock</mat-icon>
+              <div class="login-required-text">
+                <strong>Accedi per vedere la disponibilità</strong>
+                <span>La consultazione delle fasce orarie è riservata agli utenti autenticati del campus.</span>
+              </div>
+              <a matButton="filled" routerLink="/login" [queryParams]="{ returnUrl: currentUrl }">
+                <mat-icon fontSet="material-symbols-outlined">login</mat-icon>
+                Accedi
+              </a>
+            </div>
+          } @else {
+            <div class="date-picker-bar">
+              <mat-form-field appearance="outline" class="date-field" subscriptSizing="dynamic">
+                <mat-label>Scegli un giorno</mat-label>
+                <input
+                  matInput
+                  [matDatepicker]="picker"
+                  [min]="minDate"
+                  [max]="maxDate"
+                  [value]="selectedDate()"
+                  (dateChange)="onDateChange($event.value)"
+                  readonly
+                />
+                <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+              </mat-form-field>
+            </div>
+
+            @if (isLoadingAvailability()) {
+              <div class="availability-loading">
+                <mat-spinner diameter="32"></mat-spinner>
+                <span>Caricamento fasce orarie...</span>
+              </div>
+            } @else if (availabilityErrorMessage()) {
+              <div class="availability-error">
+                <mat-icon fontSet="material-symbols-outlined">error_outline</mat-icon>
+                <span>{{ availabilityErrorMessage() }}</span>
+              </div>
+            } @else if (availability(); as av) {
+              @if (!av.isOpen) {
+                <div class="closed-notice">
+                  <mat-icon fontSet="material-symbols-outlined">event_busy</mat-icon>
+                  <div class="closed-notice-text">
+                    <strong>Spazio chiuso</strong>
+                    <span>Lo spazio non è aperto al pubblico nella data selezionata.</span>
+                  </div>
+                </div>
+              } @else {
+                <div class="slots-grid">
+                  @for (slot of av.slots; track slot.start) {
+                    <div
+                      class="slot-item"
+                      [class.is-free]="slot.isFree"
+                      [class.is-occupied]="!slot.isFree"
+                    >
+                      <div class="slot-time">
+                        <mat-icon fontSet="material-symbols-outlined">schedule</mat-icon>
+                        <span>{{ formatTime(slot.start) }} – {{ formatTime(slot.end) }}</span>
+                      </div>
+
+                      <div class="slot-badge">
+                        @if (slot.isFree) {
+                          <mat-icon fontSet="material-symbols-outlined">check_circle</mat-icon>
+                          <span>Libera</span>
+                        } @else {
+                          <mat-icon fontSet="material-symbols-outlined">block</mat-icon>
+                          <span>Occupata</span>
+                        }
+                      </div>
+                    </div>
+                  } @empty {
+                    <p class="empty-text">Nessuna fascia oraria disponibile per questo giorno.</p>
+                  }
+                </div>
+              }
+            }
+          }
+        </div>
       </mat-card-content>
 
       <mat-card-actions class="card-actions">
@@ -141,8 +225,8 @@
         <div class="booking-actions">
           <button
             matButton="outlined"
-            disabled
-            title="Visualizzazione disponibilità non ancora disponibile (US-03)"
+            type="button"
+            (click)="scrollToAvailability()"
           >
             <mat-icon fontSet="material-symbols-outlined">event_available</mat-icon>
             Vedi disponibilità

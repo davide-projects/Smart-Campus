@@ -7,7 +7,9 @@ import { vi } from 'vitest';
 import { RoomDetail } from './room-detail';
 import { AuthService } from '../../services/auth.service';
 import { RoomsService } from '../../services/rooms.service';
+import { BookingsService } from '../../services/bookings.service';
 import { RoomDetail as RoomDetailData } from '../../models/room.model';
+import { DailyAvailability } from '../../models/availability.model';
 
 // Dati sintetici per i test
 const mockRoom: RoomDetailData = {
@@ -27,18 +29,41 @@ const mockRoom: RoomDetailData = {
   ],
 };
 
+const mockAvailability: DailyAvailability = {
+  roomId: 'room-1',
+  date: '2026-11-03',
+  isOpen: true,
+  slots: [
+    { start: '2026-11-03T08:00:00+01:00', end: '2026-11-03T08:30:00+01:00', isFree: true },
+    { start: '2026-11-03T08:30:00+01:00', end: '2026-11-03T09:00:00+01:00', isFree: false },
+  ],
+};
+
+const mockClosedAvailability: DailyAvailability = {
+  roomId: 'room-1',
+  date: '2026-11-08',
+  isOpen: false,
+  slots: [],
+};
+
 describe('RoomDetail', () => {
   let component: RoomDetail;
   let fixture: ComponentFixture<RoomDetail>;
   let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn> };
+  let mockBookingsService: { getDailyAvailability: ReturnType<typeof vi.fn> };
   let currentParamId: string | null = 'room-1';
   const isStaff = signal(false);
+  const isLoggedIn = signal(true);
 
   beforeEach(async () => {
     currentParamId = 'room-1';
     isStaff.set(false);
+    isLoggedIn.set(true);
     mockRoomsService = {
       getRoomById: vi.fn().mockReturnValue(of(mockRoom)),
+    };
+    mockBookingsService = {
+      getDailyAvailability: vi.fn().mockReturnValue(of(mockAvailability)),
     };
 
     await TestBed.configureTestingModule({
@@ -46,7 +71,8 @@ describe('RoomDetail', () => {
       providers: [
         provideRouter([]),
         { provide: RoomsService, useValue: mockRoomsService },
-        { provide: AuthService, useValue: { isStaff } },
+        { provide: AuthService, useValue: { isStaff, isLoggedIn } },
+        { provide: BookingsService, useValue: mockBookingsService },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -192,5 +218,76 @@ describe('RoomDetail', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('a[href="/staff/rooms/room-1/edit"]')).toBeNull();
+  });
+
+  // Test 7: Criteri 2, 3 e 4 - Fasce libere, occupate e privacy
+  it('dovrebbe mostrare le fasce libere e occupate senza esporre chi ha prenotato', () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    // Verifica orari formattati
+    expect(compiled.textContent).toContain('08:00 – 08:30');
+    expect(compiled.textContent).toContain('08:30 – 09:00');
+
+    // Verifica etichette degli stati
+    expect(compiled.textContent).toContain('Libera');
+    expect(compiled.textContent).toContain('Occupata');
+
+    // Verifica privacy: nessun nome o campo utente presente
+    expect(compiled.textContent).not.toContain('organizer');
+    expect(compiled.textContent).not.toContain('Mario Rossi');
+  });
+
+  // Test 8: Criterio 5 - Giorno di chiusura
+  it('dovrebbe mostrare "Spazio chiuso" nei giorni in cui lo spazio non è aperto', () => {
+    mockBookingsService.getDailyAvailability.mockReturnValue(of(mockClosedAvailability));
+
+    fixture = TestBed.createComponent(RoomDetail);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).toContain('Spazio chiuso');
+    expect(compiled.textContent).not.toContain('08:00 – 08:30');
+  });
+
+  // Test 9: Cambio data da selettore
+  it('dovrebbe ricaricare la disponibilità quando viene selezionata una nuova data', () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    // Simula la selezione di una nuova data dal Datepicker
+    component['onDateChange'](new Date(2026, 10, 5)); // 5 novembre 2026
+    fixture.detectChanges();
+
+    expect(mockBookingsService.getDailyAvailability).toHaveBeenCalledWith('room-1', '2026-11-05');
+  });
+
+  // Test 10: Visitatore senza accesso (non autenticato)
+  it('dovrebbe invitare ad accedere senza chiamare il servizio di disponibilità se l\'utente non è autenticato', () => {
+    isLoggedIn.set(false);
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    // Verifica messaggio di invito al login
+    expect(compiled.textContent).toContain('Accedi per vedere la disponibilità');
+    expect(compiled.textContent).toContain(
+      'La consultazione delle fasce orarie è riservata agli utenti autenticati del campus',
+    );
+
+    // Verifica presenza del link al login con returnUrl
+    const loginLink = compiled.querySelector<HTMLAnchorElement>('a[href^="/login"]');
+    expect(loginLink).toBeTruthy();
+
+    // Verifica che il servizio di disponibilità non sia stato chiamato
+    expect(mockBookingsService.getDailyAvailability).not.toHaveBeenCalled();
   });
 });
