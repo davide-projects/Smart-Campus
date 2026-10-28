@@ -1,0 +1,108 @@
+using SmartCampus.Bookings.Api.Entities;
+
+namespace SmartCampus.Bookings.Api.Features.Reservations;
+
+// Regole di una prenotazione come funzioni pure: ricevono tutto come parametro (anche "adesso")
+// e restituiscono null se la richiesta va bene, altrimenti il motivo del rifiuto.
+public static class ReservationRules
+{
+    // Assunzione A1: si prenota a blocchi di 30 minuti.
+    public static readonly TimeSpan SlotLength = TimeSpan.FromMinutes(30);
+
+    // Assunzione A2: al massimo 4 ore, al massimo 14 giorni prima.
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromHours(4);
+    public static readonly TimeSpan MaxAdvance = TimeSpan.FromDays(14);
+
+    // Gruppo 1: regole sulla sola richiesta. Si controllano prima della transazione:
+    // se la richiesta è sbagliata non serve prendere nessun lock.
+    public static ReservationRejection? ValidateRequest(CreateReservationRequest request, DateTimeOffset now)
+    {
+        // INV-2
+        if (request.End <= request.Start)
+        {
+            return Unprocessable("Orario non valido", "L'orario di fine deve essere successivo a quello di inizio.");
+        }
+
+        // INV-6
+        if (request.Start < now)
+        {
+            return Unprocessable("Orario nel passato", "Non è possibile prenotare nel passato.");
+        }
+
+        // A1: inizio e fine all'ora esatta o alla mezz'ora, come le fasce della disponibilità.
+        if (!IsOnSlotBoundary(request.Start) || !IsOnSlotBoundary(request.End))
+        {
+            return Unprocessable("Orario non valido", "Le prenotazioni iniziano e finiscono all'ora esatta o alla mezz'ora.");
+        }
+
+        // A2
+        if (request.End - request.Start > MaxDuration)
+        {
+            return Unprocessable("Durata eccessiva", "Una prenotazione può durare al massimo 4 ore.");
+        }
+
+        // A2
+        if (request.Start > now + MaxAdvance)
+        {
+            return Unprocessable("Troppo in anticipo", "Si può prenotare al massimo 14 giorni prima.");
+        }
+
+        return null;
+    }
+
+    // Gruppo 2: regole sullo spazio. Si controllano dentro la transazione, dopo il lock sulla riga
+    // dello spazio, così nessuno può cambiarlo mentre decidiamo.
+    public static ReservationRejection? ValidateAgainstRoom(
+        CreateReservationRequest request,
+        BookableRoom room,
+        TimeZoneInfo campusTimeZone)
+    {
+        // INV-4
+        if (!room.IsActive || !room.IsBookable)
+        {
+            return Unprocessable("Spazio non prenotabile", "Questo spazio non è prenotabile.");
+        }
+
+        // INV-3: gli orari di apertura sono in ora locale del campus.
+        var localStart = TimeZoneInfo.ConvertTime(request.Start, campusTimeZone);
+        var localEnd = TimeZoneInfo.ConvertTime(request.End, campusTimeZone);
+
+        if (localStart.Date != localEnd.Date)
+        {
+            return Unprocessable("Orario non valido", "La prenotazione deve iniziare e finire nello stesso giorno.");
+        }
+
+        var openingHours = room.OpeningHours.SingleOrDefault(hours => hours.DayOfWeek == localStart.DayOfWeek);
+
+        if (openingHours is null)
+        {
+            return Unprocessable("Fuori orario", "Lo spazio è chiuso in questo giorno.");
+        }
+
+        var startTime = TimeOnly.FromDateTime(localStart.DateTime);
+        var endTime = TimeOnly.FromDateTime(localEnd.DateTime);
+
+        if (startTime < openingHours.OpensAt || endTime > openingHours.ClosesAt)
+        {
+            return Unprocessable(
+                "Fuori orario",
+                $"Lo spazio è aperto dalle {openingHours.OpensAt:HH\\:mm} alle {openingHours.ClosesAt:HH\\:mm}.");
+        }
+
+        return null;
+    }
+
+    // INV-1: conflitto con una prenotazione confermata dello stesso spazio.
+    public static ReservationRejection RoomConflict() =>
+        new(StatusCodes.Status409Conflict, "Spazio già prenotato", "Lo spazio è già prenotato in questa fascia.");
+
+    // INV-8: l'organizzatore ha già una prenotazione confermata sovrapposta, anche in un altro spazio.
+    public static ReservationRejection OrganizerConflict() =>
+        new(StatusCodes.Status409Conflict, "Hai già una prenotazione", "Hai già una prenotazione in questa fascia oraria.");
+
+    private static bool IsOnSlotBoundary(DateTimeOffset value) =>
+        value.TimeOfDay.Ticks % SlotLength.Ticks == 0;
+
+    private static ReservationRejection Unprocessable(string title, string detail) =>
+        new(StatusCodes.Status422UnprocessableEntity, title, detail);
+}
