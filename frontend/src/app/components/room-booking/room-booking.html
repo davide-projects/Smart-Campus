@@ -74,7 +74,9 @@
             [matDatepickerFilter]="isOpenDay"
             [min]="minDay"
             [max]="maxDay"
+            readonly
             required
+            (click)="dayPicker.open()"
           />
           <mat-datepicker-toggle matIconSuffix [for]="dayPicker" />
           <mat-datepicker #dayPicker />

@@ -128,6 +128,7 @@ export class RoomBooking implements OnInit {
   });
 
   private readonly selectedDay = signal<Date | null>(null);
+  private readonly selectedStart = signal<string | null>(null);
 
   // Orario di apertura del giorno scelto; null se non c'è un giorno o lo spazio è chiuso.
   protected readonly dayHours = computed(() => {
@@ -136,14 +137,18 @@ export class RoomBooking implements OnInit {
     return room && day ? openingHoursOn(room, day) : null;
   });
 
-  // Inizio fino a mezz'ora prima della chiusura, fine da mezz'ora dopo l'apertura.
+  // Inizio fino a mezz'ora prima della chiusura, fine da mezz'ora dopo l'apertura e, scelto
+  // l'inizio, solo dopo l'inizio. Il limite delle 4 ore resta del servizio.
   protected readonly startOptions = computed(() => {
     const hours = this.dayHours();
     return hours ? halfHourSlots(hours).slice(0, -1) : [];
   });
   protected readonly endOptions = computed(() => {
     const hours = this.dayHours();
-    return hours ? halfHourSlots(hours).slice(1) : [];
+    const start = this.selectedStart();
+    const ends = hours ? halfHourSlots(hours).slice(1) : [];
+    // Gli orari «HH:mm» si confrontano come testo.
+    return start === null ? ends : ends.filter((time) => time > start);
   });
 
   // Il calendario esclude i giorni senza orario di apertura.
@@ -162,11 +167,23 @@ export class RoomBooking implements OnInit {
       .subscribe((day) => {
         this.selectedDay.set(day);
         const { start, end } = this.form.controls;
+        if (end.value !== null && !this.endOptions().includes(end.value)) {
+          end.reset(null);
+        }
         if (start.value !== null && !this.startOptions().includes(start.value)) {
           start.reset(null);
         }
+      });
+
+    // Un nuovo inizio che supera la fine scelta la azzera, e la fine risulta obbligatoria.
+    this.form.controls.start.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((start) => {
+        this.selectedStart.set(start);
+        const { end } = this.form.controls;
         if (end.value !== null && !this.endOptions().includes(end.value)) {
-          end.reset(null);
+          end.setValue(null);
+          end.markAsTouched();
         }
       });
   }

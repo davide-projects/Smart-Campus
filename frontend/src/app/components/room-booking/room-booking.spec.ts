@@ -6,7 +6,10 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
-import { MatDatepickerInputHarness } from '@angular/material/datepicker/testing';
+import {
+  MatDatepickerInputHarness,
+  MatDatepickerToggleHarness,
+} from '@angular/material/datepicker/testing';
 import { MatFormFieldHarness } from '@angular/material/form-field/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
 import { MatSelectHarness } from '@angular/material/select/testing';
@@ -124,9 +127,14 @@ describe('RoomBooking', () => {
     return (await field.getControl(MatSelectHarness))!;
   }
 
+  // Il campo «Giorno» è di sola lettura: il calendario si apre dal pulsante accanto.
+  async function openCalendar(): Promise<void> {
+    await (await loader.getHarness(MatDatepickerToggleHarness)).openCalendar();
+  }
+
   async function chooseDay(day: number): Promise<void> {
     const input = await dayInput();
-    await input.openCalendar();
+    await openCalendar();
     await (await input.getCalendar()).selectCell({ text: String(day) });
     await stable();
   }
@@ -205,7 +213,7 @@ describe('RoomBooking', () => {
       await render();
       const input = await dayInput();
 
-      await input.openCalendar();
+      await openCalendar();
       const calendar = await input.getCalendar();
       const enabled = await Promise.all(
         (await calendar.getCells({ disabled: false })).map((cell) => cell.getText()),
@@ -245,8 +253,6 @@ describe('RoomBooking', () => {
       expect(await (await select('Ora di inizio')).getValueText()).toBe('10:00');
       expect(await (await select('Ora di fine')).getValueText()).toBe('');
       expect(await optionTexts('Ora di fine')).toEqual([
-        '09:30',
-        '10:00',
         '10:30',
         '11:00',
         '11:30',
@@ -254,6 +260,73 @@ describe('RoomBooking', () => {
         '12:30',
         '13:00',
       ]);
+    });
+
+    it('offers only end times after the chosen start', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseTime('Ora di inizio', '10:00');
+
+      const ends = await optionTexts('Ora di fine');
+
+      expect(ends[0]).toBe('10:30');
+      expect(ends.at(-1)).toBe('20:00');
+      expect(ends).toHaveLength(20);
+    });
+
+    it('clears the end and marks it required when the new start passes it', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseTime('Ora di inizio', '10:00');
+      await chooseTime('Ora di fine', '11:00');
+
+      await chooseTime('Ora di inizio', '11:00');
+
+      expect(await (await select('Ora di fine')).getValueText()).toBe('');
+      const field = await loader.getHarness(
+        MatFormFieldHarness.with({ floatingLabelText: 'Ora di fine' }),
+      );
+      expect(await field.getTextErrors()).toEqual(["L'ora di fine è obbligatoria."]);
+    });
+
+    it('keeps the end when it is still after the new start', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseTime('Ora di inizio', '10:00');
+      await chooseTime('Ora di fine', '12:00');
+
+      await chooseTime('Ora di inizio', '11:00');
+
+      expect(await (await select('Ora di fine')).getValueText()).toBe('12:00');
+      const field = await loader.getHarness(
+        MatFormFieldHarness.with({ floatingLabelText: 'Ora di fine' }),
+      );
+      expect(await field.getTextErrors()).toEqual([]);
+    });
+
+    it('fills the day only from the calendar', async () => {
+      await render();
+      const input = await dayInput();
+      const host = await input.host();
+
+      expect(await host.getProperty<boolean>('readOnly')).toBe(true);
+
+      // Il browser non accetta testo in un campo di sola lettura (jsdom non lo simula: qui si
+      // verifica l'attributo). Il giorno arriva dal calendario.
+      expect(await host.getAttribute('readonly')).not.toBeNull();
+      expect(await input.getValue()).toBe('');
+
+      await chooseDay(5);
+      expect(await input.getValue()).not.toBe('');
+      expect(await optionTexts('Ora di inizio')).toContain('08:00');
+    });
+
+    it('keeps the calendar toggle reachable from the keyboard', async () => {
+      await render();
+      const toggle = element().querySelector<HTMLButtonElement>('mat-datepicker-toggle button')!;
+
+      expect(toggle.tabIndex).not.toBe(-1);
+      expect(toggle.getAttribute('aria-label')).toBeTruthy();
     });
   });
 
@@ -526,7 +599,7 @@ describe('RoomBooking with an expired session', () => {
     const loader = TestbedHarnessEnvironment.loader(harness.fixture);
 
     const input = await loader.getHarness(MatDatepickerInputHarness);
-    await input.openCalendar();
+    await (await loader.getHarness(MatDatepickerToggleHarness)).openCalendar();
     await (await input.getCalendar()).selectCell({ text: '5' });
     for (const [label, time] of [
       ['Ora di inizio', '10:00'],
