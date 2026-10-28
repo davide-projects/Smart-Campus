@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 
 using SmartCampus.Bookings.Api.Data.Context;
+using SmartCampus.Bookings.Api.Entities.Enums;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -11,7 +12,7 @@ public sealed record ReservationListItem(
     Guid OrganizerId,
     int Participants,
     IReadOnlyList<Guid> MemberIds,
-    string Status,
+    ReservationStatus Status,
     DateTimeOffset? CancelledAt);
 
 public static class ReservationListEndpoints
@@ -24,6 +25,7 @@ public static class ReservationListEndpoints
         // GET /api/bookings?roomId=...&date=2026-11-03
         api.MapGet("/", ListByRoomAndDateAsync)
             .WithName("ListReservationsByRoomAndDate")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
             .WithTags("Reservations")
             .Produces<IReadOnlyList<ReservationListItem>>()
             .Produces(StatusCodes.Status404NotFound);
@@ -74,7 +76,7 @@ public static class ReservationListEndpoints
         // Le cancellate restano nell'elenco: si riconoscono dallo stato.
         var items = reservations
             .Select(r => new ReservationListItem(
-                r.Id, r.Start, r.End, r.OrganizerId, r.Participants, r.MemberIds, r.Status.ToString(), r.CancelledAt))
+                r.Id, r.Start, r.End, r.OrganizerId, r.Participants, r.MemberIds, r.Status, r.CancelledAt))
             .ToList();
 
         return Results.Ok(items);
