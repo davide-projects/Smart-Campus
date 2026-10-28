@@ -21,10 +21,10 @@ public static class ReservationEndpoints
     }
 
     private static async Task<IResult> CountFutureAsync(
-    Guid roomId,
-    BookingDbContext db,
-    TimeProvider clock,
-    CancellationToken cancellationToken)
+        Guid roomId,
+        BookingDbContext db,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
     {
         var roomExists = await db.BookableRooms.AnyAsync(room => room.RoomId == roomId, cancellationToken);
         if (!roomExists)
