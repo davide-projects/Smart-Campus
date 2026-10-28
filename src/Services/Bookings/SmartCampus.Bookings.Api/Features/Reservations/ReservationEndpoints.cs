@@ -292,7 +292,7 @@ public static class ReservationEndpoints
         // Il ciclo termina al più al secondo giro: un UPDATE con 0 righe vuol dire che un'altra richiesta
         // ha già portato la prenotazione a Cancelled (INV-7: non torna più Confirmed), quindi la rilettura
         // dà 204 o 403, oppure 404/422; non può più dare "consentita" con lo stesso "adesso".
-        while (true)
+        for (var attempt = 0; attempt < 2; attempt++)
         {
             // 2. Lettura senza tracking: la scrittura è un comando a parte.
             var reservation = await db.Reservations
@@ -335,6 +335,11 @@ public static class ReservationEndpoints
 
             // 0 righe: la prenotazione è cambiata tra la lettura e l'UPDATE. Si rilegge e si decide di nuovo.
         }
+
+        // Non dovrebbe mai succedere: vorrebbe dire che una prenotazione cancellata è tornata Confirmed (INV-7).
+        throw new InvalidOperationException(
+            $"La prenotazione {id} risulta ancora cancellabile dopo un UPDATE senza righe aggiornate: " +
+            "una prenotazione cancellata non deve tornare confermata (INV-7).");
     }
 
     // Nome visualizzato emesso da Identity. Null se il claim manca, è vuoto o è più lungo della colonna.

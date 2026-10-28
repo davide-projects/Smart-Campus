@@ -1,9 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities;
@@ -248,7 +246,7 @@ public sealed class MyReservationsTests : IDisposable
     {
         // Token "alg: none" con un sub qualsiasi: senza firma non vale, anche se il contenuto è plausibile.
         var client = _fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", UnsignedToken(Guid.NewGuid()));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", BookingsApiFixture.CreateUnsignedToken(Guid.NewGuid()));
 
         var response = await client.GetAsync("/api/bookings/mine");
 
@@ -291,15 +289,6 @@ public sealed class MyReservationsTests : IDisposable
     }
 
     // --- Supporto ---
-
-    // JWT senza firma (alg: none), come in CreateReservationTests.
-    private static string UnsignedToken(Guid userId)
-    {
-        static string Encode(object value) =>
-            Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
-
-        return $"{Encode(new { alg = "none", typ = "JWT" })}.{Encode(new { sub = userId.ToString(), role = "Student" })}.test";
-    }
 
     private static async Task AssertUnauthorizedAsync(HttpResponseMessage response)
     {

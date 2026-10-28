@@ -93,6 +93,31 @@ public sealed class CancelReservationTests : IDisposable
     }
 
     [Fact]
+    public async Task Cancel_ThenFormerParticipantsCanBookTheSameSlotAgain()
+    {
+        // INV-8 conta solo le Confirmed: la prenotazione cancellata non blocca più organizzatore e membro.
+        // L'organizzatore riprenota lo stesso spazio, il membro un altro spazio nella stessa fascia (INV-1).
+        var organizer = Guid.NewGuid();
+        var member = Guid.NewGuid();
+        var reservation = await SeedReservationAsync(organizer, DayAfterTomorrowAt10, members: [member]);
+        var otherRoomId = await SeedRoomAsync();
+
+        var cancelled = await DeleteAsync(ClientFor(organizer), reservation.Id);
+        var organizerAgain = await ClientFor(organizer).PostAsJsonAsync(
+            "/api/bookings",
+            new CreateReservationRequest(reservation.RoomId, reservation.Start, reservation.End, Purpose: null));
+        var memberAgain = await ClientFor(member).PostAsJsonAsync(
+            "/api/bookings",
+            new CreateReservationRequest(otherRoomId, reservation.Start, reservation.End, Purpose: null));
+
+        Assert.Equal(HttpStatusCode.NoContent, cancelled.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, organizerAgain.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, memberAgain.StatusCode);
+        var confirmed = await ConfirmedInSlotAsync(reservation.RoomId, reservation.Start, reservation.End);
+        Assert.Equal(organizer, Assert.Single(confirmed).OrganizerId);
+    }
+
+    [Fact]
     public async Task Cancel_MovesTheReservationFromUpcomingToCancelledForOrganizerAndMember()
     {
         var organizer = Guid.NewGuid();
@@ -210,6 +235,14 @@ public sealed class CancelReservationTests : IDisposable
         var stored = await LoadAsync(reservation.Id);
         Assert.Equal(ReservationStatus.Confirmed, stored.Status);
         Assert.Null(stored.CancelledAt);
+
+        // Una prenotazione passata resta tra le passate dell'organizzatore.
+        if (when == "passata")
+        {
+            var mine = await GetMineAsync(organizer);
+            Assert.Contains(mine.Past, item => item.Id == reservation.Id);
+            Assert.DoesNotContain(mine.Cancelled, item => item.Id == reservation.Id);
+        }
     }
 
     [Fact]
@@ -450,13 +483,8 @@ public sealed class CancelReservationTests : IDisposable
             .ToListAsync();
     }
 
-    // Spazio nuovo aperto tutti i giorni 08:00-20:00 con una prenotazione di un'ora;
-    // con membri diventa di gruppo (INV-5: partecipanti = organizzatore + membri).
-    private async Task<Reservation> SeedReservationAsync(
-        Guid organizerId,
-        DateTimeOffset start,
-        ReservationStatus status = ReservationStatus.Confirmed,
-        Guid[]? members = null)
+    // Spazio nuovo aperto tutti i giorni 08:00-20:00.
+    private async Task<Guid> SeedRoomAsync()
     {
         var roomId = Guid.NewGuid();
         var room = new BookableRoom
@@ -480,6 +508,23 @@ public sealed class CancelReservationTests : IDisposable
             });
         }
 
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        db.BookableRooms.Add(room);
+        await db.SaveChangesAsync();
+
+        return roomId;
+    }
+
+    // Spazio nuovo con una prenotazione di un'ora; con membri diventa di gruppo
+    // (INV-5: partecipanti = organizzatore + membri).
+    private async Task<Reservation> SeedReservationAsync(
+        Guid organizerId,
+        DateTimeOffset start,
+        ReservationStatus status = ReservationStatus.Confirmed,
+        Guid[]? members = null)
+    {
+        var roomId = await SeedRoomAsync();
         var reservation = new Reservation
         {
             Id = Guid.NewGuid(),
@@ -501,7 +546,6 @@ public sealed class CancelReservationTests : IDisposable
 
         await using var scope = _fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
-        db.BookableRooms.Add(room);
         db.Reservations.Add(reservation);
         await db.SaveChangesAsync();
 

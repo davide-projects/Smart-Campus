@@ -1,11 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MassTransit.Testing;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
@@ -147,7 +145,7 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         // Prima la firma non veniva verificata: bastava un token "alg: none" con un sub qualsiasi per prenotare a nome di altri.
         var roomId = await SeedRoomAsync();
 
-        var response = await PostWithTokenAsync(UnsignedToken(Guid.NewGuid()), roomId);
+        var response = await PostWithTokenAsync(BookingsApiFixture.CreateUnsignedToken(Guid.NewGuid()), roomId);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal(0, await CountReservationsAsync(roomId));
@@ -289,15 +287,6 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         return await client.PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00"));
-    }
-
-    // Token senza firma ("alg": "none"): per un controllo serio non deve essere accettato.
-    private static string UnsignedToken(Guid userId)
-    {
-        static string Encode(object value) =>
-            Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
-
-        return $"{Encode(new { alg = "none", typ = "JWT" })}.{Encode(new { sub = userId.ToString(), role = "Student" })}.test";
     }
 
     private async Task<bool> RoomHasActiveStateAsync(Guid roomId, bool isActive)
