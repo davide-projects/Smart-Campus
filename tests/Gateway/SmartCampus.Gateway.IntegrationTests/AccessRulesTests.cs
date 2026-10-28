@@ -9,6 +9,9 @@ public sealed class AccessRulesTests(GatewayFixture fixture) : IClassFixture<Gat
     private const string FutureCountUrl =
         "/api/bookings/rooms/11111111-1111-1111-1111-111111111111/future-reservations-count";
 
+    private const string ReservationsListUrl =
+        "/api/bookings?roomId=11111111-1111-1111-1111-111111111111&date=2031-06-10";
+
     private readonly HttpClient _client = fixture.Factory.CreateClient();
 
     [Fact]
@@ -129,11 +132,11 @@ public sealed class AccessRulesTests(GatewayFixture fixture) : IClassFixture<Gat
     [InlineData("Staff")]
     public async Task Bookings_WithValidToken_ReachesBookings(string role)
     {
-        var response = await _client.SendAsync(HttpMethod.Get, "/api/bookings/", TestTokens.Create(role));
+        var response = await _client.SendAsync(HttpMethod.Get, "/api/bookings/availability", TestTokens.Create(role));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var echo = await response.Content.ReadFromJsonAsync<EchoResponse>();
-        Assert.Equal("/api/bookings/", echo!.Path);
+        Assert.Equal("/api/bookings/availability", echo!.Path);
     }
 
     [Fact]
@@ -160,5 +163,39 @@ public sealed class AccessRulesTests(GatewayFixture fixture) : IClassFixture<Gat
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var echo = await response.Content.ReadFromJsonAsync<EchoResponse>();
         Assert.Equal(FutureCountUrl, echo!.Path);
+    }
+
+    [Fact]
+    public async Task ReservationsList_WithoutToken_Returns401()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, ReservationsListUrl);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReservationsList_AsStudent_Returns403()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, ReservationsListUrl, TestTokens.Student());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReservationsList_AsStudent_WithTrailingSlash_Returns403()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, "/api/bookings/", TestTokens.Student());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReservationsList_AsStaff_ReachesBookings()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, ReservationsListUrl, TestTokens.Staff());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var echo = await response.Content.ReadFromJsonAsync<EchoResponse>();
+        Assert.Equal("/api/bookings", echo!.Path);
     }
 }
