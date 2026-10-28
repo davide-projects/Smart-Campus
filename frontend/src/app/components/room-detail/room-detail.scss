@@ -24,7 +24,7 @@
   max-width: 600px;
   margin: 2rem auto;
   padding: 1rem;
-  border-left: 4px solid var(--mat-sys-error, #ba1a1a);
+  border-left: 4px solid var(--mat-sys-error);
 
   mat-icon {
     color: var(--mat-sys-error);
@@ -76,7 +76,7 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1.25rem;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
 
   .info-item {
     display: flex;
@@ -98,13 +98,13 @@
     .info-value {
       display: block;
       font-weight: 500;
-      font-size: 1rem;
     }
   }
 }
 
-// Sezione Attrezzature
-.equipment-section {
+.equipment-section,
+.hours-section,
+.availability-section {
   margin-top: 1.5rem;
 
   h3 {
@@ -113,35 +113,25 @@
     margin-bottom: 0.75rem;
     color: var(--mat-sys-on-surface);
   }
+}
 
-  .empty-text {
-    font-style: italic;
-    color: var(--mat-sys-on-surface-variant);
-    font-size: 0.875rem;
-  }
+.empty-text {
+  font-style: italic;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
 }
 
 // Sezione Orari settimanali
-.hours-section {
-  margin-top: 1.5rem;
-
-  h3 {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 0.75rem;
-  }
-
-  .hours-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
+.hours-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 
   .hours-row {
     display: flex;
     justify-content: space-between;
     padding: 0.5rem 0;
-    border-bottom: 1px dashed var(--mat-sys-outline-variant, #e0e0e0);
+    border-bottom: 1px dashed var(--mat-sys-outline-variant);
     font-size: 0.875rem;
 
     .day-name {
@@ -152,9 +142,171 @@
       color: var(--mat-sys-on-surface-variant);
 
       .closed-label {
-        color: var(--mat-sys-error, #ba1a1a);
+        color: var(--mat-sys-error);
         font-weight: 500;
       }
+    }
+  }
+}
+
+// Sezione Disponibilità giornaliera
+.availability-section {
+  padding-top: 1rem;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.date-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+
+  .date-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
+  .date-input {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--mat-sys-outline);
+    border-radius: 4px;
+    background: var(--mat-sys-surface);
+    color: var(--mat-sys-on-surface);
+    outline: none;
+
+    &:focus {
+      border-color: var(--mat-sys-primary);
+    }
+  }
+}
+
+.availability-loading,
+.availability-error {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+
+.availability-loading {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.availability-error {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+
+  mat-icon {
+    color: var(--mat-sys-error);
+  }
+}
+
+.closed-notice {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-variant);
+  color: var(--mat-sys-on-surface-variant);
+  border-left: 4px solid var(--mat-sys-error);
+
+  mat-icon {
+    color: var(--mat-sys-error);
+    font-size: 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .closed-notice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    strong {
+      color: var(--mat-sys-on-surface);
+    }
+
+    span {
+      font-size: 0.875rem;
+    }
+  }
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.slot-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface);
+
+  .slot-time,
+  .slot-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .slot-time {
+    font-size: 0.875rem;
+    font-weight: 500;
+
+    mat-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+  }
+
+  .slot-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    width: fit-content;
+
+    mat-icon {
+      font-size: 0.875rem;
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+
+  &.is-free {
+    border-color: var(--mat-sys-tertiary-container);
+
+    .slot-badge {
+      background: var(--mat-sys-tertiary-container);
+      color: var(--mat-sys-on-tertiary-container);
+    }
+  }
+
+  &.is-occupied {
+    opacity: 0.75;
+    background: var(--mat-sys-surface-container-high);
+
+    .slot-badge {
+      background: var(--mat-sys-surface-container-highest);
+      color: var(--mat-sys-on-surface-variant);
     }
   }
 }
@@ -168,7 +320,7 @@
   gap: 1rem;
   margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+  border-top: 1px solid var(--mat-sys-outline-variant);
 
   .booking-actions {
     display: flex;

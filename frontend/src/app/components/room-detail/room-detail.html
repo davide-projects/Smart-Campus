@@ -123,6 +123,73 @@
             }
           </ul>
         </div>
+
+        <div class="availability-section" id="availability-section">
+          <h3>Disponibilità giornaliera</h3>
+
+          <div class="date-picker-bar">
+            <label for="availability-date" class="date-label">
+              <mat-icon fontSet="material-symbols-outlined">calendar_today</mat-icon>
+              <span>Giorno:</span>
+            </label>
+            <input
+              id="availability-date"
+              type="date"
+              [value]="selectedDate()"
+              (change)="onDateChange($event)"
+              class="date-input"
+            />
+          </div>
+
+          @if (isLoadingAvailability()) {
+            <div class="availability-loading">
+              <mat-spinner diameter="32"></mat-spinner>
+              <span>Caricamento fasce orarie...</span>
+            </div>
+          } @else if (availabilityErrorMessage()) {
+            <div class="availability-error">
+              <mat-icon fontSet="material-symbols-outlined">error_outline</mat-icon>
+              <span>{{ availabilityErrorMessage() }}</span>
+            </div>
+          } @else if (availability(); as av) {
+            @if (!av.isOpen) {
+              <div class="closed-notice">
+                <mat-icon fontSet="material-symbols-outlined">event_busy</mat-icon>
+                <div class="closed-notice-text">
+                  <strong>Spazio chiuso</strong>
+                  <span>Lo spazio non è aperto al pubblico nella data selezionata.</span>
+                </div>
+              </div>
+            } @else {
+              <div class="slots-grid">
+                @for (slot of av.slots; track slot.start) {
+                  <div
+                    class="slot-item"
+                    [class.is-free]="slot.isFree"
+                    [class.is-occupied]="!slot.isFree"
+                  >
+                    <div class="slot-time">
+                      <mat-icon fontSet="material-symbols-outlined">schedule</mat-icon>
+                      <span>{{ formatTime(slot.start) }} – {{ formatTime(slot.end) }}</span>
+                    </div>
+
+                    <div class="slot-badge">
+                      @if (slot.isFree) {
+                        <mat-icon fontSet="material-symbols-outlined">check_circle</mat-icon>
+                        <span>Libera</span>
+                      } @else {
+                        <mat-icon fontSet="material-symbols-outlined">block</mat-icon>
+                        <span>Occupata</span>
+                      }
+                    </div>
+                  </div>
+                } @empty {
+                  <p class="empty-text">Nessuna fascia oraria disponibile per questo giorno.</p>
+                }
+              </div>
+            }
+          }
+        </div>
       </mat-card-content>
 
       <mat-card-actions class="card-actions">
@@ -141,8 +208,8 @@
         <div class="booking-actions">
           <button
             matButton="outlined"
-            disabled
-            title="Visualizzazione disponibilità non ancora disponibile (US-03)"
+            type="button"
+            (click)="scrollToAvailability()"
           >
             <mat-icon fontSet="material-symbols-outlined">event_available</mat-icon>
             Vedi disponibilità
