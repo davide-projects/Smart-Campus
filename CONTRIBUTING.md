@@ -10,6 +10,8 @@ User Story (issue, label story)
                 └── Pull Request  "Closes #42"          ← merge = task chiuso = Done sul Project
 ```
 
+Le storie si pianificano con OpenSpec prima del codice: flusso, convenzioni e agenti sono in [docs/workflow-openspec.md](docs/workflow-openspec.md).
+
 ---
 
 ## Lingua
