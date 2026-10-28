@@ -85,7 +85,7 @@ Usare **questi termini**: il termine italiano in storie, UI e documentazione; il
 | **Check-in** | `CheckIn` | Registrazione che lo spazio è stato effettivamente usato | Bookings |
 | **No-show** | `NoShow` | Prenotazione confermata senza check-in nella finestra prevista | Bookings |
 | **Nessuna informazione** | — | Né check-in né no-show registrato: **non** significa "non usato" | Bookings |
-| **Organizzatore** | `OrganizerId` | Chi crea la prenotazione; l'unico che può cancellarla | Bookings |
+| **Organizzatore** | `OrganizerId` | Chi crea la prenotazione; l'unico studente che può cancellarla (oltre a lui può farlo solo il personale, `Staff`) | Bookings |
 | **Membro** | `ReservationMember` | Altro studente incluso in una prenotazione di gruppo; la vede e può fare check-in | Bookings |
 | **Studente / Personale** | `Student` / `Staff` | Ruoli degli utenti | Identity |
 
@@ -158,7 +158,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | GET | `/api/bookings/availability/search?date=&start=&end=&minCapacity=` | autenticato | Spazi liberi in un intervallo *(proposta)* |
 | POST | `/api/bookings` | Student, Staff | Crea (singola o con membri) → `201` oppure `409 Conflict` |
 | GET | `/api/bookings/mine` | autenticato | Le mie prenotazioni (come organizzatore o membro), divise in `upcoming`, `past`, `cancelled` *(implementato, US-07)* |
-| DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella |
+| DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella (`Status = Cancelled`, `204`), solo prima dell'inizio, idempotente *(implementato, US-08)* |
 | GET | `/api/bookings?roomId=&date=` | Staff | Vista per spazio |
 | GET | `/api/bookings/rooms/{roomId}/future-reservations-count` | Staff | Conteggio delle prenotazioni confermate non ancora terminate di uno spazio (avviso prima della dismissione) |
 | POST | `/api/bookings/{id}/check-in` | organizzatore o membro | Check-in |
@@ -196,7 +196,9 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 | Fuori orario | 422 | "Lo spazio è aperto dalle X alle Y" |
 | Capienza superata | 422 | "Lo spazio ospita al massimo N persone" |
 | Spazio non prenotabile/disattivato | 422 | "Questo spazio non è prenotabile" |
-| Cancellazione di prenotazione altrui | 403 | "Non puoi cancellare questa prenotazione" |
+| Cancellazione di prenotazione altrui (anche da un membro non organizzatore) | 403 | "Non puoi cancellare questa prenotazione." |
+| Cancellazione di prenotazione già iniziata o passata | 422 | "Non è possibile cancellare una prenotazione già iniziata o passata." |
+| Prenotazione da cancellare inesistente | 404 | "La prenotazione richiesta non esiste." |
 
 ### 6.3 Identity
 
@@ -361,7 +363,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 | I-5 | Cosa succede alle prenotazioni future se uno spazio viene disattivato o cambia orario? | US-11: cancellazione automatica, avviso, blocco della modifica? |
 | I-6 | Limite di prenotazioni attive per studente? | Equità d'uso |
 | I-7 | Gli studenti possono prenotare i laboratori o solo il personale? | Regole per ruolo |
-| I-8 | Entro quando si può cancellare? | US-08 |
+| I-8 | Entro quando si può cancellare? | US-08. **Risolta con A5:** fino all'orario di inizio escluso, per l'organizzatore e per lo Staff; dopo l'inizio `422`. |
 | I-9 | Finestra di check-in (X, Y minuti) e chi può segnare il no-show? | US-14, US-15 |
 | I-10 | Uno studente può vedere *chi* ha prenotato uno spazio? | Privacy: proposta di mostrare solo "occupato" |
 | I-11 | Fuso orario: tutto in ora locale del campus? | Persistenza (`DateTimeOffset`) |
