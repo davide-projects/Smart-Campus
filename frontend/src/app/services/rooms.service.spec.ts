@@ -118,4 +118,13 @@ describe('RoomsService', () => {
     expect(request.request.body).toEqual(writeRequest);
     request.flush(null, { status: 204, statusText: 'No Content' });
   });
+
+  it('deactivates a room with a POST without a body', () => {
+    service.deactivate('room-1').subscribe();
+
+    const request = http.expectOne('/api/rooms/room-1/deactivate');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush(null, { status: 204, statusText: 'No Content' });
+  });
 });

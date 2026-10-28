@@ -220,6 +220,15 @@
             <mat-icon fontSet="material-symbols-outlined">edit</mat-icon>
             Modifica
           </a>
+
+          <button
+            matButton="outlined"
+            [disabled]="isDeactivating()"
+            (click)="askDeactivation()"
+          >
+            <mat-icon fontSet="material-symbols-outlined">archive</mat-icon>
+            Dismetti
+          </button>
         }
 
         <div class="booking-actions">
@@ -245,6 +254,10 @@
           }
         </div>
       </mat-card-actions>
+
+      @if (deactivateError()) {
+        <p class="deactivate-error" role="alert">{{ deactivateError() }}</p>
+      }
     </mat-card>
   </div>
 }

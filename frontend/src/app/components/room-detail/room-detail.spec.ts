@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { Component } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -55,8 +56,9 @@ const mockClosedAvailability: DailyAvailability = {
 describe('RoomDetail', () => {
   let component: RoomDetail;
   let fixture: ComponentFixture<RoomDetail>;
-  let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn> };
+  let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn>; deactivate: ReturnType<typeof vi.fn> };
   let mockBookingsService: { getDailyAvailability: ReturnType<typeof vi.fn> };
+  let mockDialog: { open: ReturnType<typeof vi.fn>; afterClosedResult: unknown };
   let currentParamId: string | null = 'room-1';
   const isStaff = signal(false);
   const isLoggedIn = signal(true);
@@ -67,6 +69,11 @@ describe('RoomDetail', () => {
     isLoggedIn.set(true);
     mockRoomsService = {
       getRoomById: vi.fn().mockReturnValue(of(mockRoom)),
+      deactivate: vi.fn().mockReturnValue(of(undefined)),
+    };
+    mockDialog = {
+      afterClosedResult: true,
+      open: vi.fn().mockImplementation(() => ({ afterClosed: () => of(mockDialog.afterClosedResult) })),
     };
     mockBookingsService = {
       getDailyAvailability: vi.fn().mockReturnValue(of(mockAvailability)),
@@ -79,6 +86,7 @@ describe('RoomDetail', () => {
         { provide: RoomsService, useValue: mockRoomsService },
         { provide: AuthService, useValue: { isStaff, isLoggedIn } },
         { provide: BookingsService, useValue: mockBookingsService },
+        { provide: MatDialog, useValue: mockDialog },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -120,17 +128,17 @@ describe('RoomDetail', () => {
     expect(compiled.textContent).toContain('Proiettore');
 
     // Verifica orari settimanali con traduzione corretta dei giorni
-    expect(compiled.textContent).toContain('Luned√¨');
-    expect(compiled.textContent).toContain('08:00 ‚Äì 20:00');
+    expect(compiled.textContent).toContain('Luned+º');
+    expect(compiled.textContent).toContain('08:00 ‘«Ù 20:00');
     expect(compiled.textContent).toContain('Domenica');
     expect(compiled.textContent).toContain('Chiuso');
 
-    // Verifica indicazione di prenotabilit√†
+    // Verifica indicazione di prenotabilit+·
     expect(compiled.textContent).toContain('Prenotabile');
   });
 
-  // Test 3: Criterio US-02 - Indicazione chiara se lo spazio non √® prenotabile
-  it('dovrebbe indicare chiaramente se lo spazio non √® prenotabile', () => {
+  // Test 3: Criterio US-02 - Indicazione chiara se lo spazio non +ø prenotabile
+  it('dovrebbe indicare chiaramente se lo spazio non +ø prenotabile', () => {
     const nonBookableRoom: RoomDetailData = {
       ...mockRoom,
       isBookable: false,
@@ -169,7 +177,7 @@ describe('RoomDetail', () => {
 
     // Verifica messaggio esplicito richiesto dalla storia
     expect(compiled.textContent).toContain('Spazio non trovato');
-    expect(compiled.textContent).toContain('Lo spazio cercato non esiste o non √® pi√π attivo');
+    expect(compiled.textContent).toContain('Lo spazio cercato non esiste o non +ø pi+¶ attivo');
 
     // Verifica presenza del pulsante per tornare all'elenco
     const backLink = compiled.querySelector('a[routerLink="/rooms"]');
@@ -177,7 +185,7 @@ describe('RoomDetail', () => {
   });
 
   // Test 5: Spazio non trovato se l'URL non contiene alcun ID
-  it('dovrebbe mostrare "Spazio non trovato" se il parametro id √® assente', () => {
+  it('dovrebbe mostrare "Spazio non trovato" se il parametro id +ø assente', () => {
     currentParamId = null;
 
     fixture = TestBed.createComponent(RoomDetail);
@@ -201,11 +209,11 @@ describe('RoomDetail', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Impossibile caricare lo spazio');
     expect(compiled.textContent).toContain(
-      'Si √® verificato un errore durante il caricamento dei dettagli dello spazio.'
+      'Si +ø verificato un errore durante il caricamento dei dettagli dello spazio.'
     );
   });
 
-  // Il personale pu√≤ aprire il modulo di modifica, gli altri no.
+  // Il personale pu+¶ aprire il modulo di modifica, gli altri no.
   it('dovrebbe mostrare il pulsante Modifica solo al personale', () => {
     isStaff.set(true);
 
@@ -218,7 +226,7 @@ describe('RoomDetail', () => {
     expect(link?.textContent).toContain('Modifica');
   });
 
-  it('dovrebbe nascondere il pulsante Modifica a chi non √® del personale', () => {
+  it('dovrebbe nascondere il pulsante Modifica a chi non +ø del personale', () => {
     fixture = TestBed.createComponent(RoomDetail);
     fixture.detectChanges();
 
@@ -226,8 +234,8 @@ describe('RoomDetail', () => {
     expect(compiled.querySelector('a[href="/staff/rooms/room-1/edit"]')).toBeNull();
   });
 
-  // US-04: ¬´Prenota spazio¬ª apre la pagina di prenotazione dello spazio prenotabile.
-  it('dovrebbe collegare ¬´Prenota spazio¬ª alla pagina di prenotazione dello spazio', async () => {
+  // US-04: -ΩPrenota spazio-+ apre la pagina di prenotazione dello spazio prenotabile.
+  it('dovrebbe collegare -ΩPrenota spazio-+ alla pagina di prenotazione dello spazio', async () => {
     fixture = TestBed.createComponent(RoomDetail);
     fixture.detectChanges();
     const loader = TestbedHarnessEnvironment.loader(fixture);
@@ -244,8 +252,8 @@ describe('RoomDetail', () => {
     expect(TestBed.inject(Router).url).toBe('/rooms/room-1/book');
   });
 
-  // US-04: sugli spazi non prenotabili resta solo il pulsante disabilitato ¬´Non prenotabile¬ª.
-  it('non dovrebbe mostrare ¬´Prenota spazio¬ª attivo su uno spazio non prenotabile', async () => {
+  // US-04: sugli spazi non prenotabili resta solo il pulsante disabilitato -ΩNon prenotabile-+.
+  it('non dovrebbe mostrare -ΩPrenota spazio-+ attivo su uno spazio non prenotabile', async () => {
     mockRoomsService.getRoomById.mockReturnValue(of({ ...mockRoom, isBookable: false }));
     fixture = TestBed.createComponent(RoomDetail);
     fixture.detectChanges();
@@ -268,8 +276,8 @@ describe('RoomDetail', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     // Verifica orari formattati
-    expect(compiled.textContent).toContain('08:00 ‚Äì 08:30');
-    expect(compiled.textContent).toContain('08:30 ‚Äì 09:00');
+    expect(compiled.textContent).toContain('08:00 ‘«Ù 08:30');
+    expect(compiled.textContent).toContain('08:30 ‘«Ù 09:00');
 
     // Verifica etichette degli stati
     expect(compiled.textContent).toContain('Libera');
@@ -281,7 +289,7 @@ describe('RoomDetail', () => {
   });
 
   // Test 8: Criterio 5 - Giorno di chiusura
-  it('dovrebbe mostrare "Spazio chiuso" nei giorni in cui lo spazio non √® aperto', () => {
+  it('dovrebbe mostrare "Spazio chiuso" nei giorni in cui lo spazio non +ø aperto', () => {
     mockBookingsService.getDailyAvailability.mockReturnValue(of(mockClosedAvailability));
 
     fixture = TestBed.createComponent(RoomDetail);
@@ -291,11 +299,11 @@ describe('RoomDetail', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     expect(compiled.textContent).toContain('Spazio chiuso');
-    expect(compiled.textContent).not.toContain('08:00 ‚Äì 08:30');
+    expect(compiled.textContent).not.toContain('08:00 ‘«Ù 08:30');
   });
 
   // Test 9: Cambio data da selettore
-  it('dovrebbe ricaricare la disponibilit√† quando viene selezionata una nuova data', () => {
+  it('dovrebbe ricaricare la disponibilit+· quando viene selezionata una nuova data', () => {
     fixture = TestBed.createComponent(RoomDetail);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -308,7 +316,7 @@ describe('RoomDetail', () => {
   });
 
   // Test 10: Visitatore senza accesso (non autenticato)
-  it('dovrebbe invitare ad accedere senza chiamare il servizio di disponibilit√† se l\'utente non √® autenticato', () => {
+  it('dovrebbe invitare ad accedere senza chiamare il servizio di disponibilit+· se l\'utente non +ø autenticato', () => {
     isLoggedIn.set(false);
 
     fixture = TestBed.createComponent(RoomDetail);
@@ -317,16 +325,107 @@ describe('RoomDetail', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     // Verifica messaggio di invito al login
-    expect(compiled.textContent).toContain('Accedi per vedere la disponibilit√†');
+    expect(compiled.textContent).toContain('Accedi per vedere la disponibilit+·');
     expect(compiled.textContent).toContain(
-      'La consultazione delle fasce orarie √® riservata agli utenti autenticati del campus',
+      'La consultazione delle fasce orarie +ø riservata agli utenti autenticati del campus',
     );
 
     // Verifica presenza del link al login con returnUrl
     const loginLink = compiled.querySelector<HTMLAnchorElement>('a[href^="/login"]');
     expect(loginLink).toBeTruthy();
 
-    // Verifica che il servizio di disponibilit√† non sia stato chiamato
+    // Verifica che il servizio di disponibilit+· non sia stato chiamato
     expect(mockBookingsService.getDailyAvailability).not.toHaveBeenCalled();
   });
-});
+  // Pulsante Dismetti: visibilit‡ solo al personale
+  it('dovrebbe mostrare il pulsante Dismetti solo al personale', () => {
+    isStaff.set(true);
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    );
+    expect(button).toBeTruthy();
+  });
+
+  it('dovrebbe nascondere il pulsante Dismetti a chi non Ë del personale', () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    );
+    expect(button).toBeUndefined();
+  });
+
+  // Flusso di dismissione
+  it('dovrebbe aprire la finestra di conferma e, se confermata, dismettere lo spazio e tornare all''elenco', () => {
+    isStaff.set(true);
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation(() => Promise.resolve(true));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    ) as HTMLButtonElement;
+    button.click();
+
+    expect(mockDialog.open).toHaveBeenCalledTimes(1);
+    const data = mockDialog.open.mock.calls[0][1].data;
+    expect(data).toEqual({ roomId: 'room-1', roomName: 'Aula A1' });
+
+    expect(mockRoomsService.deactivate).toHaveBeenCalledWith('room-1');
+    expect(vi.mocked(router.navigate)).toHaveBeenCalledWith(['/rooms']);
+  });
+
+  it('dovrebbe non dismettere lo spazio se la finestra viene annullata', () => {
+    isStaff.set(true);
+    mockDialog.afterClosedResult = false;
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation(() => Promise.resolve(true));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    ) as HTMLButtonElement;
+    button.click();
+
+    expect(mockDialog.open).toHaveBeenCalledTimes(1);
+    expect(mockRoomsService.deactivate).not.toHaveBeenCalled();
+    expect(vi.mocked(router.navigate)).not.toHaveBeenCalled();
+  });
+
+  it('dovrebbe mostrare un messaggio inline se la dismissione fallisce', () => {
+    isStaff.set(true);
+    mockRoomsService.deactivate.mockReturnValue(throwError(() => ({ status: 500 })));
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation(() => Promise.resolve(true));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Dismetti'),
+    ) as HTMLButtonElement;
+    button.click();
+
+    fixture.detectChanges();
+    expect(compiled.textContent).toContain(
+      'Si Ë verificato un errore durante la dismissione dello spazio. Riprova.',
+    );
+    expect(vi.mocked(router.navigate)).not.toHaveBeenCalled();
+  });});

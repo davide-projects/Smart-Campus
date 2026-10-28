@@ -358,3 +358,11 @@
     }
   }
 }
+
+// Messaggio di errore della dismissione, mostrato sotto le azioni
+.deactivate-error {
+  margin: 0.5rem 0 0;
+  color: var(--mat-sys-error, #ba1a1a);
+  font-size: 0.875rem;
+  font-weight: 500;
+}

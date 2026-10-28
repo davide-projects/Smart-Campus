@@ -9,6 +9,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -25,6 +26,7 @@ import {
 import { AuthService } from '../../services/auth.service';
 import { BookingsService } from '../../services/bookings.service';
 import { RoomsService } from '../../services/rooms.service';
+import { DeactivateRoomDialog, DeactivateRoomDialogData } from './deactivate-room-dialog';
 
 @Component({
   imports: [
@@ -49,6 +51,7 @@ export class RoomDetail implements OnInit {
   private readonly roomsService = inject(RoomsService);
   private readonly bookingsService = inject(BookingsService);
   private readonly authService = inject(AuthService);
+  private readonly dialog = inject(MatDialog);
 
   // Riferimento viewChild alla sezione disponibilità per scroll fluido
   private readonly availabilitySection = viewChild<ElementRef<HTMLElement>>('availabilitySection');
@@ -67,6 +70,8 @@ export class RoomDetail implements OnInit {
   protected readonly isLoading = signal<boolean>(true);
   protected readonly isNotFound = signal<boolean>(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly isDeactivating = signal<boolean>(false);
+  protected readonly deactivateError = signal<string | null>(null);
 
   // Limiti date nel fuso orario del campus (Europe/Rome): oggi fino a 14 giorni avanti
   protected readonly minDate = campusToday();
@@ -131,6 +136,7 @@ export class RoomDetail implements OnInit {
     this.isLoading.set(true);
     this.isNotFound.set(false);
     this.errorMessage.set(null);
+    this.deactivateError.set(null);
 
     this.roomsService.getRoomById(roomId).subscribe({
       next: (data) => {
@@ -171,5 +177,43 @@ export class RoomDetail implements OnInit {
   // Scorre la pagina dolcemente fino alla sezione della disponibilità tramite viewChild
   protected scrollToAvailability(): void {
     this.availabilitySection()?.nativeElement.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Apre la finestra di conferma che mostra il numero di prenotazioni future dello spazio.
+  protected askDeactivation(): void {
+    const current = this.room();
+
+    if (!current) {
+      return;
+    }
+
+    const dialogRef = this.dialog.open(DeactivateRoomDialog, {
+      data: { roomId: current.id, roomName: current.name } satisfies DeactivateRoomDialogData,
+      restoreFocus: false,
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed) => {
+      if (confirmed === true) {
+        this.deactivate(current.id);
+      }
+    });
+  }
+
+  // Dismette lo spazio e torna all'elenco; in caso di errore mostra un messaggio inline.
+  private deactivate(roomId: string): void {
+    this.isDeactivating.set(true);
+    this.deactivateError.set(null);
+
+    this.roomsService.deactivate(roomId).subscribe({
+      next: () => {
+        this.router.navigate(['/rooms']);
+      },
+      error: () => {
+        this.isDeactivating.set(false);
+        this.deactivateError.set(
+          'Si è verificato un errore durante la dismissione dello spazio. Riprova.'
+        );
+      },
+    });
   }
 }
