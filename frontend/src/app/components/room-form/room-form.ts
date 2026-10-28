@@ -11,7 +11,6 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -107,7 +106,6 @@ function toInputTime(time: string | null): string {
     MatButtonModule,
     MatCardModule,
     MatCheckboxModule,
-    MatChipsModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -142,14 +140,13 @@ export class RoomForm implements OnInit {
     floor: new FormControl<number | null>(0, [Validators.required, integer]),
     capacity: new FormControl<number | null>(null, [Validators.required, Validators.min(1), integer]),
     isBookable: new FormControl(true, { nonNullable: true }),
+    equipmentIds: new FormControl<string[]>([], { nonNullable: true }),
     days: new FormArray<DayGroup>(WEEK_DAYS.map(() => this.newDay())),
   });
 
   protected readonly days = WEEK_DAYS;
 
   protected readonly buildings = signal<BuildingOption[]>([]);
-  // Le attrezzature non si modificano da qui finché Rooms non ne espone l'elenco: in modifica
-  // vengono rimandate così come sono, perché la PUT sostituisce la lista e altrimenti le cancellerebbe.
   protected readonly equipment = signal<RoomEquipment[]>([]);
 
   protected readonly loading = signal(true);
@@ -165,11 +162,12 @@ export class RoomForm implements OnInit {
 
   ngOnInit(): void {
     forkJoin({
-      buildings: this.rooms.listBuildings(),
+      options: this.rooms.listFormOptions(),
       room: this.roomId ? this.rooms.getRoomById(this.roomId) : of(null),
     }).subscribe({
-      next: ({ buildings, room }) => {
-        this.buildings.set(buildings);
+      next: ({ options, room }) => {
+        this.buildings.set(options.buildings);
+        this.equipment.set(options.equipment);
         if (room) {
           this.fill(room);
         }
@@ -277,6 +275,7 @@ export class RoomForm implements OnInit {
       floor: room.floor,
       capacity: room.capacity,
       isBookable: room.isBookable,
+      equipmentIds: room.equipment.map((item) => item.id),
     });
 
     WEEK_DAYS.forEach((day, index) => {
@@ -290,7 +289,12 @@ export class RoomForm implements OnInit {
       }
     });
 
-    this.equipment.set(room.equipment);
+    // Le attrezzature dello spazio compaiono tra le scelte anche se la ricerca non le avesse restituite.
+    const known = new Set(this.equipment().map((item) => item.id));
+    const missing = room.equipment.filter((item) => !known.has(item.id));
+    if (missing.length > 0) {
+      this.equipment.set([...this.equipment(), ...missing]);
+    }
   }
 
   private toRequest(): RoomWriteRequest {
@@ -303,7 +307,7 @@ export class RoomForm implements OnInit {
       capacity: value.capacity as number,
       floor: value.floor as number,
       isBookable: value.isBookable,
-      equipmentIds: this.equipment().map((item) => item.id),
+      equipmentIds: value.equipmentIds,
       openingHours: value.days.flatMap((day, index) =>
         day.open
           ? [

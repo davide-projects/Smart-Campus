@@ -4,11 +4,19 @@ import { Observable, map } from 'rxjs';
 import {
   BuildingOption,
   RoomDetail,
+  RoomEquipment,
   RoomFilter,
   RoomSummary,
   RoomWriteRequest,
   buildingsOf,
+  equipmentOf,
 } from '../models/room.model';
+
+// Scelte offerte dal modulo di creazione e modifica di uno spazio.
+export interface RoomFormOptions {
+  buildings: BuildingOption[];
+  equipment: RoomEquipment[];
+}
 
 // Accesso al servizio Rooms attraverso il gateway.
 @Injectable({ providedIn: 'root' })
@@ -37,10 +45,13 @@ export class RoomsService {
     return this.http.get<RoomDetail>(`/api/rooms/${id}`);
   }
 
-  // Edifici in cui esiste almeno uno spazio attivo. Rooms non ha un elenco degli edifici:
-  // si ricavano dagli spazi, come fa il filtro della ricerca.
-  listBuildings(): Observable<BuildingOption[]> {
-    return this.search().pipe(map(buildingsOf));
+  // Edifici e attrezzature tra cui scegliere nel modulo di gestione. Rooms non ha un elenco
+  // né degli uni né delle altre: si ricavano dagli spazi attivi con una sola ricerca, quindi
+  // compaiono solo gli edifici con almeno uno spazio e le attrezzature assegnate ad almeno uno.
+  listFormOptions(): Observable<RoomFormOptions> {
+    return this.search().pipe(
+      map((rooms) => ({ buildings: buildingsOf(rooms), equipment: equipmentOf(rooms) })),
+    );
   }
 
   // Crea uno spazio (solo personale). Risponde con l'identificativo del nuovo spazio.

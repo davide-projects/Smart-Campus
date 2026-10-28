@@ -27,6 +27,8 @@ export interface RoomSummary {
   isBookable: boolean;
   buildingId: string;
   buildingName: string;
+  // Attrezzature dello spazio, con id e nome. Il servizio le invia sempre (anche vuote).
+  equipment?: RoomEquipment[];
 }
 
 // Filtri della ricerca: tutti opzionali.
@@ -113,6 +115,12 @@ export function buildingsOf(rooms: RoomSummary[]): BuildingOption[] {
   return [...byId]
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+}
+
+// Attrezzature distinte che compaiono negli spazi, in ordine alfabetico.
+export function equipmentOf(rooms: RoomSummary[]): RoomEquipment[] {
+  const byId = new Map(rooms.flatMap((room) => room.equipment ?? []).map((item) => [item.id, item]));
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'it'));
 }
 
 // Fascia di apertura inviata al servizio Rooms. Gli orari sono "HH:mm:ss".

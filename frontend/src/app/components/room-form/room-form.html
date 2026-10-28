@@ -123,21 +123,19 @@
       </fieldset>
 
       <div class="equipment">
-        <h2>Attrezzature</h2>
-        @if (equipment().length > 0) {
-          <mat-chip-set aria-label="Attrezzature dello spazio">
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Attrezzature</mat-label>
+          <mat-select formControlName="equipmentIds" multiple>
             @for (item of equipment(); track item.id) {
-              <mat-chip>{{ item.name }}</mat-chip>
+              <mat-option [value]="item.id">{{ item.name }}</mat-option>
+            } @empty {
+              <mat-option disabled>Nessuna attrezzatura disponibile.</mat-option>
             }
-          </mat-chip-set>
-        }
+          </mat-select>
+        </mat-form-field>
         <p class="hint">
-          Le attrezzature non si modificano ancora da qui.
-          @if (isEdit) {
-            Quelle attuali restano come sono.
-          } @else {
-            Lo spazio viene creato senza attrezzature.
-          }
+          Sono elencate le attrezzature già presenti in almeno uno spazio attivo. Puoi lasciare il
+          campo vuoto.
         </p>
       </div>
 

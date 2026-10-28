@@ -14,6 +14,12 @@ const BUILDINGS = [
   { id: 'b-2', name: 'Edificio B' },
 ];
 
+const EQUIPMENT = [
+  { id: 'e-2', name: 'Lavagna' },
+  { id: 'e-1', name: 'Proiettore' },
+  { id: 'e-3', name: 'Schermo' },
+];
+
 const EXISTING: RoomDetail = {
   id: 'room-1',
   name: 'Aula A1',
@@ -41,7 +47,7 @@ function badRequest(errors: Record<string, string[]>): HttpErrorResponse {
 
 describe('RoomForm', () => {
   const rooms = {
-    listBuildings: vi.fn(),
+    listFormOptions: vi.fn(),
     getRoomById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -90,7 +96,9 @@ describe('RoomForm', () => {
 
   beforeEach(() => {
     navigate.mockReset().mockResolvedValue(true);
-    rooms.listBuildings.mockReset().mockReturnValue(of(BUILDINGS));
+    rooms.listFormOptions
+      .mockReset()
+      .mockReturnValue(of({ buildings: BUILDINGS, equipment: EQUIPMENT }));
     rooms.getRoomById.mockReset().mockReturnValue(of(EXISTING));
     rooms.create.mockReset().mockReturnValue(of({ id: 'new-room' }));
     rooms.update.mockReset().mockReturnValue(of(undefined));
@@ -99,10 +107,12 @@ describe('RoomForm', () => {
   describe('new room', () => {
     beforeEach(() => render());
 
-    it('opens an empty form with the new-room heading and the buildings to choose from', () => {
+    it('opens an empty form with the new-room heading and the buildings and equipment to choose from', () => {
       expect(element.querySelector('h1')!.textContent).toContain('Nuovo spazio');
       expect(rooms.getRoomById).not.toHaveBeenCalled();
       expect(component['buildings']()).toEqual(BUILDINGS);
+      expect(component['equipment']()).toEqual(EQUIPMENT);
+      expect(component['form'].getRawValue().equipmentIds).toEqual([]);
       expect(component['form'].getRawValue().name).toBe('');
       expect(element.textContent).toContain('Crea lo spazio');
     });
@@ -153,7 +163,7 @@ describe('RoomForm', () => {
       expect(element.textContent).toContain(MESSAGES.closesBeforeOpens);
     });
 
-    it('creates the room, sending only the open days and no equipment, then opens its page', () => {
+    it('creates the room, sending only the open days, then opens its page', () => {
       fillValid();
       submit();
 
@@ -169,6 +179,14 @@ describe('RoomForm', () => {
       };
       expect(rooms.create).toHaveBeenCalledWith(expected);
       expect(navigate).toHaveBeenCalledWith(['/rooms', 'new-room']);
+    });
+
+    it('creates the room with the chosen equipment', () => {
+      fillValid();
+      component['form'].controls.equipmentIds.setValue(['e-1', 'e-3']);
+      submit();
+
+      expect(rooms.create.mock.calls[0][0].equipmentIds).toEqual(['e-1', 'e-3']);
     });
 
     it('creates a room with no opening days when none is ticked', () => {
@@ -265,8 +283,16 @@ describe('RoomForm', () => {
       expect(days[1].open).toBe(false);
       expect(days[2]).toEqual({ open: true, opensAt: '09:00', closesAt: '12:00' });
       expect(days[6].open).toBe(false);
-      expect(element.textContent).toContain('Proiettore');
+      expect(component['form'].getRawValue().equipmentIds).toEqual(['e-1', 'e-2']);
       expect(element.textContent).toContain('Salva le modifiche');
+    });
+
+    it('offers the equipment of the room even when the search did not return it', () => {
+      rooms.listFormOptions.mockReturnValue(of({ buildings: BUILDINGS, equipment: [] }));
+      TestBed.resetTestingModule();
+      render('room-1');
+
+      expect(component['equipment']()).toEqual(EXISTING.equipment);
     });
 
     it('saves the changes keeping the current equipment', () => {
@@ -290,6 +316,16 @@ describe('RoomForm', () => {
       expect(navigate).toHaveBeenCalledWith(['/rooms', 'room-1']);
     });
 
+    it('saves a changed selection of equipment, also when emptied', () => {
+      component['form'].controls.equipmentIds.setValue(['e-3']);
+      submit();
+      expect(rooms.update.mock.calls[0][1].equipmentIds).toEqual(['e-3']);
+
+      component['form'].controls.equipmentIds.setValue([]);
+      submit();
+      expect(rooms.update.mock.calls[1][1].equipmentIds).toEqual([]);
+    });
+
     it('says so when the room was removed in the meantime (404 on save)', () => {
       rooms.update.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
       submit();
@@ -308,7 +344,7 @@ describe('RoomForm', () => {
     });
 
     it('shows an error when the data cannot be loaded', () => {
-      rooms.listBuildings.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      rooms.listFormOptions.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
       render();
 
       expect(element.textContent).toContain(MESSAGES.loadFailed);

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { RoomSummary, RoomWriteRequest } from '../models/room.model';
-import { RoomsService } from './rooms.service';
+import { RoomFormOptions, RoomsService } from './rooms.service';
 
 describe('RoomsService', () => {
   let service: RoomsService;
@@ -36,7 +36,12 @@ describe('RoomsService', () => {
     request.flush([]);
   });
 
-  const room = (id: string, buildingId: string, buildingName: string): RoomSummary => ({
+  const room = (
+    id: string,
+    buildingId: string,
+    buildingName: string,
+    equipment: { id: string; name: string }[] = [],
+  ): RoomSummary => ({
     id,
     name: `Spazio ${id}`,
     type: 'Classroom',
@@ -45,20 +50,41 @@ describe('RoomsService', () => {
     isBookable: true,
     buildingId,
     buildingName,
+    equipment,
   });
 
-  it('lists each building once, in alphabetical order', () => {
-    let result: { id: string; name: string }[] = [];
-    service.listBuildings().subscribe((buildings) => (result = buildings));
+  const projector = { id: 'e-1', name: 'Proiettore' };
+  const whiteboard = { id: 'e-2', name: 'Lavagna' };
 
+  it('lists each building and each piece of equipment once, in alphabetical order', () => {
+    let result = undefined as RoomFormOptions | undefined;
+    service.listFormOptions().subscribe((options) => (result = options));
+
+    // Una sola richiesta per entrambe le liste.
     http
       .expectOne('/api/rooms')
-      .flush([room('1', 'b-2', 'Edificio B'), room('2', 'b-1', 'Edificio A'), room('3', 'b-2', 'Edificio B')]);
+      .flush([
+        room('1', 'b-2', 'Edificio B', [projector]),
+        room('2', 'b-1', 'Edificio A', [projector, whiteboard]),
+        room('3', 'b-2', 'Edificio B'),
+      ]);
 
-    expect(result).toEqual([
-      { id: 'b-1', name: 'Edificio A' },
-      { id: 'b-2', name: 'Edificio B' },
-    ]);
+    expect(result).toEqual({
+      buildings: [
+        { id: 'b-1', name: 'Edificio A' },
+        { id: 'b-2', name: 'Edificio B' },
+      ],
+      equipment: [whiteboard, projector],
+    });
+  });
+
+  it('copes with rooms that come without equipment', () => {
+    let result = undefined as RoomFormOptions | undefined;
+    service.listFormOptions().subscribe((options) => (result = options));
+
+    http.expectOne('/api/rooms').flush([{ ...room('1', 'b-1', 'Edificio A'), equipment: undefined }]);
+
+    expect(result?.equipment).toEqual([]);
   });
 
   const writeRequest: RoomWriteRequest = {

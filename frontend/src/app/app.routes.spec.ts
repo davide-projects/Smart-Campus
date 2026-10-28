@@ -34,7 +34,7 @@ describe('app routes', () => {
         {
           provide: RoomsService,
           useValue: {
-            listBuildings: () => of([]),
+            listFormOptions: () => of({ buildings: [], equipment: [] }),
             getRoomById: () =>
               of({
                 id: 'room-1',
