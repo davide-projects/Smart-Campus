@@ -2,11 +2,14 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
+import { MatTableModule } from '@angular/material/table';
 import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
 import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
@@ -18,16 +21,24 @@ interface BuildingOption {
 
 export const CAPACITY_DEBOUNCE_MS = 300;
 
+export type ResultsView = 'cards' | 'table';
+
+// La vista scelta resta per tutta la sessione della scheda, anche cambiando pagina.
+export const VIEW_STORAGE_KEY = 'smartcampus.roomSearchView';
+
 type SearchResult = { rooms: RoomSummary[] } | { error: true };
 
 @Component({
   imports: [
     MatButtonModule,
+    MatButtonToggleModule,
     MatCardModule,
     MatFormFieldModule,
+    MatIconModule,
     MatProgressBarModule,
     MatSelectModule,
     MatSliderModule,
+    MatTableModule,
     ReactiveFormsModule,
   ],
   selector: 'app-room-search',
@@ -55,6 +66,8 @@ export class RoomSearch {
   protected readonly maxCapacity = signal(0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly view = signal<ResultsView>(savedView());
+  protected readonly columns = ['name', 'type', 'building', 'capacity', 'bookable'];
 
   private readonly minCapacity = toSignal(this.filters.controls.minCapacity.valueChanges, {
     initialValue: 0,
@@ -100,6 +113,15 @@ export class RoomSearch {
     this.searches.next({});
   }
 
+  protected setView(view: ResultsView): void {
+    this.view.set(view);
+    try {
+      sessionStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {
+      // Senza sessionStorage la vista vale solo finché si resta sulla pagina.
+    }
+  }
+
   protected capacityChanged(): void {
     this.capacityChanges.next();
   }
@@ -135,6 +157,14 @@ export class RoomSearch {
         this.buildings.set(buildingsOf(rooms));
         this.maxCapacity.set(Math.max(0, ...rooms.map((room) => room.capacity)));
       });
+  }
+}
+
+function savedView(): ResultsView {
+  try {
+    return sessionStorage.getItem(VIEW_STORAGE_KEY) === 'table' ? 'table' : 'cards';
+  } catch {
+    return 'cards';
   }
 }
 

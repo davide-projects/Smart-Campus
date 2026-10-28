@@ -73,6 +73,31 @@
   list-style: none;
 }
 
+.view-switch {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+// La tabella scorre in orizzontale quando non entra nella larghezza della pagina.
+.table-scroll {
+  margin-top: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+
+  // Su desktop la tabella occupa tutta la larghezza, su mobile non scende sotto i 560px e scorre.
+  table {
+    width: 100%;
+    min-width: 560px;
+  }
+
+  th,
+  td {
+    white-space: nowrap;
+  }
+}
+
 mat-card {
   height: 100%;
 }
