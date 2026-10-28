@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { Router, TitleStrategy, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { routes } from './app.routes';
 import { AppTitleStrategy } from './services/app-title.strategy';
 import { AuthService } from './services/auth.service';
@@ -55,6 +55,8 @@ describe('app routes', () => {
           provide: BookingsService,
           useValue: { getMine: () => of({ upcoming: [], past: [], cancelled: [] }) },
         },
+        // La pagina di prenotazione resta in caricamento: qui conta solo la navigazione.
+        { provide: RoomsService, useValue: { getRoomById: () => NEVER } },
       ],
     });
     router = TestBed.inject(Router);
@@ -75,6 +77,7 @@ describe('app routes', () => {
     expect(TestBed.inject(Title).getTitle()).toBe('Le mie prenotazioni · SmartCampus');
   });
 
+<<<<<<< HEAD
   it('sends a guest from the new room form to the login, remembering the page', async () => {
     await router.navigateByUrl('/staff/rooms/new');
 
@@ -102,5 +105,20 @@ describe('app routes', () => {
     await router.navigateByUrl('/staff/rooms/room-1/edit');
     expect(router.url).toBe('/staff/rooms/room-1/edit');
     expect(TestBed.inject(Title).getTitle()).toBe('Modifica spazio · SmartCampus');
+=======
+  it('sends a guest from the booking page to the login, remembering the page', async () => {
+    await router.navigateByUrl('/rooms/r1/book');
+
+    expect(router.url).toBe('/login?returnUrl=%2Frooms%2Fr1%2Fbook');
+  });
+
+  it('opens the booking page with its title for a logged in user', async () => {
+    isLoggedIn.set(true);
+
+    await router.navigateByUrl('/rooms/r1/book');
+
+    expect(router.url).toBe('/rooms/r1/book');
+    expect(TestBed.inject(Title).getTitle()).toBe('Prenota spazio · SmartCampus');
+>>>>>>> 533377b (feat(frontend): aggiunge la pagina di prenotazione di uno spazio (#15))
   });
 });

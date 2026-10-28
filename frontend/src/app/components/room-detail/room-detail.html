@@ -233,14 +233,10 @@
           </button>
 
           @if (r.isBookable) {
-            <button
-              matButton="filled"
-              disabled
-              title="Prenotazione non ancora disponibile (US-04)"
-            >
+            <a matButton="filled" [routerLink]="['/rooms', r.id, 'book']">
               <mat-icon fontSet="material-symbols-outlined">bookmark_add</mat-icon>
               Prenota spazio
-            </button>
+            </a>
           } @else {
             <button matButton="filled" disabled title="Questo spazio non è prenotabile">
               <mat-icon fontSet="material-symbols-outlined">block</mat-icon>

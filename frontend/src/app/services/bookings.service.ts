@@ -2,7 +2,11 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { DailyAvailability } from '../models/availability.model';
-import { MyReservationsResponse } from '../models/booking.model';
+import {
+  CreateReservationRequest,
+  MyReservationsResponse,
+  ReservationResponse,
+} from '../models/booking.model';
 
 // Accesso al servizio Bookings attraverso il gateway.
 @Injectable({ providedIn: 'root' })
@@ -25,5 +29,10 @@ export class BookingsService {
   // Cancella una prenotazione: la riga resta, con stato «cancellata». Risposta 204 senza corpo.
   cancel(id: string): Observable<void> {
     return this.http.delete<void>(`/api/bookings/${encodeURIComponent(id)}`);
+  }
+
+  // Crea una prenotazione singola confermata a nome dell'utente autenticato.
+  create(request: CreateReservationRequest): Observable<ReservationResponse> {
+    return this.http.post<ReservationResponse>('/api/bookings', request);
   }
 }

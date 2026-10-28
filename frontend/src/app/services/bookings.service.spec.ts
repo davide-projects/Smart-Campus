@@ -2,7 +2,11 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { DailyAvailability } from '../models/availability.model';
-import { MyReservationsResponse } from '../models/booking.model';
+import {
+  CreateReservationRequest,
+  MyReservationsResponse,
+  ReservationResponse,
+} from '../models/booking.model';
 import { BookingsService } from './bookings.service';
 
 // Dati sintetici di prova.
@@ -104,5 +108,31 @@ describe('BookingsService', () => {
     request.flush(null, { status: 204, statusText: 'No Content' });
 
     await result;
+  });
+
+  it('creates a reservation with POST /api/bookings and returns the confirmation', async () => {
+    const body: CreateReservationRequest = {
+      roomId: 'r1',
+      start: '2026-11-05T10:00:00+01:00',
+      end: '2026-11-05T11:00:00+01:00',
+      purpose: 'Ripasso di analisi',
+    };
+    const created: ReservationResponse = {
+      id: 'p9',
+      roomId: 'r1',
+      roomName: 'Aula A1',
+      start: '2026-11-05T10:00:00+01:00',
+      end: '2026-11-05T11:00:00+01:00',
+      participants: 1,
+      status: 'Confirmed',
+    };
+    const result = new Promise((resolve) => service.create(body).subscribe(resolve));
+
+    const request = http.expectOne('/api/bookings');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(body);
+    request.flush(created, { status: 201, statusText: 'Created' });
+
+    expect(await result).toEqual(created);
   });
 });
