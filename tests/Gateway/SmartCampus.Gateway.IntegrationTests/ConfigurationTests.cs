@@ -1,5 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+using SmartCampus.Gateway.Auth;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Gateway.IntegrationTests;
 
@@ -21,14 +25,41 @@ public sealed class ConfigurationTests(GatewayFixture fixture) : IClassFixture<G
     [Theory]
     [InlineData("")]
     [InlineData("chiave-troppo-corta")]
-    public async Task Startup_Fails_WithoutAValidSigningKey(string signingKey)
+    public void Options_AreRejected_WithoutAValidSigningKey(string signingKey)
     {
-        await using var factory = new GatewayFactory(fixture.Downstream.Address, signingKey);
+        using var provider = BuildProvider(signingKey);
 
-        var exception = Record.Exception(() => factory.CreateClient());
+        var exception = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<SmartCampusJwtOptions>>().Value);
 
-        Assert.NotNull(exception);
-        Assert.Contains("Jwt:SigningKey", exception.ToString());
-        Assert.Contains("Jwt__SigningKey", exception.ToString());
+        Assert.Contains("Jwt:SigningKey", exception.Message);
+        Assert.Contains("Jwt__SigningKey", exception.Message);
+    }
+
+    [Fact]
+    public void Options_AreAccepted_WithAValidSigningKey()
+    {
+        using var provider = BuildProvider(TestTokens.SigningKey);
+
+        var options = provider.GetRequiredService<IOptions<SmartCampusJwtOptions>>().Value;
+
+        Assert.Equal(TestTokens.SigningKey, options.SigningKey);
+    }
+
+    private static ServiceProvider BuildProvider(string signingKey)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Issuer"] = "SmartCampus.Identity",
+                ["Jwt:Audience"] = "SmartCampus",
+                ["Jwt:SigningKey"] = signingKey
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddGatewayAuthentication(configuration);
+
+        return services.BuildServiceProvider();
     }
 }
