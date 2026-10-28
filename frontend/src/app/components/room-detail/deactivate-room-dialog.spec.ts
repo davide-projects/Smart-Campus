@@ -38,7 +38,7 @@ describe('DeactivateRoomDialog', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Aula A1');
-    expect(compiled.textContent).toContain('Prenotazioni future');
+    expect(compiled.textContent).toContain('Prenotazioni non ancora concluse');
     expect(compiled.textContent).toContain('5');
     expect(mockBookingsService.futureReservationsCount).toHaveBeenCalledWith('room-1');
   });

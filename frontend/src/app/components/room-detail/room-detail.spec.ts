@@ -4,6 +4,7 @@ import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { Component } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -59,6 +60,7 @@ describe('RoomDetail', () => {
   let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn>; deactivate: ReturnType<typeof vi.fn> };
   let mockBookingsService: { getDailyAvailability: ReturnType<typeof vi.fn> };
   let mockDialog: { open: ReturnType<typeof vi.fn>; afterClosedResult: unknown };
+  let mockSnackBar: { open: ReturnType<typeof vi.fn> };
   let currentParamId: string | null = 'room-1';
   const isStaff = signal(false);
   const isLoggedIn = signal(true);
@@ -75,6 +77,7 @@ describe('RoomDetail', () => {
       afterClosedResult: true,
       open: vi.fn().mockImplementation(() => ({ afterClosed: () => of(mockDialog.afterClosedResult) })),
     };
+    mockSnackBar = { open: vi.fn() };
     mockBookingsService = {
       getDailyAvailability: vi.fn().mockReturnValue(of(mockAvailability)),
     };
@@ -87,6 +90,7 @@ describe('RoomDetail', () => {
         { provide: AuthService, useValue: { isStaff, isLoggedIn } },
         { provide: BookingsService, useValue: mockBookingsService },
         { provide: MatDialog, useValue: mockDialog },
+        { provide: MatSnackBar, useValue: mockSnackBar },
         {
           provide: ActivatedRoute,
           useValue: {

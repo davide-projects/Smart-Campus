@@ -14,6 +14,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 // Servizio e Modelli
 import { DailyAvailability } from '../../models/availability.model';
@@ -52,6 +53,7 @@ export class RoomDetail implements OnInit {
   private readonly bookingsService = inject(BookingsService);
   private readonly authService = inject(AuthService);
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   // Riferimento viewChild alla sezione disponibilità per scroll fluido
   private readonly availabilitySection = viewChild<ElementRef<HTMLElement>>('availabilitySection');
@@ -189,7 +191,6 @@ export class RoomDetail implements OnInit {
 
     const dialogRef = this.dialog.open(DeactivateRoomDialog, {
       data: { roomId: current.id, roomName: current.name } satisfies DeactivateRoomDialogData,
-      restoreFocus: false,
     });
 
     dialogRef.afterClosed().subscribe((confirmed) => {
@@ -206,6 +207,7 @@ export class RoomDetail implements OnInit {
 
     this.roomsService.deactivate(roomId).subscribe({
       next: () => {
+        this.snackBar.open('Spazio dismesso', '', { duration: 3000 });
         this.router.navigate(['/rooms']);
       },
       error: () => {
