@@ -103,11 +103,11 @@ describe('RoomSearch', () => {
     return Promise.all((await table.getRows()).map((row) => row.getCellTextByColumnName()));
   }
 
-  afterEach(() => sessionStorage.clear());
-
   beforeEach(() => {
     search = vi.fn(() => of(ROOMS));
   });
+
+  afterEach(() => sessionStorage.clear());
 
   it('shows all rooms with name, type, building and capacity on load', async () => {
     await render();
