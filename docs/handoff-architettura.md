@@ -176,7 +176,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 8. **INV-8** Nessun utente (organizzatore o membro) è in due prenotazioni `Confirmed` sovrapposte, anche in spazi diversi.
 9. **INV-9** I membri sono utenti con ruolo `Student`.
 
-**Meccanismo anti-conflitto (SQL Server):** per lo spazio, lock `UPDLOCK, ROWLOCK` sulla riga `BookableRoom` + verifica sovrapposizione + insert nella stessa transazione. Vedi [architettura.md](architettura.md). Per INV-8 il meccanismo è **da definire**: il lock sullo spazio non protegge la stessa persona che prenota due spazi diversi nello stesso istante.
+**Meccanismo anti-conflitto (SQL Server):** per lo spazio, lock `UPDLOCK, ROWLOCK` sulla riga `BookableRoom` + verifica sovrapposizione + insert nella stessa transazione. Vedi [architettura.md](architettura.md). Per INV-8 il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi diversi nello stesso istante: nella stessa transazione Bookings prende anche un lock `sp_getapplock` sulla persona (risorsa `user:{id}`, legato alla transazione, attesa massima 10 secondi, poi `409`). Dettagli in [servizi.md](servizi.md#come-bookings-evita-le-sovrapposizioni-inv-1-e-inv-8).
 
 **Eventi:** consuma `Room*`. Non pubblica eventi.
 
@@ -192,6 +192,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 |---|---|---|
 | Conflitto sullo spazio | 409 | "Lo spazio è già prenotato in questa fascia. Ecco le fasce libere…" |
 | Conflitto sulla persona | 409 | "Hai già una prenotazione in questa fascia" / "Uno o più membri hanno già una prenotazione in questa fascia" |
+| Altra prenotazione della stessa persona in elaborazione (lock oltre 10 secondi) | 409 | "Hai un'altra prenotazione in corso, riprova tra qualche secondo." |
 | Fuori orario | 422 | "Lo spazio è aperto dalle X alle Y" |
 | Capienza superata | 422 | "Lo spazio ospita al massimo N persone" |
 | Spazio non prenotabile/disattivato | 422 | "Questo spazio non è prenotabile" |
@@ -228,7 +229,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 ### F1. Prenotazione (singola o di gruppo)
 ```
 Angular → Gateway → Bookings
-  Bookings: lock BookableRoom → verifica INV-1..9 → INSERT Reservation + ReservationMember (1 transazione)
+  Bookings: lock BookableRoom → lock persona (sp_getapplock) → verifica INV-1..9 → INSERT Reservation + ReservationMember (1 transazione)
   → 201 Created
 ```
 ### F2. Cancellazione
