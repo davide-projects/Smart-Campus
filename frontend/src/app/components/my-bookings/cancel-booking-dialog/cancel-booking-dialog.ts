@@ -32,7 +32,7 @@ export class CancelBookingDialog {
   protected readonly pending = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
-  protected cancel(): void {
+  protected dismiss(): void {
     if (!this.pending()) {
       this.dialogRef.close();
     }

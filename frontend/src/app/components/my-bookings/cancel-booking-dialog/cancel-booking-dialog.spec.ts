@@ -223,7 +223,36 @@ describe('CancelBookingDialog', () => {
         expect(isOpen()).toBe(true);
         expect(result.closed).toBe(false);
       });
+
+      it(`shows the generic message when a ${status} has no detail`, async () => {
+        await open();
+
+        await confirm();
+        http
+          .expectOne('/api/bookings/p1')
+          .flush({ title: 'Errore', status }, { status, statusText: 'Error' });
+        await fixture.whenStable();
+
+        expect(alertText()).toBe(GENERIC);
+        expect(isOpen()).toBe(true);
+      });
     }
+
+    it('shows the generic message on a 500 even when it has a detail', async () => {
+      await open();
+
+      await confirm();
+      http
+        .expectOne('/api/bookings/p1')
+        .flush(
+          { title: 'Errore', status: 500, detail: 'Dettaglio interno del server.' },
+          { status: 500, statusText: 'Server Error' },
+        );
+      await fixture.whenStable();
+
+      expect(alertText()).toBe(GENERIC);
+      expect(isOpen()).toBe(true);
+    });
 
     it('shows the generic message on 500 and stays open', async () => {
       await open();

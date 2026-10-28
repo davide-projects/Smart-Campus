@@ -569,6 +569,9 @@ describe('MyBookings', () => {
     });
 
     it('closes the snackbar by itself after 5 seconds', async () => {
+      // shouldAdvanceTime serve: senza, gli harness e le animazioni di Material restano in attesa del
+      // tempo reale e il test va in timeout. Il margine di un secondo tra 4000 e 5500 ms assorbe
+      // l'avanzamento reale durante il test.
       vi.useFakeTimers({
         toFake: ['Date', 'setTimeout', 'clearTimeout'],
         shouldAdvanceTime: true,
