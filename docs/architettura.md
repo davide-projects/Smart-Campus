@@ -23,7 +23,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Gestione:** `POST /api/rooms` e `PUT /api/rooms/{id}` sono riservati al ruolo `Staff`; aggiornano anche attrezzature e orari.
 - **Orari:** nel primo incremento è prevista una fascia per spazio e giorno; i giorni chiusi sono assenti e le chiusure straordinarie fuori ambito. `RoomCreated` e `RoomUpdated` includono lo snapshot degli orari.
 - **Seed:** i dati sintetici sono inclusi nella migrazione iniziale per la demo locale e vengono applicati anche a ogni nuovo database Rooms; non sono seed limitati all'ambiente Development. All'avvio Rooms ne pubblica gli eventi una sola volta tramite outbox.
-- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati.
+- **Pubblica:** `RoomCreated` (`RoomId`, `Name`, `Capacity`, `IsBookable`, `OpeningHours`, `BuildingName`), `RoomUpdated` (gli stessi campi più `IsActive`), `RoomDeactivated` (`RoomId`), accodati con EF Core Bus Outbox nella stessa transazione dei dati. `BuildingName` è il nome dell'edificio dello spazio al momento dell'accodamento: Rooms lo valorizza sempre (creazione, modifica e pubblicazione seed), ma nel contratto è facoltativo e vale `null` negli eventi che non lo contengono.
 
 ### Bookings
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.

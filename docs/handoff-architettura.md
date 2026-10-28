@@ -133,7 +133,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare piÃ
 | POST | `/api/rooms/{id}/deactivate` | Staff | Disattiva |
 | GET/POST/PUT | `/api/rooms/buildings`, `/api/rooms/equipment` | Staff (scrittura) | Anagrafiche |
 
-**Eventi pubblicati:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`. `RoomCreated` e `RoomUpdated` trasportano lo snapshot degli orari come lista di `{ DayOfWeek, OpensAt, ClosesAt }`; i giorni senza fascia sono chiusi. Rooms usa l'EF Core Bus Outbox per rendere atomici gli aggiornamenti di database e l'accodamento dei messaggi; all'avvio pubblica una volta gli eventi corrispondenti agli spazi seed.
+**Eventi pubblicati:** `RoomCreated`, `RoomUpdated`, `RoomDeactivated`. `RoomCreated` e `RoomUpdated` trasportano lo snapshot degli orari come lista di `{ DayOfWeek, OpensAt, ClosesAt }`; i giorni senza fascia sono chiusi. Trasportano anche `BuildingName`, il nome dell'edificio dello spazio al momento dell'accodamento: campo facoltativo nel contratto (`null` se assente), sempre valorizzato da Rooms. Rooms usa l'EF Core Bus Outbox per rendere atomici gli aggiornamenti di database e l'accodamento dei messaggi; all'avvio pubblica una volta gli eventi corrispondenti agli spazi seed.
 
 **Regole**
 - Capienza > 0.

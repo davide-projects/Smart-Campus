@@ -62,7 +62,12 @@ public static class RoomEndpoints
             return Results.ValidationProblem(validationErrors);
         }
 
-        if (!await db.Buildings.AnyAsync(building => building.Id == request.BuildingId, cancellationToken))
+        // Il nome dell'edificio serve all'evento; se manca, l'edificio non esiste.
+        var buildingName = await db.Buildings
+            .Where(building => building.Id == request.BuildingId)
+            .Select(building => building.Name)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (buildingName is null)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -110,7 +115,7 @@ public static class RoomEndpoints
         };
 
         db.Rooms.Add(room);
-        await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room), cancellationToken);
+        await publishEndpoint.Publish(RoomEventFactory.ToCreatedEvent(room, buildingName), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.Created($"/api/rooms/{room.Id}", new { room.Id });
@@ -142,7 +147,12 @@ public static class RoomEndpoints
                 statusCode: StatusCodes.Status404NotFound);
         }
 
-        if (!await db.Buildings.AnyAsync(building => building.Id == request.BuildingId, cancellationToken))
+        // Il nome dell'edificio serve all'evento; se manca, l'edificio non esiste.
+        var buildingName = await db.Buildings
+            .Where(building => building.Id == request.BuildingId)
+            .Select(building => building.Name)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (buildingName is null)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -196,11 +206,7 @@ public static class RoomEndpoints
             db.RoomEquipment.Add(new RoomEquipment { RoomId = room.Id, EquipmentId = equipmentId });
         }
 
-        var roomUpdated = new RoomUpdated(room.Id, room.Name, room.Capacity, room.IsBookable, room.IsActive)
-        {
-            OpeningHours = RoomEventFactory.ToOpeningHours(room)
-        };
-        await publishEndpoint.Publish(roomUpdated, cancellationToken);
+        await publishEndpoint.Publish(RoomEventFactory.ToUpdatedEvent(room, buildingName), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.NoContent();
