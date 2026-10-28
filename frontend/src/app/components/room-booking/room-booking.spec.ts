@@ -1,6 +1,6 @@
 import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { HarnessLoader } from '@angular/cdk/testing';
+import { HarnessLoader, TestKey } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -327,6 +327,50 @@ describe('RoomBooking', () => {
 
       expect(toggle.tabIndex).not.toBe(-1);
       expect(toggle.getAttribute('aria-label')).toBeTruthy();
+    });
+
+    it('opens the calendar with Enter on the day field, without sending the form', async () => {
+      await render();
+      const input = await dayInput();
+      // Evento costruito a mano per leggere defaultPrevented: nel browser è ciò che impedisce
+      // a Invio di inviare anche il modulo (jsdom non simula l'invio implicito).
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
+      element().querySelector('input[formControlName="day"]')!.dispatchEvent(enter);
+      await stable();
+
+      expect(await input.isCalendarOpen()).toBe(true);
+      expect(enter.defaultPrevented).toBe(true);
+      http.expectNone('/api/bookings');
+      expect(await (await select('Ora di inizio')).isDisabled()).toBe(false);
+      expect(element().querySelector('mat-error')).toBeNull();
+    });
+
+    it('opens the calendar with Alt+Down on the day field', async () => {
+      await render();
+      const input = await dayInput();
+
+      // Il campo è di sola lettura, quindi Material ignora Alt+Freccia giù: lo gestisce la pagina.
+      await (await input.host()).sendKeys({ alt: true }, TestKey.DOWN_ARROW);
+      await stable();
+
+      expect(await input.isCalendarOpen()).toBe(true);
+    });
+
+    it('still sends a single request when the complete form is submitted from another field', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseTime('Ora di inizio', '10:00');
+      await chooseTime('Ora di fine', '11:00');
+
+      // Invio implicito del modulo (quello che il browser fa con Invio fuori dal campo «Giorno»).
+      element()
+        .querySelector('form')!
+        .dispatchEvent(new Event('submit', { cancelable: true }));
+      await stable();
+
+      expect(await (await dayInput()).isCalendarOpen()).toBe(false);
+      await respond(created(), { status: 201, statusText: 'Created' });
     });
   });
 

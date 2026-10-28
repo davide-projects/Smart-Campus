@@ -77,6 +77,8 @@
             readonly
             required
             (click)="dayPicker.open()"
+            (keydown.enter)="openCalendar($event, dayPicker)"
+            (keydown.alt.arrowdown)="openCalendar($event, dayPicker)"
           />
           <mat-datepicker-toggle matIconSuffix [for]="dayPicker" />
           <mat-datepicker #dayPicker />

@@ -19,7 +19,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
-import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDatepicker, MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -249,6 +249,13 @@ export class RoomBooking implements OnInit {
           this.errorMessage.set(rejectionMessage(error));
         },
       });
+  }
+
+  // Il campo «Giorno» è di sola lettura: Invio e Alt+Freccia giù aprono il calendario.
+  // preventDefault evita che Invio invii anche il modulo.
+  protected openCalendar(event: Event, picker: MatDatepicker<Date>): void {
+    event.preventDefault();
+    picker.open();
   }
 
   // Dopo la conferma: modulo vuoto per lo stesso spazio, senza messaggi di rifiuto.
