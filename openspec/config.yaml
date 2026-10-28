@@ -1,0 +1,58 @@
+schema: spec-driven
+
+context: |
+  Language: Italiano
+  All artifacts must be written in Italiano.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Keep code identifiers, routes, JSON fields, event names and file paths in English.
+
+  Progetto: SmartCampus, project work ITS. Prenotazione di spazi del campus (aule, laboratori, sale studio).
+  Riferimenti: CONTRIBUTING.md (flusso GitHub e lingua), docs/architettura.md, docs/servizi.md,
+  docs/endpoints.md, glossario in docs/handoff-architettura.md (sezione 4).
+
+  Stack:
+  - Backend .NET 10, un microservizio per contesto: Identity, Rooms, Bookings; gateway YARP (src/Gateway).
+  - Un database SQL Server per servizio (EF Core, migrazioni); MongoDB previsto per le attrezzature di Rooms (#76).
+  - Eventi tra servizi con MassTransit 8.5.12 su RabbitMQ, outbox EF Core in Rooms; contratti in src/BuildingBlocks/SmartCampus.Contracts.
+  - Autenticazione: Identity emette JWT; Gateway e Rooms li validano con AddSmartCampusJwtBearer (ServiceDefaults).
+  - Frontend Angular 22 con Angular Material 3, solo chiamate a /api/... sul gateway.
+    Cartelle in frontend/src/app: components/<nome>/ (pagine), components/shared/ (solo componenti comuni), models/, services/.
+  - Test: xUnit con Testcontainers (backend), Vitest con harness di Angular Material (frontend).
+
+  Flusso OpenSpec del team:
+  - Una change per user story, chiamata <numero-issue-storia>-<descrizione-kebab> (es. 73-raffina-ricerca-spazi).
+  - Le delta spec sono organizzate per servizio: specs/identity, specs/rooms, specs/bookings, specs/gateway, specs/frontend.
+  - Ogni gruppo di tasks.md corrisponde a un task di sviluppo GitHub (sub-issue della storia) e a un branch/PR.
+  - La storia ha due sub-issue in più, «Pianificazione OpenSpec» e «Archivio OpenSpec»: la PR della change
+    chiude il primo, la PR di archivio il secondo. Non hanno un gruppo in tasks.md.
+  - Si archivia dopo il merge dell'ultima PR di sviluppo della storia.
+  - Dettagli in docs/workflow-openspec.md.
+
+  Dati solo sintetici: nessun segreto o dato personale reale in spec, esempi, test o log.
+
+rules:
+  proposal:
+    - Nella prima riga indica la storia GitHub (es. «Storia #73») e il formato della storia (Come / voglio / in modo da).
+    - Riporta i criteri di accettazione della storia e indica cosa è fuori ambito.
+    - Elenca i servizi toccati e gli eventi o contratti tra servizi che cambiano.
+  specs:
+    - Un requisito per comportamento osservabile, con almeno uno scenario WHEN/THEN per criterio di accettazione.
+    - Per le API indica metodo, route, codici di stato e messaggi di errore in italiano visibili all'utente.
+    - Per il frontend descrivi il comportamento visibile, compresi tastiera e larghezza mobile (375px).
+  design:
+    - Motiva ogni scelta tecnica nuova (libreria, database, pattern) e le alternative scartate.
+    - Segnala impatti su migrazioni, contratti degli eventi, configurazione (user-secrets, docker-compose) e documentazione.
+  tasks:
+    - Ogni gruppo di task corrisponde a un task di sviluppo GitHub, con intestazione «## N. <titolo> (#<issue>)» e area (frontend, svc:rooms...).
+    - Includi i test da scrivere e l'aggiornamento della documentazione in docs/ quando serve.
+
+operations:
+  apply:
+    guidance:
+      - Lavora solo sul gruppo di task del task GitHub del branch corrente (il numero è nel nome del branch).
+      - Rispetta CONTRIBUTING.md per commit e PR; non aggiungere trailer Co-Authored-By né footer di generazione.
+      - Prima di dichiarare un task concluso esegui build e test dell'area (dotnet test SmartCampus.slnx oppure npx ng test --watch=false) e riporta comando ed esito.
+  archive:
+    guidance:
+      - Archivia solo quando tutti i task di sviluppo della storia sono chiusi e le loro PR unite su main.
+      - Riassumi in poche righe quali spec sono cambiate.
