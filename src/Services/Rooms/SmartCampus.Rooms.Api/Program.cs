@@ -17,6 +17,8 @@ builder.Services.AddDbContext<RoomsDbContext>((provider, options) =>
         provider.GetRequiredService<IConfiguration>().GetConnectionString("Database"),
         sql => sql.EnableRetryOnFailure()));
 
+builder.Services.AddSmartCampusJwtBearer(builder.Configuration);
+
 var rabbitMqHost = builder.Configuration["RabbitMq:Host"] ?? "localhost";
 var rabbitMqPort = builder.Configuration.GetValue<ushort?>("RabbitMq:Port") ?? 5672;
 var rabbitMqVirtualHost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
@@ -75,6 +77,8 @@ else
     app.Logger.LogInformation("Database Rooms allineato con le migrazioni.");
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapDefaultEndpoints();
 
 // Tutte le route del servizio stanno sotto /api/rooms: il gateway le inoltra senza riscriverle.

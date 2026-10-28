@@ -53,6 +53,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
 
         try
         {
+            fixture.AuthorizeAsRole("Staff");
             await fixture.RabbitMq.PauseAsync();
             var createResponse = await fixture.Client.PostAsJsonAsync(
                 "/api/rooms/",
@@ -63,6 +64,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
                     20,
                     1,
                     true,
+                    [],
                     [new RoomOpeningHours(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(17, 0))]));
 
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
@@ -91,6 +93,7 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
                     24,
                     1,
                     true,
+                    [],
                     [new RoomOpeningHours(DayOfWeek.Tuesday, new TimeOnly(10, 0), new TimeOnly(18, 0))]));
 
             Assert.Equal(HttpStatusCode.NoContent, updateResponse.StatusCode);
@@ -124,9 +127,10 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
     [Fact]
     public async Task CreateRoom_WithNameAlreadyUsedInBuilding_ReturnsConflict()
     {
+        fixture.AuthorizeAsRole("Staff");
         var response = await fixture.Client.PostAsJsonAsync(
             "/api/rooms/",
-            new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, []));
+            new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, [], []));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
@@ -137,16 +141,17 @@ public sealed class RoomEventOutboxTests(RoomsApiFixture fixture) : IClassFixtur
     [Fact]
     public async Task UpdateRoom_WithNameAlreadyUsedInBuilding_ReturnsConflictWithoutChangingRoom()
     {
+        fixture.AuthorizeAsRole("Staff");
         var createResponse = await fixture.Client.PostAsJsonAsync(
             "/api/rooms/",
-            new RoomWriteRequest(BuildingAId, "Room for duplicate test", RoomType.Classroom, 20, 1, true, []));
+            new RoomWriteRequest(BuildingAId, "Room for duplicate test", RoomType.Classroom, 20, 1, true, [], []));
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var createdBody = await createResponse.Content.ReadFromJsonAsync<CreatedRoomResponse>();
         Assert.NotNull(createdBody);
 
         var updateResponse = await fixture.Client.PutAsJsonAsync(
             $"/api/rooms/{createdBody.Id}",
-            new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, []));
+            new RoomWriteRequest(BuildingAId, "Aula A1", RoomType.Classroom, 20, 1, true, [], []));
 
         Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
         var detailResponse = await fixture.Client.GetAsync($"/api/rooms/{createdBody.Id}");

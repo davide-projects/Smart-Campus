@@ -1,17 +1,26 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
+
 using SmartCampus.Rooms.Data;
+
 using Testcontainers.MsSql;
 using Testcontainers.RabbitMq;
 
 namespace SmartCampus.Rooms.IntegrationTests;
 
-
 public sealed class RoomsApiFixture : IAsyncLifetime
 {
+    private const string JwtSigningKey = "rooms-integration-signing-key-with-at-least-32-bytes";
+
     private readonly MsSqlContainer _database = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
         .Build();
 
@@ -26,6 +35,22 @@ public sealed class RoomsApiFixture : IAsyncLifetime
 
     public RabbitMqContainer RabbitMq => _rabbitMq;
 
+    public void AuthorizeAsRole(string role)
+    {
+        var now = DateTime.UtcNow;
+        var token = new JwtSecurityToken(
+            issuer: "SmartCampus.Identity",
+            audience: "SmartCampus",
+            claims: [new Claim("role", role)],
+            notBefore: now,
+            expires: now.AddMinutes(5),
+            signingCredentials: new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSigningKey)),
+                SecurityAlgorithms.HmacSha256));
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", new JwtSecurityTokenHandler().WriteToken(token));
+    }
+
     public async Task InitializeAsync()
     {
         await _database.StartAsync();
@@ -36,6 +61,9 @@ public sealed class RoomsApiFixture : IAsyncLifetime
             {
                 builder.UseEnvironment("Development");
                 builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString());
+                builder.UseSetting("Jwt:Issuer", "SmartCampus.Identity");
+                builder.UseSetting("Jwt:Audience", "SmartCampus");
+                builder.UseSetting("Jwt:SigningKey", JwtSigningKey);
                 builder.UseSetting("RabbitMq:Host", "localhost");
                 builder.UseSetting("RabbitMq:Port", _rabbitMq.GetMappedPublicPort(5672).ToString());
                 builder.UseSetting("RabbitMq:VirtualHost", "/");
@@ -54,7 +82,6 @@ public sealed class RoomsApiFixture : IAsyncLifetime
                 });
             });
 
-        
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RoomsDbContext>();

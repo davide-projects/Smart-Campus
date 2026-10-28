@@ -29,5 +29,6 @@ public sealed class ConfigurationTests(GatewayFixture fixture) : IClassFixture<G
 
         Assert.NotNull(exception);
         Assert.Contains("Jwt:SigningKey", exception.ToString());
+        Assert.Contains("Jwt__SigningKey", exception.ToString());
     }
 }

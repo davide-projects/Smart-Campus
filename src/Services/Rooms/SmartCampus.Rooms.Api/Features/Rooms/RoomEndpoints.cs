@@ -26,6 +26,7 @@ public static class RoomEndpoints
         api.MapPost("/", CreateAsync)
             .WithName("CreateRoom")
             .WithTags("Rooms")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
             .Produces(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
@@ -33,6 +34,7 @@ public static class RoomEndpoints
         api.MapPut("/{id:guid}", UpdateAsync)
             .WithName("UpdateRoom")
             .WithTags("Rooms")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
@@ -41,6 +43,7 @@ public static class RoomEndpoints
         api.MapPost("/{id:guid}/deactivate", DeactivateAsync)
             .WithName("DeactivateRoom")
             .WithTags("Rooms")
+            .RequireAuthorization(policy => policy.RequireRole("Staff"))
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -77,9 +80,22 @@ public static class RoomEndpoints
             });
         }
 
+        var equipmentIds = await db.Equipment
+            .Where(item => request.EquipmentIds.Contains(item.Id))
+            .Select(item => item.Id)
+            .ToListAsync(cancellationToken);
+        if (equipmentIds.Count != request.EquipmentIds.Count)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.EquipmentIds)] = ["Una o più attrezzature indicate non esistono."]
+            });
+        }
+
+        var roomId = Guid.NewGuid();
         var room = new Room
         {
-            Id = Guid.NewGuid(),
+            Id = roomId,
             BuildingId = request.BuildingId,
             Name = roomName,
             Type = request.Type,
@@ -87,7 +103,10 @@ public static class RoomEndpoints
             Floor = request.Floor,
             IsBookable = request.IsBookable,
             IsActive = true,
-            OpeningHours = CreateOpeningHours(request.OpeningHours)
+            OpeningHours = CreateOpeningHours(request.OpeningHours),
+            RoomEquipment = request.EquipmentIds
+                .Select(equipmentId => new RoomEquipment { RoomId = roomId, EquipmentId = equipmentId })
+                .ToList()
         };
 
         db.Rooms.Add(room);
@@ -112,6 +131,7 @@ public static class RoomEndpoints
 
         var room = await db.Rooms
             .Include(existing => existing.OpeningHours)
+            .Include(existing => existing.RoomEquipment)
             .SingleOrDefaultAsync(existing => existing.Id == id && existing.IsActive, cancellationToken);
 
         if (room is null)
@@ -142,46 +162,41 @@ public static class RoomEndpoints
             });
         }
 
+        var equipmentIds = await db.Equipment
+            .Where(item => request.EquipmentIds.Contains(item.Id))
+            .Select(item => item.Id)
+            .ToListAsync(cancellationToken);
+        if (equipmentIds.Count != request.EquipmentIds.Count)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.EquipmentIds)] = ["Una o più attrezzature indicate non esistono."]
+            });
+        }
+
         room.BuildingId = request.BuildingId;
         room.Name = roomName;
         room.Type = request.Type;
         room.Capacity = request.Capacity;
         room.Floor = request.Floor;
         room.IsBookable = request.IsBookable;
-        var requestedHours = request.OpeningHours.ToDictionary(hours => hours.DayOfWeek);
-        foreach (var existingHours in room.OpeningHours.ToArray())
+        UpdateOpeningHours(room, request.OpeningHours, db);
+
+        var requestedEquipmentIds = request.EquipmentIds.ToHashSet();
+        foreach (var existingLink in room.RoomEquipment.ToArray())
         {
-            if (!requestedHours.TryGetValue(existingHours.DayOfWeek, out var updatedHours))
+            if (!requestedEquipmentIds.Remove(existingLink.EquipmentId))
             {
-                room.OpeningHours.Remove(existingHours);
-                db.OpeningHours.Remove(existingHours);
-                continue;
+                db.RoomEquipment.Remove(existingLink);
             }
-
-            existingHours.OpensAt = updatedHours.OpensAt;
-            existingHours.ClosesAt = updatedHours.ClosesAt;
-            requestedHours.Remove(existingHours.DayOfWeek);
         }
 
-        foreach (var openingHours in requestedHours.Values)
+        foreach (var equipmentId in requestedEquipmentIds)
         {
-            db.OpeningHours.Add(new OpeningHours
-            {
-                Id = Guid.NewGuid(),
-                RoomId = room.Id,
-                Room = room,
-                DayOfWeek = openingHours.DayOfWeek,
-                OpensAt = openingHours.OpensAt,
-                ClosesAt = openingHours.ClosesAt
-            });
+            db.RoomEquipment.Add(new RoomEquipment { RoomId = room.Id, EquipmentId = equipmentId });
         }
 
-        var roomUpdated = new RoomUpdated(
-            room.Id,
-            room.Name,
-            room.Capacity,
-            room.IsBookable,
-            room.IsActive)
+        var roomUpdated = new RoomUpdated(room.Id, room.Name, room.Capacity, room.IsBookable, room.IsActive)
         {
             OpeningHours = RoomSeedEventPublisher.ToOpeningHours(room)
         };
@@ -239,23 +254,28 @@ public static class RoomEndpoints
             errors[nameof(request.Type)] = ["Il tipo di spazio non è valido."];
         }
 
+        if (request.EquipmentIds is null || request.EquipmentIds.Any(id => id == Guid.Empty))
+        {
+            errors[nameof(request.EquipmentIds)] = ["La lista delle attrezzature è obbligatoria e non può contenere identificativi vuoti."];
+        }
+        else if (request.EquipmentIds.Distinct().Count() != request.EquipmentIds.Count)
+        {
+            errors[nameof(request.EquipmentIds)] = ["Un'attrezzatura non può essere indicata più di una volta."];
+        }
+
         if (request.OpeningHours is null)
         {
-            errors[nameof(request.OpeningHours)] = ["Gli orari di apertura sono obbligatori; usa una lista vuota per indicare uno spazio sempre chiuso."];
+            errors[nameof(request.OpeningHours)] = ["Gli orari sono obbligatori; usa una lista vuota per indicare uno spazio sempre chiuso."];
             return errors;
         }
 
-        if (request.OpeningHours.Any(hours => hours is null))
+        if (request.OpeningHours.Any(hours => hours is null || !Enum.IsDefined(hours.DayOfWeek)))
         {
-            errors[nameof(request.OpeningHours)] = ["La lista degli orari non può contenere valori nulli."];
+            errors[nameof(request.OpeningHours)] = ["Gli orari contengono un giorno non valido."];
             return errors;
         }
 
-        if (request.OpeningHours.Any(hours => !Enum.IsDefined(hours.DayOfWeek)))
-        {
-            errors[nameof(request.OpeningHours)] = ["Il giorno della settimana non è valido."];
-        }
-        else if (request.OpeningHours.GroupBy(hours => hours.DayOfWeek).Any(group => group.Count() > 1))
+        if (request.OpeningHours.GroupBy(hours => hours.DayOfWeek).Any(group => group.Count() > 1))
         {
             errors[nameof(request.OpeningHours)] = ["È ammessa una sola fascia di apertura per giorno."];
         }
@@ -276,6 +296,37 @@ public static class RoomEndpoints
             ClosesAt = hours.ClosesAt
         })
         .ToList();
+
+    private static void UpdateOpeningHours(Room room, IReadOnlyList<RoomOpeningHours> requestedHours, RoomsDbContext db)
+    {
+        var requestedByDay = requestedHours.ToDictionary(hours => hours.DayOfWeek);
+        foreach (var existing in room.OpeningHours.ToArray())
+        {
+            if (!requestedByDay.TryGetValue(existing.DayOfWeek, out var updated))
+            {
+                room.OpeningHours.Remove(existing);
+                db.OpeningHours.Remove(existing);
+                continue;
+            }
+
+            existing.OpensAt = updated.OpensAt;
+            existing.ClosesAt = updated.ClosesAt;
+            requestedByDay.Remove(existing.DayOfWeek);
+        }
+
+        foreach (var hours in requestedByDay.Values)
+        {
+            db.OpeningHours.Add(new OpeningHours
+            {
+                Id = Guid.NewGuid(),
+                RoomId = room.Id,
+                Room = room,
+                DayOfWeek = hours.DayOfWeek,
+                OpensAt = hours.OpensAt,
+                ClosesAt = hours.ClosesAt
+            });
+        }
+    }
 
     private static async Task<IResult> GetByIdAsync(
         Guid id,

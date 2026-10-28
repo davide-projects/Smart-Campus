@@ -42,6 +42,7 @@ services:
   rooms:
     build: { context: ., dockerfile: src/Services/Rooms/SmartCampus.Rooms.Api/Dockerfile }
     environment:
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Imposta JWT_SIGNING_KEY nel file .env}
       RabbitMq__Host: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__VirtualHost: /

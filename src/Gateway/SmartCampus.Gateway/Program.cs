@@ -2,8 +2,8 @@ using SmartCampus.Gateway.Auth;
 using SmartCampus.ServiceDefaults;
 
 // API Gateway: unico ingresso pubblico. Instrada /api/{servizio}/** verso il servizio corrispondente
-// e applica le regole di accesso: valida il JWT emesso da Identity e controlla il ruolo (route in appsettings.json).
-// Non contiene logica di dominio. I servizi a valle non rivalidano il token (vedi docs/gateway.md).
+// e valida il JWT emesso da Identity; Rooms lo rivalida per proteggere le route riservate allo Staff.
+// Non contiene logica di dominio.
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
