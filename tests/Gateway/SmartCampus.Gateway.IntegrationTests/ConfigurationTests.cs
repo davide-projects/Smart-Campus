@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using SmartCampus.ServiceDefaults;
 
 using SmartCampus.Gateway.Auth;
+using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Gateway.IntegrationTests;
 

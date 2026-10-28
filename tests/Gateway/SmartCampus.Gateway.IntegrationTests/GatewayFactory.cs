@@ -5,8 +5,7 @@ using Microsoft.Extensions.Configuration;
 namespace SmartCampus.Gateway.IntegrationTests;
 
 /// <summary>Avvia il Gateway reale con chiave JWT di prova e tutti i servizi puntati al servizio a valle finto.</summary>
-public sealed class GatewayFactory(string downstreamAddress, string? signingKey = TestTokens.SigningKey)
-    : WebApplicationFactory<Program>
+public sealed class GatewayFactory(string downstreamAddress) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -14,7 +13,7 @@ public sealed class GatewayFactory(string downstreamAddress, string? signingKey 
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["Jwt:SigningKey"] = signingKey,
+                ["Jwt:SigningKey"] = TestTokens.SigningKey,
                 ["ReverseProxy:Clusters:identity:Destinations:d1:Address"] = downstreamAddress,
                 ["ReverseProxy:Clusters:rooms:Destinations:d1:Address"] = downstreamAddress,
                 ["ReverseProxy:Clusters:bookings:Destinations:d1:Address"] = downstreamAddress

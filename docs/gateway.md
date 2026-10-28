@@ -59,9 +59,18 @@ Con Identity, Rooms, Bookings e Gateway avviati:
 5. Ripeti il login con `staff1`: i token `Student` e `Staff` sono ammessi su `/api/bookings/`; solo `Staff` potrà usare le route di gestione degli spazi di Rooms quando esisteranno.
 6. `GET http://localhost:5000/api/bookings/rooms/<id dello spazio>/future-reservations-count`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con il conteggio (o `404` se lo spazio non esiste).
 
+### Avvio senza chiave
+
+Il Gateway non deve partire senza una chiave JWT valida. Il rifiuto in fase di avvio non è coperto da un test automatico, quindi si controlla a mano:
+
+1. Rimuovi la chiave: `dotnet user-secrets remove "Jwt:SigningKey" --project src/Gateway/SmartCampus.Gateway`.
+2. Avvia il Gateway: `dotnet run --project src/Gateway/SmartCampus.Gateway`.
+3. Deve fermarsi subito con un `OptionsValidationException` il cui messaggio nomina `Jwt:SigningKey`.
+4. Rimetti la chiave con `dotnet user-secrets set "Jwt:SigningKey" "<la stessa di Identity>" --project src/Gateway/SmartCampus.Gateway`.
+
 ## Test
 
-`tests/Gateway/SmartCampus.Gateway.IntegrationTests` avvia il Gateway reale davanti a un servizio a valle finto (nessun database, nessun Docker): verifica anonimo / `Student` / `Staff` su ogni gruppo di route, token scaduto, firma errata, issuer o audience sbagliati, inoltro dell'intestazione `Authorization`, preflight CORS, health anonimi e avvio che fallisce senza chiave valida.
+`tests/Gateway/SmartCampus.Gateway.IntegrationTests` avvia il Gateway reale davanti a un servizio a valle finto (nessun database, nessun Docker): verifica anonimo / `Student` / `Staff` su ogni gruppo di route, token scaduto, firma errata, issuer o audience sbagliati, inoltro dell'intestazione `Authorization`, preflight CORS, health anonimi, rifiuto di una chiave JWT assente o troppo corta (verificato sulle opzioni, senza avviare il server).
 
 ```bash
 dotnet test tests/Gateway/SmartCampus.Gateway.IntegrationTests
