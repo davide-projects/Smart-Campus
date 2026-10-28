@@ -16,7 +16,6 @@ using SmartCampus.Bookings.Api.Features.Reservations;
 namespace SmartCampus.Bookings.IntegrationTests;
 
 // Criteri di US-04 verificati sull'endpoint reale con SQL Server (Testcontainers).
-// La concorrenza (20 richieste parallele) è nel task #14.
 [Collection(BookingsApiCollection.Name)]
 public sealed class CreateReservationTests(BookingsApiFixture fixture)
 {

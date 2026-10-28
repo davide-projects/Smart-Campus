@@ -43,7 +43,7 @@ Il gruppo è in grado di produrre una prima versione di Product Backlog ordinabi
 | Database, EF Core, migrazioni, seed | ✅ Identity, Rooms e Bookings hanno persistenza e migrazioni |
 | Autenticazione JWT | ✅ Identity emette i token; Rooms applica l'autorizzazione Staff |
 | Messaggistica (MassTransit + outbox) | ✅ versione 8.5.12 condivisa; Rooms usa RabbitMQ e outbox EF Core; Bookings consuma gli eventi |
-| Test di concorrenza prenotazioni | ❌ da fare (prova chiave del progetto) |
+| Test di concorrenza prenotazioni | ✅ `ConcurrentReservationTests` su SQL Server reale (Testcontainers): 20 richieste sulla stessa fascia, stessa persona su due spazi, timeout del lock sulla persona, membro di gruppo |
 
 ### Vincoli che le storie devono rispettare
 - **Stack:** backend C# / ASP.NET Core, frontend Angular, database SQL Server.
