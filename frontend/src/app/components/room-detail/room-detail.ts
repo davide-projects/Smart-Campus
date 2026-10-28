@@ -9,6 +9,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 // Servizio e Modelli
+import { AuthService } from '../../services/auth.service';
 import { RoomsService } from '../../services/rooms.service';
 import {
   RoomDetail as RoomDetailData,
@@ -32,6 +33,9 @@ import {
 export class RoomDetail implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly roomsService = inject(RoomsService);
+
+  // Il pulsante «Modifica» compare solo al personale.
+  protected readonly isStaff = inject(AuthService).isStaff;
 
   // Esposte al template HTML
   protected readonly roomTypeLabel = roomTypeLabel;

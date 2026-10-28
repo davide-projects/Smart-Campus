@@ -1,0 +1,154 @@
+<section class="room-form">
+  <h1>{{ heading() }}</h1>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Caricamento dei dati" />
+  } @else if (notFound()) {
+    <mat-card class="message-card" role="alert">
+      <mat-card-header>
+        <mat-icon fontSet="material-symbols-outlined" mat-card-avatar>error_outline</mat-icon>
+        <mat-card-title>Spazio non trovato</mat-card-title>
+        <mat-card-subtitle>Lo spazio cercato non esiste o non è più attivo.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-actions>
+        <a matButton="filled" routerLink="/rooms">Torna alla ricerca degli spazi</a>
+      </mat-card-actions>
+    </mat-card>
+  } @else if (loadError()) {
+    <mat-card class="message-card" role="alert">
+      <mat-card-header>
+        <mat-icon fontSet="material-symbols-outlined" mat-card-avatar>cloud_off</mat-icon>
+        <mat-card-title>Impossibile aprire il modulo</mat-card-title>
+        <mat-card-subtitle>{{ loadError() }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-actions>
+        <a matButton="filled" routerLink="/rooms">Torna alla ricerca degli spazi</a>
+      </mat-card-actions>
+    </mat-card>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      @if (formError(); as message) {
+        <p class="form-error" role="alert">{{ message }}</p>
+      }
+
+      <div class="fields">
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Nome</mat-label>
+          <input matInput formControlName="name" autocomplete="off" required />
+          @if (fieldError('name'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Edificio</mat-label>
+          <mat-select formControlName="buildingId" required>
+            @for (building of buildings(); track building.id) {
+              <mat-option [value]="building.id">{{ building.name }}</mat-option>
+            } @empty {
+              <mat-option disabled>Non ci sono edifici tra cui scegliere.</mat-option>
+            }
+          </mat-select>
+          @if (fieldError('buildingId'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Tipo</mat-label>
+          <mat-select formControlName="type" required>
+            @for (type of types; track type) {
+              <mat-option [value]="type">{{ typeLabel(type) }}</mat-option>
+            }
+          </mat-select>
+          @if (fieldError('type'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Piano</mat-label>
+          <input matInput type="number" step="1" formControlName="floor" required />
+          @if (fieldError('floor'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Capienza</mat-label>
+          <input matInput type="number" min="1" step="1" formControlName="capacity" required />
+          @if (fieldError('capacity'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-slide-toggle formControlName="isBookable">Prenotabile</mat-slide-toggle>
+      <p class="hint">
+        Uno spazio non prenotabile resta visibile nella ricerca ma non si può prenotare.
+      </p>
+
+      <fieldset class="hours">
+        <legend>Orari di apertura</legend>
+        <p class="hint">Spunta i giorni in cui lo spazio è aperto. I giorni senza spunta sono chiusi.</p>
+
+        @if (hoursError(); as message) {
+          <p class="form-error" role="alert">{{ message }}</p>
+        }
+
+        <ul class="days" formArrayName="days">
+          @for (day of days; track day; let i = $index) {
+            <li class="day" [formGroupName]="i">
+              <mat-checkbox formControlName="open" class="day-name">{{ dayLabel(day) }}</mat-checkbox>
+
+              @if (isOpen(i)) {
+                <mat-form-field appearance="outline" class="time">
+                  <mat-label>Apre alle</mat-label>
+                  <input matInput type="time" formControlName="opensAt" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="time">
+                  <mat-label>Chiude alle</mat-label>
+                  <input matInput type="time" formControlName="closesAt" />
+                </mat-form-field>
+              } @else {
+                <span class="closed">Chiuso</span>
+              }
+
+              @if (dayError(i); as message) {
+                <p class="day-error" role="alert">{{ message }}</p>
+              }
+            </li>
+          }
+        </ul>
+      </fieldset>
+
+      <div class="equipment">
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Attrezzature</mat-label>
+          <mat-select formControlName="equipmentIds" multiple>
+            @for (item of equipment(); track item.id) {
+              <mat-option [value]="item.id">{{ item.name }}</mat-option>
+            } @empty {
+              <mat-option disabled>Nessuna attrezzatura disponibile.</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <p class="hint">
+          Sono elencate le attrezzature già presenti in almeno uno spazio attivo. Puoi lasciare il
+          campo vuoto.
+        </p>
+      </div>
+
+      <div class="actions">
+        <button matButton="filled" type="submit" [disabled]="saving()">
+          {{ isEdit ? 'Salva le modifiche' : 'Crea lo spazio' }}
+        </button>
+        <a matButton [routerLink]="roomId ? ['/rooms', roomId] : ['/rooms']">Annulla</a>
+      </div>
+
+      @if (saving()) {
+        <mat-progress-bar mode="indeterminate" aria-label="Salvataggio in corso" />
+      }
+    </form>
+  }
+</section>

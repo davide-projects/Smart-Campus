@@ -80,6 +80,22 @@ describe('Navbar', () => {
     expect(navLinks()).not.toContainEqual(MY_BOOKINGS);
   });
 
+  const NEW_ROOM = { text: 'Nuovo spazio', href: '/staff/rooms/new' };
+
+  it('shows the link to create a room to the staff only', async () => {
+    user.set(STAFF);
+    await render();
+
+    expect(navLinks()).toContainEqual(NEW_ROOM);
+  });
+
+  it('hides the link to create a room from students and guests', async () => {
+    user.set(STUDENT);
+    await render();
+
+    expect(navLinks()).not.toContainEqual(NEW_ROOM);
+  });
+
   it('has the link to my reservations in the mobile menu', async () => {
     user.set(STUDENT);
     await render();

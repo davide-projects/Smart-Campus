@@ -131,6 +131,13 @@
           Torna all'elenco
         </a>
 
+        @if (isStaff()) {
+          <a matButton="outlined" [routerLink]="['/staff/rooms', r.id, 'edit']">
+            <mat-icon fontSet="material-symbols-outlined">edit</mat-icon>
+            Modifica
+          </a>
+        }
+
         <div class="booking-actions">
           <button
             matButton="outlined"

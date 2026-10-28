@@ -2,6 +2,9 @@
 // i tipi disponibili nel filtro si ricavano dagli spazi che esistono.
 export type RoomType = string;
 
+// Tipi che il servizio Rooms accetta in scrittura (enum fisso lato backend).
+export const ROOM_TYPES: RoomType[] = ['Classroom', 'Laboratory', 'StudyRoom'];
+
 // Etichette italiane dei tipi noti.
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   Classroom: 'Aula',
@@ -24,6 +27,8 @@ export interface RoomSummary {
   isBookable: boolean;
   buildingId: string;
   buildingName: string;
+  // Attrezzature dello spazio, con id e nome. Il servizio le invia sempre (anche vuote).
+  equipment?: RoomEquipment[];
 }
 
 // Filtri della ricerca: tutti opzionali.
@@ -85,4 +90,54 @@ export interface RoomDetail {
   isBookable: boolean;
   equipment: RoomEquipment[];
   openingHours: OpeningHours[];
+}
+
+// Giorni nell'ordine in cui si mostrano nel modulo di gestione (la settimana parte dal lunedì).
+export const WEEK_DAYS: DayOfWeek[] = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+// Edificio scelto nel modulo di gestione.
+export interface BuildingOption {
+  id: string;
+  name: string;
+}
+
+// Edifici distinti che compaiono negli spazi, in ordine alfabetico.
+export function buildingsOf(rooms: RoomSummary[]): BuildingOption[] {
+  const byId = new Map(rooms.map((room) => [room.buildingId, room.buildingName]));
+  return [...byId]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+}
+
+// Attrezzature distinte che compaiono negli spazi, in ordine alfabetico.
+export function equipmentOf(rooms: RoomSummary[]): RoomEquipment[] {
+  const byId = new Map(rooms.flatMap((room) => room.equipment ?? []).map((item) => [item.id, item]));
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'it'));
+}
+
+// Fascia di apertura inviata al servizio Rooms. Gli orari sono "HH:mm:ss".
+export interface OpeningHoursInput {
+  dayOfWeek: DayOfWeek;
+  opensAt: string;
+  closesAt: string;
+}
+
+// Corpo di POST /api/rooms e PUT /api/rooms/{id}. I giorni senza fascia sono chiusi.
+export interface RoomWriteRequest {
+  buildingId: string;
+  name: string;
+  type: RoomType;
+  capacity: number;
+  floor: number;
+  isBookable: boolean;
+  equipmentIds: string[];
+  openingHours: OpeningHoursInput[];
 }

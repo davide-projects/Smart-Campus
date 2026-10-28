@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './services/auth.guards';
+import { authGuard, staffGuard } from './services/auth.guards';
 
 export const routes: Routes = [
   {
@@ -25,5 +25,17 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./components/my-bookings/my-bookings').then((m) => m.MyBookings),
+  },
+  {
+    path: 'staff/rooms/new',
+    title: 'Nuovo spazio',
+    canActivate: [staffGuard],
+    loadComponent: () => import('./components/room-form/room-form').then((m) => m.RoomForm),
+  },
+  {
+    path: 'staff/rooms/:id/edit',
+    title: 'Modifica spazio',
+    canActivate: [staffGuard],
+    loadComponent: () => import('./components/room-form/room-form').then((m) => m.RoomForm),
   },
 ];

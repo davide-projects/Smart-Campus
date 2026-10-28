@@ -12,13 +12,15 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
-import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
+import {
+  BuildingOption,
+  RoomFilter,
+  RoomSummary,
+  RoomType,
+  buildingsOf,
+  roomTypeLabel,
+} from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
-
-interface BuildingOption {
-  id: string;
-  name: string;
-}
 
 export const CAPACITY_DEBOUNCE_MS = 300;
 
@@ -181,11 +183,4 @@ function typesOf(rooms: RoomSummary[]): RoomType[] {
   return [...new Set(rooms.map((room) => room.type))].sort((a, b) =>
     roomTypeLabel(a).localeCompare(roomTypeLabel(b), 'it'),
   );
-}
-
-function buildingsOf(rooms: RoomSummary[]): BuildingOption[] {
-  const byId = new Map(rooms.map((room) => [room.buildingId, room.buildingName]));
-  return [...byId]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'it'));
 }
