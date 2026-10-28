@@ -88,6 +88,7 @@ var api = app.MapGroup("/api/bookings").RequireAuthorization();
 api.MapReservationEndpoints();
 api.MapReservationListEndpoints();
 api.MapAvailabilityEndpoints();
+api.MapAvailabilitySearchEndpoints();
 
 app.Run();
 
