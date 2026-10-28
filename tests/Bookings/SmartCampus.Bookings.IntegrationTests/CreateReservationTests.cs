@@ -4,7 +4,8 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.WebUtilities; 
+using MassTransit.Testing;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SmartCampus.Bookings.Api.Data.Context;
@@ -12,6 +13,7 @@ using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
 using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.Bookings.Api.Features.Reservations;
+using SmartCampus.Contracts;
 
 namespace SmartCampus.Bookings.IntegrationTests;
 
@@ -216,6 +218,34 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Create_DeactivatedRoom_Returns422AndCreatesNothing()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        var openingHours = Enum.GetValues<DayOfWeek>()
+            .Select(day => new RoomOpeningHours(day, new TimeOnly(8, 0), new TimeOnly(20, 0)))
+            .ToArray();
+
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula disattivata", 30, IsBookable: true)
+        {
+            OpeningHours = openingHours
+        });
+        await WaitUntilAsync(() => RoomHasActiveStateAsync(roomId, isActive: true));
+
+        await harness.Bus.Publish(new RoomDeactivated(roomId));
+        await WaitUntilAsync(() => RoomHasActiveStateAsync(roomId, isActive: false));
+
+        var response = await ClientFor(Guid.NewGuid()).PostAsJsonAsync(
+            "/api/bookings",
+            Request(roomId, "10:00", "11:00"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Spazio non prenotabile", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
     // --- Dati di prova ---
 
     // Spazio aperto tutti i giorni 08:00-20:00, con un Id nuovo per ogni test.
@@ -268,6 +298,28 @@ public sealed class CreateReservationTests(BookingsApiFixture fixture)
             Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
 
         return $"{Encode(new { alg = "none", typ = "JWT" })}.{Encode(new { sub = userId.ToString(), role = "Student" })}.test";
+    }
+
+    private async Task<bool> RoomHasActiveStateAsync(Guid roomId, bool isActive)
+    {
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        return await db.BookableRooms.AsNoTracking()
+            .AnyAsync(room => room.RoomId == roomId && room.IsActive == isActive);
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!await condition())
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException("Bookings non ha aggiornato la copia locale dello spazio in tempo.");
+            }
+
+            await Task.Delay(100);
+        }
     }
 
     private static CreateReservationRequest Request(Guid roomId, string start, string end) =>

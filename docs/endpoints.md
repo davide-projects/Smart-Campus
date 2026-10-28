@@ -57,7 +57,7 @@ Base pubblica: `/api/rooms`
 | `GET` | `/api/rooms/{id}` | anonimo | `id`: GUID dello spazio | Restituisce il dettaglio di uno spazio attivo, incluse attrezzature e orari; risponde `404` se non esiste o è dismesso. |
 | `POST` | `/api/rooms/` | Staff | Body: `RoomWriteRequest` | Crea uno spazio attivo e pubblica `RoomCreated` tramite outbox; risponde `409` se il nome è già usato nell'edificio. |
 | `PUT` | `/api/rooms/{id}` | Staff | `id`: GUID; body: `RoomWriteRequest` | Aggiorna i dati e gli orari, quindi pubblica `RoomUpdated` tramite outbox; risponde `404` se lo spazio non esiste o è dismesso e `409` se il nome è già usato nell'edificio. |
-| `POST` | `/api/rooms/{id}/deactivate` | Staff | `id`: GUID dello spazio | Dismette lo spazio e pubblica `RoomDeactivated` tramite outbox. |
+| `POST` | `/api/rooms/{id}/deactivate` | Staff | `id`: GUID dello spazio | Imposta `IsActive = false` senza cancellare lo spazio, lo esclude dalla ricerca e pubblica `RoomDeactivated` tramite outbox; Bookings aggiorna la copia locale e rifiuta nuove prenotazioni. |
 
 Esempio di ricerca filtrata:
 
