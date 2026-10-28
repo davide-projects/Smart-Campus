@@ -160,6 +160,7 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi√
 | GET | `/api/bookings/mine` | autenticato | Le mie prenotazioni (come organizzatore o membro) |
 | DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella |
 | GET | `/api/bookings?roomId=&date=` | Staff | Vista per spazio |
+| GET | `/api/bookings/rooms/{roomId}/future-reservations-count` | Staff | Conteggio delle prenotazioni confermate non ancora terminate di uno spazio (avviso prima della dismissione) |
 | POST | `/api/bookings/{id}/check-in` | organizzatore o membro | Check-in |
 | POST | `/api/bookings/{id}/no-show` | Staff | Segna no-show |
 | GET | `/api/bookings/reports/rooms?from=&to=&buildingId=` | Staff | Report aggregato |

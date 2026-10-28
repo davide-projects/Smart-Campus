@@ -4,12 +4,14 @@ using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.ServiceDefaults;
 using MassTransit;
 using SmartCampus.Bookings.Api.Consumers;
+using SmartCampus.Bookings.Api.Features.Reservations;
 
 // Servizio Bookings: chi userà quale spazio e quando, e se lo ha usato davvero. Prenotazioni singole e di gruppo senza conflitti, disponibilità, check-in, mancate presentazioni e report.
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+builder.Services.AddSingleton(TimeProvider.System);
 // Il DbContext legge la connection string "Database" dalla configurazione (user-secrets, variabili d'ambiente).
 // La si legge dal provider e non da una variabile catturata, così i test di integrazione possono sostituirla.
 builder.Services.AddDbContext<BookingDbContext>((provider, options) =>
@@ -70,6 +72,7 @@ app.MapDefaultEndpoints();
 
 // Tutte le route del servizio stanno sotto /api/bookings: il gateway le inoltra senza riscriverle.
 var api = app.MapGroup("/api/bookings");
+api.MapReservationEndpoints();
 
 api.MapGet("/", () => Results.Ok(new { service = "bookings", status = "ok" }))
     .WithName("InfoBookings");

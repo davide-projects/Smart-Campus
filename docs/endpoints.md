@@ -20,6 +20,7 @@ Base pubblica: `/api/bookings`
 | Metodo | Percorso | Accesso | Parametri | Descrizione |
 |---|---|---|---|---|
 | `GET` | `/api/bookings/` | autenticato | — | Endpoint informativo; conferma che il servizio Bookings risponde. |
+| `GET` | `/api/bookings/rooms/{roomId}/future-reservations-count` | Staff | `roomId`: GUID dello spazio | Conta le prenotazioni confermate non ancora terminate di uno spazio (comprese quelle in corso), da mostrare al personale prima della dismissione; risponde `404` se lo spazio non esiste. Con un ruolo diverso da `Staff` risponde `403`. |
 
 ### Identity
 

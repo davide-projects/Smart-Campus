@@ -6,6 +6,9 @@ namespace SmartCampus.Gateway.IntegrationTests;
 /// <summary>Chi può chiamare cosa: anonimo, Student e Staff su ogni gruppo di route.</summary>
 public sealed class AccessRulesTests(GatewayFixture fixture) : IClassFixture<GatewayFixture>
 {
+    private const string FutureCountUrl =
+        "/api/bookings/rooms/11111111-1111-1111-1111-111111111111/future-reservations-count";
+
     private readonly HttpClient _client = fixture.Factory.CreateClient();
 
     [Fact]
@@ -131,5 +134,31 @@ public sealed class AccessRulesTests(GatewayFixture fixture) : IClassFixture<Gat
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var echo = await response.Content.ReadFromJsonAsync<EchoResponse>();
         Assert.Equal("/api/bookings/", echo!.Path);
+    }
+
+    [Fact]
+    public async Task FutureReservationsCount_WithoutToken_Returns401()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, FutureCountUrl);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FutureReservationsCount_AsStudent_Returns403()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, FutureCountUrl, TestTokens.Student());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FutureReservationsCount_AsStaff_ReachesBookings()
+    {
+        var response = await _client.SendAsync(HttpMethod.Get, FutureCountUrl, TestTokens.Staff());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var echo = await response.Content.ReadFromJsonAsync<EchoResponse>();
+        Assert.Equal(FutureCountUrl, echo!.Path);
     }
 }
