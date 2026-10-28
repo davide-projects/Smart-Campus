@@ -9,7 +9,8 @@ namespace SmartCampus.Bookings.IntegrationTests;
 
 // Criteri di completamento della #9: la copia locale degli spazi segue gli eventi di Rooms
 // e un evento ricevuto due volte non crea duplicati.
-public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture) : IClassFixture<BookingsApiFixture>
+[Collection(BookingsApiCollection.Name)]
+public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture)
 {
     [Fact]
     public async Task RoomUpdated_AfterRoomCreated_UpdatesTheLocalCopy()

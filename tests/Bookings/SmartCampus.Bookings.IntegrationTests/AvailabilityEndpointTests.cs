@@ -10,7 +10,8 @@ namespace SmartCampus.Bookings.IntegrationTests;
 
 // Criterio della #10: la disponibilità si legge dal database reale e la risposta
 // non contiene mai dati dell'organizzatore.
-public sealed class AvailabilityEndpointTests(BookingsApiFixture fixture) : IClassFixture<BookingsApiFixture>
+[Collection(BookingsApiCollection.Name)]
+public sealed class AvailabilityEndpointTests(BookingsApiFixture fixture)
 {
     private static readonly TimeZoneInfo Rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
     private static readonly DateOnly Tuesday = new(2026, 11, 3);

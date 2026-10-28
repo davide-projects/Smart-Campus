@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Features.Availability;
@@ -12,6 +13,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+// Gli enum viaggiano come stringa ("Confirmed") e non come numero, come in Rooms.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
 // Il DbContext legge la connection string "Database" dalla configurazione (user-secrets, variabili d'ambiente).
 // La si legge dal provider e non da una variabile catturata, così i test di integrazione possono sostituirla.
 builder.Services.AddDbContext<BookingDbContext>((provider, options) =>
