@@ -39,9 +39,34 @@ export interface RoomEquipment {
   name: string;
 }
 
+// Giorni della settimana come inviati dal servizio Rooms (serializzati come stringhe).
+export type DayOfWeek =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+// Etichette italiane dei giorni della settimana.
+const DAY_OF_WEEK_LABELS: Record<string, string> = {
+  Monday: 'Lunedì',
+  Tuesday: 'Martedì',
+  Wednesday: 'Mercoledì',
+  Thursday: 'Giovedì',
+  Friday: 'Venerdì',
+  Saturday: 'Sabato',
+  Sunday: 'Domenica',
+};
+
+export function dayOfWeekLabel(day: string): string {
+  return DAY_OF_WEEK_LABELS[day] ?? day;
+}
+
 // Orario di apertura settimanale di uno spazio.
 export interface OpeningHours {
-  dayOfWeek: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  dayOfWeek: DayOfWeek;
   opensAt: string | null;
   closesAt: string | null;
   isClosed: boolean;

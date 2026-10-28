@@ -10,6 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
 import { RoomFilter, RoomSummary, RoomType, roomTypeLabel } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
@@ -40,6 +41,7 @@ type SearchResult = { rooms: RoomSummary[] } | { error: true };
     MatSliderModule,
     MatTableModule,
     ReactiveFormsModule,
+    RouterLink,
   ],
   selector: 'app-room-search',
   styleUrl: './room-search.scss',
@@ -52,32 +54,54 @@ export class RoomSearch {
   private readonly capacityChanges = new Subject<void>();
 
   protected readonly typeLabel = roomTypeLabel;
+  protected readonly columns: (keyof RoomSummary | 'building' | 'bookable')[] = [
+    'name',
+    'type',
+    'building',
+    'capacity',
+    'bookable',
+  ];
 
   protected readonly filters = new FormGroup({
     type: new FormControl<RoomType | null>(null),
-    // 0 vuol dire nessuna capienza minima.
-    minCapacity: new FormControl(0, { nonNullable: true }),
+    minCapacity: new FormControl<number>(0, { nonNullable: true }),
     buildingId: new FormControl<string | null>(null),
   });
 
   protected readonly rooms = signal<RoomSummary[]>([]);
+  protected readonly allRooms = signal<RoomSummary[]>([]);
   protected readonly types = signal<RoomType[]>([]);
   protected readonly buildings = signal<BuildingOption[]>([]);
-  protected readonly maxCapacity = signal(0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
-  protected readonly view = signal<ResultsView>(savedView());
-  protected readonly columns = ['name', 'type', 'building', 'capacity', 'bookable'];
 
-  private readonly minCapacity = toSignal(this.filters.controls.minCapacity.valueChanges, {
-    initialValue: 0,
+  // Vista scelta dall'utente (card o tabella). Inizializzata dal sessionStorage.
+  protected readonly view = signal<ResultsView>(initialView());
+
+  // Il massimo dello slider corrisponde alla capienza più alta tra tutti gli spazi attivi,
+  // così la corsa dello slider è proporzionata al campus reale.
+  protected readonly maxCapacity = computed(() =>
+    this.allRooms().reduce((max, room) => Math.max(max, room.capacity), 0),
+  );
+
+  // toSignal con valore iniziale evita che il testo della capienza compaia solo dopo il primo tocco.
+  private readonly minCapacityValue = toSignal(
+    this.filters.controls.minCapacity.valueChanges,
+    { initialValue: this.filters.controls.minCapacity.value },
+  );
+
+  protected readonly capacityText = computed(() => {
+    const value = this.minCapacityValue();
+    return value > 0 ? `almeno ${value} posti` : 'qualsiasi';
   });
-  protected readonly capacityText = computed(() => capacityLabel(this.minCapacity()));
-  // Lo slider usa lo stesso testo anche per i lettori di schermo (aria-valuetext).
-  protected readonly capacityLabel = capacityLabel;
 
   constructor() {
     this.loadFilterOptions();
+
+    // Lo slider invia la ricerca con un ritardo: trascinandolo non parte una richiesta per ogni scatto.
+    this.capacityChanges
+      .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe(() => this.triggerSearch());
 
     this.searches
       .pipe(
@@ -104,13 +128,29 @@ export class RoomSearch {
         }
       });
 
-    // Da tastiera ogni freccia cambia il valore: si cerca solo quando lo slider
-    // resta fermo per 300 ms.
-    this.capacityChanges
-      .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
-      .subscribe(() => this.search());
+    this.triggerSearch();
+  }
 
-    this.searches.next({});
+  protected search(): void {
+    this.triggerSearch();
+  }
+
+  // Notifica la modifica dello slider per applicare il debounce.
+  protected capacityChanged(): void {
+    this.capacityChanges.next();
+  }
+
+  protected capacityLabel(value: number): string {
+    return value > 0 ? `${value}` : 'tutti';
+  }
+
+  protected resetFilters(): void {
+    this.filters.reset({ type: null, minCapacity: 0, buildingId: null });
+    // Se il primo caricamento delle opzioni non era riuscito, è l'occasione per riprovare.
+    if (this.types().length === 0) {
+      this.loadFilterOptions();
+    }
+    this.triggerSearch();
   }
 
   protected setView(view: ResultsView): void {
@@ -118,33 +158,22 @@ export class RoomSearch {
     try {
       sessionStorage.setItem(VIEW_STORAGE_KEY, view);
     } catch {
-      // Senza sessionStorage la vista vale solo finché si resta sulla pagina.
+      // Navigazione anonima o storage disabilitato: l'impostazione resta valida solo in memoria.
     }
   }
 
-  protected capacityChanged(): void {
-    this.capacityChanges.next();
-  }
-
-  // Parte quando cambia un menu, quando si ferma lo slider e con «Cerca».
-  protected search(): void {
+  private triggerSearch(): void {
     const { type, minCapacity, buildingId } = this.filters.getRawValue();
-    this.searches.next({ type, minCapacity: minCapacity > 0 ? minCapacity : null, buildingId });
+    this.searches.next({
+      type,
+      minCapacity: minCapacity > 0 ? minCapacity : null,
+      buildingId,
+    });
   }
 
-  protected resetFilters(): void {
-    this.filters.reset();
-    // Se il primo caricamento dei filtri non era riuscito, è l'occasione per riprovare.
-    if (this.types().length === 0) {
-      this.loadFilterOptions();
-    }
-    this.searches.next({});
-  }
-
-  // Tipi, edifici e capienza massima dei filtri si ricavano da tutti gli spazi attivi,
-  // così un tipo o un edificio nuovo compare senza modificare il frontend.
-  // È una richiesta separata dalla ricerca: premere «Cerca» durante il primo caricamento
-  // non la annulla.
+  // Tipi, edifici e massimo dello slider si ricavano da tutti gli spazi attivi, così un tipo
+  // o un edificio nuovo compare senza modificare il frontend. È una richiesta separata dalla
+  // ricerca: premere «Cerca» durante il primo caricamento non la annulla.
   private loadFilterOptions(): void {
     this.roomsService
       .search()
@@ -153,26 +182,20 @@ export class RoomSearch {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((rooms) => {
+        this.allRooms.set(rooms);
         this.types.set(typesOf(rooms));
         this.buildings.set(buildingsOf(rooms));
-        this.maxCapacity.set(Math.max(0, ...rooms.map((room) => room.capacity)));
       });
   }
 }
 
-function savedView(): ResultsView {
+function initialView(): ResultsView {
   try {
-    return sessionStorage.getItem(VIEW_STORAGE_KEY) === 'table' ? 'table' : 'cards';
+    const saved = sessionStorage.getItem(VIEW_STORAGE_KEY);
+    return saved === 'table' ? 'table' : 'cards';
   } catch {
     return 'cards';
   }
-}
-
-function capacityLabel(minCapacity: number): string {
-  if (minCapacity <= 0) {
-    return 'Qualsiasi';
-  }
-  return minCapacity === 1 ? 'Almeno 1 posto' : `Almeno ${minCapacity} posti`;
 }
 
 function typesOf(rooms: RoomSummary[]): RoomType[] {

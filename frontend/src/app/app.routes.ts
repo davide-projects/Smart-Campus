@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { RoomDetail } from './components/shared/room-detail/room-detail';
 
 export const routes: Routes = [
   {
@@ -16,6 +15,7 @@ export const routes: Routes = [
   {
     path: 'rooms/:id',
     title: 'Dettaglio spazio',
-    component: RoomDetail,
+    loadComponent: () =>
+      import('./components/room-detail/room-detail').then((m) => m.RoomDetail),
   },
 ];

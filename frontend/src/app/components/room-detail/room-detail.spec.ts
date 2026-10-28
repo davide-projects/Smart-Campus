@@ -4,8 +4,8 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { RoomDetail } from './room-detail';
-import { RoomService } from '../../../services/room.service';
-import { RoomDetail as RoomDetailData } from '../../../models/room.model';
+import { RoomsService } from '../../services/rooms.service';
+import { RoomDetail as RoomDetailData } from '../../models/room.model';
 
 // Dati sintetici per i test
 const mockRoom: RoomDetailData = {
@@ -20,20 +20,20 @@ const mockRoom: RoomDetailData = {
   isBookable: true,
   equipment: [{ id: 'e1', name: 'Proiettore' }],
   openingHours: [
-    { dayOfWeek: 1, opensAt: '08:00:00', closesAt: '20:00:00', isClosed: false },
-    { dayOfWeek: 0, opensAt: null, closesAt: null, isClosed: true },
+    { dayOfWeek: 'Monday', opensAt: '08:00:00', closesAt: '20:00:00', isClosed: false },
+    { dayOfWeek: 'Sunday', opensAt: null, closesAt: null, isClosed: true },
   ],
 };
 
 describe('RoomDetail', () => {
   let component: RoomDetail;
   let fixture: ComponentFixture<RoomDetail>;
-  let mockRoomService: { getRoomById: ReturnType<typeof vi.fn> };
+  let mockRoomsService: { getRoomById: ReturnType<typeof vi.fn> };
   let currentParamId: string | null = 'room-1';
 
   beforeEach(async () => {
     currentParamId = 'room-1';
-    mockRoomService = {
+    mockRoomsService = {
       getRoomById: vi.fn().mockReturnValue(of(mockRoom)),
     };
 
@@ -41,7 +41,7 @@ describe('RoomDetail', () => {
       imports: [RoomDetail],
       providers: [
         provideRouter([]),
-        { provide: RoomService, useValue: mockRoomService },
+        { provide: RoomsService, useValue: mockRoomsService },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -82,7 +82,7 @@ describe('RoomDetail', () => {
     // Verifica attrezzature
     expect(compiled.textContent).toContain('Proiettore');
 
-    // Verifica orari settimanali
+    // Verifica orari settimanali con traduzione corretta dei giorni
     expect(compiled.textContent).toContain('Lunedì');
     expect(compiled.textContent).toContain('08:00 – 20:00');
     expect(compiled.textContent).toContain('Domenica');
@@ -98,7 +98,7 @@ describe('RoomDetail', () => {
       ...mockRoom,
       isBookable: false,
     };
-    mockRoomService.getRoomById.mockReturnValue(of(nonBookableRoom));
+    mockRoomsService.getRoomById.mockReturnValue(of(nonBookableRoom));
 
     fixture = TestBed.createComponent(RoomDetail);
     component = fixture.componentInstance;
@@ -110,14 +110,17 @@ describe('RoomDetail', () => {
     expect(compiled.textContent).toContain('Non prenotabile');
 
     // Verifica che il pulsante sia disabilitato
-    const disabledButton = compiled.querySelector('button[disabled]');
-    expect(disabledButton).toBeTruthy();
-    expect(disabledButton?.textContent).toContain('Non prenotabile');
+    const disabledButtons = compiled.querySelectorAll('button[disabled]');
+    expect(disabledButtons.length).toBeGreaterThan(0);
+    const hasNonBookableDisabled = Array.from(disabledButtons).some((btn) =>
+      btn.textContent?.includes('Non prenotabile'),
+    );
+    expect(hasNonBookableDisabled).toBe(true);
   });
 
   // Test 4: Criterio US-02 - Messaggio esplicito "spazio non trovato" su errore 404
   it('dovrebbe mostrare "Spazio non trovato" quando il server risponde 404', () => {
-    mockRoomService.getRoomById.mockReturnValue(
+    mockRoomsService.getRoomById.mockReturnValue(
       throwError(() => ({ status: 404 }))
     );
 
@@ -146,5 +149,22 @@ describe('RoomDetail', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Spazio non trovato');
+  });
+
+  // Test 6: Mostra messaggio di errore generico se la richiesta fallisce con errore diverso da 404
+  it('dovrebbe mostrare il messaggio di errore generico se la richiesta fallisce con errore di rete', () => {
+    mockRoomsService.getRoomById.mockReturnValue(
+      throwError(() => ({ status: 500 }))
+    );
+
+    fixture = TestBed.createComponent(RoomDetail);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Impossibile caricare lo spazio');
+    expect(compiled.textContent).toContain(
+      'Si è verificato un errore durante il caricamento dei dettagli dello spazio.'
+    );
   });
 });
