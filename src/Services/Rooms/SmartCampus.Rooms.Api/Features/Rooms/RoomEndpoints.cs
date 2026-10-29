@@ -368,6 +368,7 @@ public static class RoomEndpoints
     private static async Task<IResult> SearchAsync(
         [FromQuery] RoomType? type,
         [FromQuery] int? minCapacity,
+        [FromQuery] int? maxCapacity,
         [FromQuery] Guid? buildingId,
         [FromQuery] Guid[]? equipmentIds,
         RoomsDbContext db,
@@ -379,6 +380,22 @@ public static class RoomEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["minCapacity"] = ["La capienza minima deve essere maggiore di zero."]
+            });
+        }
+
+        if (maxCapacity is <= 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["maxCapacity"] = ["La capienza massima deve essere maggiore di zero."]
+            });
+        }
+
+        if (minCapacity is { } min && maxCapacity is { } max && max < min)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["maxCapacity"] = ["La capienza massima non può essere inferiore alla minima."]
             });
         }
 
@@ -404,7 +421,7 @@ public static class RoomEndpoints
 
         var rooms = await RoomSearch
             .ApplyEquipmentFilter(
-                RoomSearch.Apply(db.Rooms.AsNoTracking(), new RoomFilter(type, minCapacity, buildingId)),
+                RoomSearch.Apply(db.Rooms.AsNoTracking(), new RoomFilter(type, minCapacity, maxCapacity, buildingId)),
                 matchingRoomIds?.ToArray())
             .OrderBy(room => room.Building.Name)
             .ThenBy(room => room.Name)
