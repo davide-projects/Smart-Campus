@@ -225,12 +225,6 @@
         @if (errorMessage(); as message) {
           <div class="rejection" role="alert">
             <p>{{ message }}</p>
-            @if (showAvailabilityLink()) {
-              <a matButton="outlined" [routerLink]="['/rooms', roomId()]">
-                <mat-icon fontSet="material-symbols-outlined">event_available</mat-icon>
-                Vedi la disponibilità dello spazio
-              </a>
-            }
           </div>
         }
 

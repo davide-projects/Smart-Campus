@@ -78,11 +78,9 @@ const MAX_DURATION_MINUTES = 240;
 // Lunghezza massima del motivo, come in Bookings.
 export const MAX_PURPOSE_LENGTH = 200;
 
-// Codice di motivo del conflitto sullo spazio: solo con questo si propone la disponibilità.
+// Codice di motivo del conflitto sullo spazio: solo con questo si propongono le fasce libere e si
+// aggiorna la linea del tempo, perché solo questo conflitto cambia la disponibilità dello spazio.
 const ROOM_OCCUPIED_CODE = 'room-occupied';
-
-// Ripiego per un servizio che non invia il codice: il conflitto si riconosce dal testo.
-export const ROOM_CONFLICT_DETAIL = 'Lo spazio è già prenotato in questa fascia.';
 
 export const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
 
@@ -154,14 +152,9 @@ export class RoomBooking implements OnInit {
 
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  private readonly rejectionCode = signal<string | null>(null);
   // Fasce libere proposte dopo un conflitto sullo spazio; null senza conflitto, vuoto se non ce ne sono.
   protected readonly freeSlots = signal<FreeRange[] | null>(null);
   protected readonly confirmation = signal<Confirmation | null>(null);
-  protected readonly showAvailabilityLink = computed(
-    () =>
-      this.rejectionCode() === ROOM_OCCUPIED_CODE || this.errorMessage() === ROOM_CONFLICT_DETAIL,
-  );
 
   // Giorni prenotabili: da oggi a oggi + 14 giorni, come date del campus.
   protected readonly minDay = campusToday();
@@ -445,12 +438,11 @@ export class RoomBooking implements OnInit {
           this.submitting.set(false);
           const problem = problemOf(error);
           this.errorMessage.set(rejectionMessage(problem));
-          this.rejectionCode.set(problem.code);
-          this.freeSlots.set(
-            problem.code === ROOM_OCCUPIED_CODE ? this.bookableSlots(problem.freeSlots) : null,
-          );
-          // Un conflitto vuol dire che la disponibilità è cambiata: la linea del tempo la aggiorna.
-          if (problem.status === 409) {
+          const roomOccupied = problem.code === ROOM_OCCUPIED_CODE;
+          this.freeSlots.set(roomOccupied ? this.bookableSlots(problem.freeSlots) : null);
+          // Solo un conflitto sullo spazio ha cambiato la disponibilità: la linea del tempo si aggiorna.
+          // Gli altri 409 (sulla persona o sui membri) non la toccano.
+          if (roomOccupied) {
             this.availabilityRequests.next({ day: this.form.controls.day.value, keepCurrent: true });
           }
         },
@@ -569,10 +561,9 @@ export class RoomBooking implements OnInit {
     });
   }
 
-  // Toglie il rifiuto mostrato: messaggio, codice e fasce libere proposte.
+  // Toglie il rifiuto mostrato: messaggio e fasce libere proposte.
   private clearRejection(): void {
     this.errorMessage.set(null);
-    this.rejectionCode.set(null);
     this.freeSlots.set(null);
   }
 

@@ -794,19 +794,15 @@ describe('RoomBooking', () => {
       expect(await (await confirmButton()).isDisabled()).toBe(false);
     });
 
-    it('links to the availability of the room on a room conflict', async () => {
+    it('shows the room conflict without a link to the room: the timeline is already in the page', async () => {
       await render();
       await fillAndSubmit();
 
       await respond(...problem(409, 'Spazio già prenotato', ROOM_CONFLICT));
 
       expect(alertText()).toBe(ROOM_CONFLICT);
-      const link = await availabilityLink();
-      expect(link!.getAttribute('href')).toBe('/rooms/r1');
-
-      link!.click();
-      await stable();
-      expect(TestBed.inject(Router).url).toBe('/rooms/r1');
+      expect(await availabilityLink()).toBeNull();
+      expect(element().querySelector('[role="alert"] a')).toBeNull();
     });
 
     it('writes the message of the reason code and its limits, not the text of the service', async () => {
@@ -823,7 +819,7 @@ describe('RoomBooking', () => {
       expect(alertText()).toBe('Lo spazio è aperto dalle 09:00 alle 13:00.');
     });
 
-    it('recognises a room conflict by its code and links to the availability', async () => {
+    it('recognises a room conflict by its code', async () => {
       await render();
       await fillAndSubmit();
 
@@ -835,7 +831,7 @@ describe('RoomBooking', () => {
       );
 
       expect(alertText()).toBe(ROOM_CONFLICT);
-      expect((await availabilityLink())!.getAttribute('href')).toBe('/rooms/r1');
+      expect(await availabilityLink()).toBeNull();
     });
 
     it('does not link to the availability for a conflict on the person', async () => {
@@ -890,7 +886,12 @@ describe('RoomBooking', () => {
       await stable();
       expect(element().querySelectorAll('app-availability-timeline .block')).toHaveLength(1);
 
-      await respond(...problem(409, 'Spazio già prenotato', ROOM_CONFLICT));
+      await respond(
+        ...problem(409, 'Spazio già prenotato', ROOM_CONFLICT, {
+          code: 'room-occupied',
+          freeSlots: [],
+        }),
+      );
 
       const refresh = http.expectOne(
         (request) => isAvailabilityRequest(request) && request.params.get('date') === '2026-11-05',
@@ -906,6 +907,28 @@ describe('RoomBooking', () => {
           node.textContent!.trim(),
         ),
       ).toEqual(['Libera dalle 08:00 alle 09:00', 'Occupata dalle 09:00 alle 10:00']);
+    });
+
+    it.each(['person-occupied', 'members-occupied', 'member-booking-in-progress'])(
+      'does not update the timeline after a 409 «%s», which does not change the room',
+      async (code) => {
+        await render();
+        await fillAndSubmit();
+
+        await respond(...problem(409, 'Conflitto', 'Testo del servizio.', { code }));
+
+        // Resta solo la richiesta fatta scegliendo il giorno.
+        expect(http.match(isAvailabilityRequest)).toHaveLength(1);
+      },
+    );
+
+    it('does not update the timeline after a 409 without a code', async () => {
+      await render();
+      await fillAndSubmit();
+
+      await respond(...problem(409, 'Conflitto', ROOM_CONFLICT));
+
+      expect(http.match(isAvailabilityRequest)).toHaveLength(1);
     });
 
     it('does not ask for the availability again after a rejection that is not a conflict', async () => {
