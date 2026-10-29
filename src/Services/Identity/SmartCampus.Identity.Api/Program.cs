@@ -42,6 +42,12 @@ api.MapGet("/", () => Results.Ok(new { service = "identity", status = "ok" }))
 
 api.MapIdentityEndpoints();
 
+// Endpoint interni per gli altri servizi (es. Bookings): fuori da /api, quindi il gateway non li instrada.
+// Richiedono comunque un JWT valido emesso da Identity, con qualunque ruolo.
+app.MapGroup("/internal")
+   .RequireAuthorization()
+   .MapInternalUserEndpoints();
+
 app.Run();
 
 // Esposto per WebApplicationFactory nei test di integrazione.

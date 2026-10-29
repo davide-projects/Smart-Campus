@@ -40,6 +40,7 @@ Il contratto del token (claim, durata, configurazione) e gli utenti sintetici di
 | `GET` | `/api/identity/` | autenticato | — | Endpoint informativo; conferma che il servizio Identity risponde. |
 | `GET` | `/api/identity/me` | autenticato | Intestazione `Authorization: Bearer <jwt>` | Restituisce il profilo dell'utente autenticato (`id`, `username`, `displayName`, `role`), letto dal database. Risponde `401` se il token è assente, scaduto o non valido. |
 | `POST` | `/api/identity/login` | anonimo | Body JSON: `username`, `password` | Verifica le credenziali e restituisce il token JWT (`accessToken`, `tokenType`, `expiresAt`) insieme al profilo dell'utente. Lo username non distingue maiuscole e minuscole; la password sì. Risponde `400` se mancano i campi e `401` con un messaggio generico se le credenziali non sono corrette. |
+| `GET` | `/api/identity/students` | Student | Query: `search` (almeno 2 caratteri dopo aver tolto gli spazi iniziali e finali) | Cerca gli studenti da aggiungere a una prenotazione di gruppo: nome visualizzato o username che contengono il testo, senza distinguere maiuscole e minuscole. Risponde `200` con al massimo 10 studenti (`id`, `username`, `displayName`), ordinati per `displayName` e poi per `username`; esclude gli utenti `Staff` e chi cerca. `400` sul campo `search` con «Scrivi almeno 2 caratteri per cercare.» se il testo è più corto o manca; `401` senza token o con un token non valido; `403` con titolo «Ricerca non consentita» e messaggio «Solo gli studenti possono cercare altri studenti.» per un utente `Staff` (il Gateway inoltra la richiesta, il `403` lo dà Identity). |
 
 Esempio di login:
 
@@ -49,6 +50,14 @@ Content-Type: application/json
 
 { "username": "student1", "password": "<password di sviluppo>" }
 ```
+
+#### Endpoint interni (non instradati dal Gateway)
+
+Questi endpoint stanno fuori da `/api`: il Gateway non ha una route che li raggiunga e risponde `404` (vedi [gateway.md](gateway.md)). Li chiamano solo gli altri servizi dalla rete interna.
+
+| Metodo | Percorso | Accesso | Parametri | Descrizione |
+|---|---|---|---|---|
+| `POST` | `/internal/users/students/check` | autenticato (qualunque ruolo) | Intestazione `Authorization: Bearer <jwt>` (Bookings inoltra quella dell'utente); body JSON: `{ "userIds": [GUID, ...] }` | Indica quali id sono studenti registrati (INV-9), con una sola query sugli id distinti. Risponde `200` con `{ "students": [{ "id", "displayName" }], "notStudents": [GUID, ...] }`: ogni id distinto compare una sola volta, in `students` se è un utente con ruolo `Student`, altrimenti in `notStudents` (utente `Staff` o id inesistente, senza distinguerli). `400` (ValidationProblem sul campo `userIds`, «Indica almeno un utente da verificare.») se il corpo manca, non è JSON valido, `userIds` manca o è vuoto, o contiene valori non GUID; `401` senza token o con un token non valido, senza dire nulla sugli id. |
 
 ### Rooms
 
