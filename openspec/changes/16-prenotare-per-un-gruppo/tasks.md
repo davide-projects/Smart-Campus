@@ -108,3 +108,16 @@ Area: `frontend`. Parte dopo il merge di #123 e #17.
   - un membro già impegnato mostra il `409`.
 
   Riportare l'esito nella PR.
+- [ ] 3.8 Bookings, nome dei membri (decisione 8 del design):
+  - `DisplayName` (`string?`) in `ReservationMember`, `HasMaxLength(128)` in `ReservationMemberConfiguration`, migrazione `AddMemberDisplayName` con `dotnet ef migrations add` (colonna nullable, `Down` che la toglie);
+  - `IdentityClient.CheckStudentsAsync` restituisce, con «tutti studenti», il `displayName` di ogni id;
+  - `CreateReservationAsync` lo salva in ogni `ReservationMember`; mancante, vuoto dopo `Trim` o oltre 128 caratteri → `null`, senza rifiuto.
+
+  Test di integrazione con lo stub di Identity: nomi salvati; `displayName` assente, vuoto e di 129 caratteri → `201` e `DisplayName` `null`.
+- [ ] 3.9 Bookings, `members` in `GET /api/bookings/mine`: record `MyReservationMember(Id, DisplayName)` e `MyReservationItem.Members`, nella stessa query; ordine per `displayName` (`OrdinalIgnoreCase`), `null` in fondo, poi `id`; `[]` per le singole. Test di integrazione: elenco visto dall'organizzatore (in ordine, organizzatore escluso) e da un membro (uguale, con il suo nome); singola `[]`; riga con `DisplayName` `null` in fondo; gruppo cancellato con i membri in `cancelled`. Aggiornare i test esistenti di `/mine` che confrontano le voci.
+- [ ] 3.10 Frontend: `ReservationMemberSummary` e `members` in `MyReservationItem`; `membersLabel(item)` in `models/booking.model.ts` («Membri: A, B», «Nome non disponibile» per `null`, `null` per voci singole o senza membri); in `my-bookings` `<p class="members">` sotto l'organizzatore, con `overflow-wrap` per i 375px. Test Vitest: `membersLabel` (due nomi, nome `null`, singola); pagina con voce di gruppo, nome non noto e voce singola senza riga. Aggiornare le fixture esistenti con `members`.
+- [ ] 3.11 Documentazione e verifica:
+  - `docs/endpoints.md`: `members` nella risposta di `GET /api/bookings/mine`;
+  - `docs/architettura.md` e `docs/handoff-architettura.md`: `DisplayName` di `ReservationMember`.
+
+  Eseguire `dotnet test SmartCampus.slnx` e `npx ng test --watch=false` e `npx ng build`; con `docker compose up --build` una prenotazione di `student1` con `student2` e `student3` mostra in «Le mie prenotazioni» di `student2` la riga «Membri: …» con entrambi i nomi. Riportare l'esito nella PR.

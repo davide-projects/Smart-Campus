@@ -34,6 +34,10 @@ Oggi `POST /api/bookings` crea solo prenotazioni per una persona (`participants`
   - numero dei partecipanti (organizzatore + membri) calcolato e mostrato, con un avviso se supera la capienza dello spazio;
   - i messaggi `409`, `422` e `503` del servizio restano visibili, e la conferma riporta i partecipanti delle prenotazioni di gruppo;
   - il modulo si usa da tastiera e a 375px.
+- **Elenco dei membri in «Le mie prenotazioni» (#18, aggiunta approvata dal team):**
+  - alla creazione Bookings salva in `ReservationMember` il `displayName` di ogni membro preso dalla risposta della verifica interna di Identity, come fa con `organizerName` dal token; un nome mancante, vuoto o oltre 128 caratteri si salva `null`. Nuova colonna nullable con una migrazione;
+  - `GET /api/bookings/mine` restituisce in ogni voce `members` (`id`, `displayName`): per le prenotazioni di gruppo tutti i membri, organizzatore escluso, in ordine di nome, uguali per organizzatore e membri; `[]` per le prenotazioni singole; `displayName` `null` per i membri salvati prima della migrazione;
+  - la voce di gruppo di «Le mie prenotazioni» mostra «Membri: <nomi>» sotto l'organizzatore, con «Nome non disponibile» per i nomi `null`.
 
 ### Fuori ambito
 
@@ -51,8 +55,8 @@ Oggi `POST /api/bookings` crea solo prenotazioni per una persona (`participants`
 
 ### Modified Capabilities
 
-- `bookings`: la creazione di una prenotazione accetta i membri del gruppo (al massimo 10, solo se chi prenota non è `Staff`), con capienza (INV-5), sovrapposizioni dei membri (INV-8), membri solo studenti (INV-9), indisponibilità di Identity, permessi dei membri e richieste contemporanee; requisito «Creazione di una prenotazione singola» aggiornato per `memberIds`.
-- `frontend`: scelta dei membri nel modulo di prenotazione, numero di partecipanti, avviso di capienza, tastiera e 375px; requisiti «Conferma della prenotazione» e «Messaggi di rifiuto della prenotazione» aggiornati.
+- `bookings`: la creazione di una prenotazione accetta i membri del gruppo (al massimo 10, solo se chi prenota non è `Staff`), con capienza (INV-5), sovrapposizioni dei membri (INV-8), membri solo studenti (INV-9), indisponibilità di Identity, permessi dei membri e richieste contemporanee; nome dei membri salvato alla creazione ed elenco `members` in `GET /api/bookings/mine`; requisito «Creazione di una prenotazione singola» aggiornato per `memberIds`.
+- `frontend`: scelta dei membri nel modulo di prenotazione, numero di partecipanti, avviso di capienza, tastiera e 375px, elenco dei membri nella voce di gruppo di «Le mie prenotazioni»; requisiti «Conferma della prenotazione» e «Messaggi di rifiuto della prenotazione» aggiornati.
 
 Il Gateway non cambia configurazione. La route `identity` (`/api/identity/**`, policy `Default`) copre già `GET /api/identity/students`. `/internal/**` non corrisponde a nessuna route, quindi il Gateway risponde `404` senza inoltrare la richiesta.
 
@@ -60,10 +64,11 @@ Il Gateway non cambia configurazione. La route `identity` (`/api/identity/**`, p
 
 - **Servizi toccati:** Identity, Bookings, Frontend. Gateway e Rooms senza modifiche al codice. Nel Gateway si aggiunge solo un test che verifica che `/internal/**` non arrivi a Identity.
 - **Contratti tra servizi:** nuovo contratto **sincrono** Bookings → Identity, `POST /internal/users/students/check`. È la prima chiamata HTTP tra servizi del progetto: finora i servizi si parlavano solo con eventi su RabbitMQ. Nessun evento nuovo o modificato.
-- **Database:** nessuna migrazione. La tabella `ReservationMembers` (chiave `ReservationId` + `UserId`, indice su `UserId`) esiste da `InitialCreate` di Bookings; Identity non cambia schema.
+- **Database:** una migrazione in Bookings, `AddMemberDisplayName`: colonna `DisplayName` (`nvarchar(128)`, nullable) in `ReservationMembers`. La tabella (chiave `ReservationId` + `UserId`, indice su `UserId`) esiste da `InitialCreate`; Identity non cambia schema.
 - **API:**
   - nuove `POST /internal/users/students/check` e `GET /api/identity/students`;
-  - `POST /api/bookings` accetta `memberIds` (compatibile: senza il campo il comportamento non cambia) e può rispondere `403` (Staff con membri) e `503`.
+  - `POST /api/bookings` accetta `memberIds` (compatibile: senza il campo il comportamento non cambia) e può rispondere `403` (Staff con membri) e `503`;
+  - `GET /api/bookings/mine` aggiunge `members` a ogni voce (campo nuovo, compatibile).
 - **Configurazione:**
   - nuova chiave `Services:Identity:BaseAddress` in Bookings: `appsettings.json` `http://localhost:5101`, `docker-compose.yml` `http://identity:8080`;
   - in `docker-compose.yml` Bookings dipende anche da `identity`;
@@ -71,4 +76,5 @@ Il Gateway non cambia configurazione. La route `identity` (`/api/identity/**`, p
 - **Dipendenze tra task:** #123 → #17 → #18. Il #17 ha bisogno dell'endpoint interno, ma nei suoi test usa una Identity finta. Il #18 ha bisogno di `GET /api/identity/students` e di `memberIds` nella `POST`.
 - **Documentazione:**
   - `docs/endpoints.md`, `docs/identity.md`, `docs/gateway.md` e `docs/handoff-architettura.md` (6.3) nel #123;
-  - `docs/endpoints.md` (riga della `POST`), `docs/servizi.md` e `docs/architettura.md` (chiamata sincrona Bookings → Identity) e `docs/handoff-architettura.md` (F1, tabella degli errori) nel #17.
+  - `docs/endpoints.md` (riga della `POST`), `docs/servizi.md` e `docs/architettura.md` (chiamata sincrona Bookings → Identity) e `docs/handoff-architettura.md` (F1, tabella degli errori) nel #17;
+  - `docs/endpoints.md` (risposta di `GET /api/bookings/mine`), `docs/architettura.md` e `docs/handoff-architettura.md` (campo `DisplayName` di `ReservationMember`) nel #18.

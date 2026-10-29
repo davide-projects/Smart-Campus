@@ -116,6 +116,25 @@ A 375px di larghezza il campo «Membri del gruppo», le proposte, i chip (che va
 - **WHEN** lo studente apre il modulo su uno schermo largo 375px e aggiunge quattro membri
 - **THEN** i quattro chip vanno a capo, e nomi, pulsanti di rimozione e «Partecipanti: 5» sono leggibili senza scorrere in orizzontale
 
+### Requirement: Membri nella voce di gruppo
+In «Le mie prenotazioni» le voci con `isGroup` = `true` SHALL mostrare, sotto l'organizzatore, «Membri: » seguito dai nomi di `members` separati da virgola, nell'ordine ricevuto. Un membro con `displayName` = `null` SHALL comparire come «Nome non disponibile». Le voci singole MUST NOT mostrare la riga dei membri. A 375px la riga SHALL andare a capo senza scorrimento orizzontale.
+
+#### Scenario: Voce di gruppo con i membri
+- **WHEN** una voce ha `isGroup` = `true` e `members` con Anna Bianchi e Luca Verdi
+- **THEN** la voce mostra «Prenotazione di gruppo», l'organizzatore e «Membri: Anna Bianchi, Luca Verdi»
+
+#### Scenario: Nome di un membro non noto
+- **WHEN** una voce di gruppo ha `members` con Anna Bianchi e un membro con `displayName` = `null`
+- **THEN** la voce mostra «Membri: Anna Bianchi, Nome non disponibile»
+
+#### Scenario: Prenotazione singola senza membri
+- **WHEN** una voce ha `isGroup` = `false` e `members` = `[]`
+- **THEN** la voce non mostra la riga dei membri
+
+#### Scenario: Dieci membri su schermo da 375px
+- **WHEN** lo studente apre la pagina su uno schermo largo 375px e una voce ha dieci membri
+- **THEN** la riga dei membri va a capo e tutti i nomi sono leggibili senza scorrere in orizzontale
+
 ## MODIFIED Requirements
 
 ### Requirement: Conferma della prenotazione
