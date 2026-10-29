@@ -4,6 +4,10 @@
 
 html {
   height: 100%;
+
+  // Carattere del nome «SmartCampus» (navbar e pagina iniziale). Se Poppins non si carica, si usa Roboto.
+  --app-brand-font: 'Poppins', Roboto, sans-serif;
+
   @include mat.theme(
     (
       color: (
