@@ -1,5 +1,6 @@
 // Una prenotazione dell'utente, come organizzatore o come membro (GET /api/bookings/mine).
 // buildingName e organizerName sono null quando Bookings non li conosce (dati precedenti a US-07).
+// members sono i membri del gruppo, organizzatore escluso, già in ordine di nome: [] se singola.
 export interface MyReservationItem {
   id: string;
   roomId: string;
@@ -10,6 +11,13 @@ export interface MyReservationItem {
   isGroup: boolean;
   organizerName: string | null;
   isOrganizer: boolean;
+  members: ReservationMemberSummary[];
+}
+
+// Membro di una prenotazione di gruppo: displayName è null quando Bookings non conosce il nome.
+export interface ReservationMemberSummary {
+  id: string;
+  displayName: string | null;
 }
 
 // Risposta di GET /api/bookings/mine: le tre sezioni della pagina «Le mie prenotazioni».
@@ -201,6 +209,15 @@ export function organizerLabel(
   return item.organizerName === null
     ? 'Organizzatore non disponibile'
     : `Organizzatore: ${item.organizerName}`;
+}
+
+// Membri di una prenotazione di gruppo nell'ordine ricevuto: null sulle prenotazioni singole.
+export function membersLabel(item: Pick<MyReservationItem, 'isGroup' | 'members'>): string | null {
+  if (!item.isGroup || item.members.length === 0) {
+    return null;
+  }
+  const names = item.members.map((member) => member.displayName ?? 'Nome non disponibile');
+  return `Membri: ${names.join(', ')}`;
 }
 
 // Converte un oggetto Date nel formato "YYYY-MM-DD" richiesto come parametro query dall'API

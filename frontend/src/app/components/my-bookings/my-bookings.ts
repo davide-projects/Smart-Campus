@@ -19,19 +19,21 @@ import { RouterLink } from '@angular/router';
 import {
   MyReservationItem,
   MyReservationsResponse,
+  membersLabel,
   organizerLabel,
   reservationTimeLabel,
 } from '../../models/booking.model';
 import { BookingsService } from '../../services/bookings.service';
 import { CancelBookingDialog } from './cancel-booking-dialog/cancel-booking-dialog';
 
-// Voce come la mostra la pagina: organizer è null sulle prenotazioni singole.
+// Voce come la mostra la pagina: organizer e members sono null sulle prenotazioni singole.
 interface ReservationView {
   item: MyReservationItem;
   roomName: string;
   buildingName: string;
   time: string;
   organizer: string | null;
+  members: string | null;
   // Solo l'organizzatore, prima dell'inizio, vede «Cancella».
   canCancel: boolean;
   cancelLabel: string;
@@ -159,6 +161,7 @@ function toView(item: MyReservationItem, canCancel: boolean): ReservationView {
     buildingName: item.buildingName ?? '—',
     time,
     organizer: item.isGroup ? organizerLabel(item) : null,
+    members: membersLabel(item),
     canCancel,
     cancelLabel: `Cancella la prenotazione di ${item.roomName}, ${time}`,
   };

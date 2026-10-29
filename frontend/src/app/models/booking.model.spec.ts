@@ -4,6 +4,7 @@ import {
   campusToday,
   defaultSearchSlot,
   halfHourSlots,
+  membersLabel,
   reservationTimeLabel,
   toMinutes,
 } from './booking.model';
@@ -139,5 +140,36 @@ describe('campus time helpers', () => {
       const slot = defaultSearchSlot(new Date('2026-11-05T20:00:00Z'));
       expect(slot).toEqual({ start: '09:00', end: '10:00' });
     });
+  });
+});
+
+describe('membersLabel', () => {
+  it('joins the member names in the order received', () => {
+    expect(
+      membersLabel({
+        isGroup: true,
+        members: [
+          { id: 'u2', displayName: 'Anna Bianchi' },
+          { id: 'u3', displayName: 'Luca Verdi' },
+        ],
+      }),
+    ).toBe('Membri: Anna Bianchi, Luca Verdi');
+  });
+
+  it('uses a fallback for a name that is not known', () => {
+    expect(
+      membersLabel({
+        isGroup: true,
+        members: [
+          { id: 'u2', displayName: 'Anna Bianchi' },
+          { id: 'u3', displayName: null },
+        ],
+      }),
+    ).toBe('Membri: Anna Bianchi, Nome non disponibile');
+  });
+
+  it('is null on a single reservation or without members', () => {
+    expect(membersLabel({ isGroup: false, members: [] })).toBeNull();
+    expect(membersLabel({ isGroup: true, members: [] })).toBeNull();
   });
 });

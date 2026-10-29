@@ -41,7 +41,13 @@ mat-card {
   font: var(--mat-sys-label-medium);
 }
 
-.organizer {
+.organizer,
+.members {
   margin: 4px 0 0;
   color: var(--mat-sys-on-surface-variant);
+}
+
+// Fino a dieci nomi: a 375px la riga va a capo invece di allargare la voce.
+.members {
+  overflow-wrap: anywhere;
 }

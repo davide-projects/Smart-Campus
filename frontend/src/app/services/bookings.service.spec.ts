@@ -22,6 +22,7 @@ const RESPONSE: MyReservationsResponse = {
       isGroup: false,
       organizerName: 'Mario Rossi',
       isOrganizer: true,
+      members: [],
     },
   ],
   past: [],
