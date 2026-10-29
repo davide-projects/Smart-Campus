@@ -383,6 +383,22 @@ public static class RoomEndpoints
             });
         }
 
+        if (maxCapacity is <= 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["maxCapacity"] = ["La capienza massima deve essere maggiore di zero."]
+            });
+        }
+
+        if (minCapacity is { } min && maxCapacity is { } max && max < min)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["maxCapacity"] = ["La capienza massima non può essere inferiore alla minima."]
+            });
+        }
+
         if (buildingId == Guid.Empty)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>

@@ -23,10 +23,10 @@
     </mat-form-field>
 
     <div class="capacity">
-      <span class="capacity-label" id="capacity-label">Capienza (range)</span>
+      <span class="capacity-label" id="capacity-label">Capienza</span>
       <div class="capacity-control">
-      @if (maxCapacity() > 0) {
-        <mat-slider min="0" [max]="maxCapacity()" step="1" [displayWith]="capacityLabel">
+      @if (highestCapacity() > 0) {
+        <mat-slider min="0" [max]="highestCapacity()" step="1" [displayWith]="capacityLabel">
           <input
             matSliderStartThumb
             formControlName="minCapacity"

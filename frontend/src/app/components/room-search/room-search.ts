@@ -68,7 +68,7 @@ export class RoomSearch {
   protected readonly rooms = signal<RoomSummary[]>([]);
   protected readonly types = signal<RoomType[]>([]);
   protected readonly buildings = signal<BuildingOption[]>([]);
-  protected readonly maxCapacity = signal(0);
+  protected readonly highestCapacity = signal(0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly view = signal<ResultsView>(savedView());
@@ -83,10 +83,10 @@ export class RoomSearch {
   protected readonly capacityText = computed(() => {
     const min = this.minCapacity();
     const max = this.maxCapacityFilter();
-    if (min <= 0 && (max <= 0 || max >= this.maxCapacity())) {
+    if (min <= 0 && (max <= 0 || max >= this.highestCapacity())) {
       return 'Qualsiasi';
     }
-    if (min > 0 && max > 0 && max < this.maxCapacity()) {
+    if (min > 0 && max > 0 && max < this.highestCapacity()) {
       return `Da ${min} a ${max} posti`;
     }
     if (min > 0) {
@@ -150,17 +150,18 @@ export class RoomSearch {
   // Parte quando cambia un menu, quando si ferma lo slider e con «Cerca».
   protected search(): void {
     const { type, minCapacity, maxCapacity, buildingId } = this.filters.getRawValue();
-    const max = this.maxCapacity();
+    const highest = this.highestCapacity();
     this.searches.next({
       type,
       minCapacity: minCapacity > 0 ? minCapacity : null,
-      maxCapacity: maxCapacity > 0 ? maxCapacity : null,
+      maxCapacity: maxCapacity > 0 && maxCapacity < highest ? maxCapacity : null,
       buildingId,
     });
   }
 
   protected resetFilters(): void {
     this.filters.reset();
+    this.filters.controls.maxCapacity.setValue(this.highestCapacity());
     // Se il primo caricamento dei filtri non era riuscito, è l'occasione per riprovare.
     if (this.types().length === 0) {
       this.loadFilterOptions();
@@ -182,7 +183,9 @@ export class RoomSearch {
       .subscribe((rooms) => {
         this.types.set(typesOf(rooms));
         this.buildings.set(buildingsOf(rooms));
-        this.maxCapacity.set(Math.max(0, ...rooms.map((room) => room.capacity)));
+        const highest = Math.max(0, ...rooms.map((room) => room.capacity));
+        this.highestCapacity.set(highest);
+        this.filters.controls.maxCapacity.setValue(highest);
       });
   }
 }
