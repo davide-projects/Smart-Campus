@@ -68,9 +68,14 @@ function created(overrides: Partial<ReservationResponse> = {}): ReservationRespo
   };
 }
 
-function problem(status: number, title: string, detail: string): [object, object] {
+function problem(
+  status: number,
+  title: string,
+  detail: string,
+  extra: object = {},
+): [object, object] {
   return [
-    { status, title, detail },
+    { status, title, detail, ...extra },
     { status, statusText: title },
   ];
 }
@@ -584,6 +589,66 @@ describe('RoomBooking', () => {
       link!.click();
       await stable();
       expect(TestBed.inject(Router).url).toBe('/rooms/r1');
+    });
+
+    it('writes the message of the reason code and its limits, not the text of the service', async () => {
+      await render();
+      await fillAndSubmit(5, '19:00', '20:00');
+
+      await respond(
+        ...problem(422, 'Fuori orario', 'Testo del servizio.', {
+          code: 'outside-opening-hours',
+          limits: { opensAt: '09:00', closesAt: '13:00' },
+        }),
+      );
+
+      expect(alertText()).toBe('Lo spazio è aperto dalle 09:00 alle 13:00.');
+    });
+
+    it('recognises a room conflict by its code and links to the availability', async () => {
+      await render();
+      await fillAndSubmit();
+
+      await respond(
+        ...problem(409, 'Spazio già prenotato', 'Testo del servizio.', {
+          code: 'room-occupied',
+          freeSlots: [],
+        }),
+      );
+
+      expect(alertText()).toBe(ROOM_CONFLICT);
+      expect((await availabilityLink())!.getAttribute('href')).toBe('/rooms/r1');
+    });
+
+    it('does not link to the availability for a conflict on the person', async () => {
+      await render();
+      await fillAndSubmit();
+
+      await respond(
+        ...problem(409, 'Hai già una prenotazione', 'Testo del servizio.', {
+          code: 'person-occupied',
+        }),
+      );
+
+      expect(alertText()).toBe('Hai già una prenotazione in questa fascia oraria.');
+      expect(await availabilityLink()).toBeNull();
+    });
+
+    it('keeps the values of the form after a rejection with a code', async () => {
+      await render();
+      await fillAndSubmit(5, '19:00', '20:00');
+
+      await respond(
+        ...problem(422, 'Durata eccessiva', 'Testo del servizio.', {
+          code: 'duration-exceeded',
+          limits: { maxDurationMinutes: 240 },
+        }),
+      );
+
+      expect(alertText()).toBe('Una prenotazione può durare al massimo 4 ore.');
+      expect(await (await dayInput()).getValue()).not.toBe('');
+      expect(await (await select('Ora di inizio')).getValueText()).toBe('19:00');
+      expect(await (await select('Ora di fine')).getValueText()).toBe('20:00');
     });
 
     it.each([

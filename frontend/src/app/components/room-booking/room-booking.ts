@@ -37,7 +37,9 @@ import {
   reservationTimeLabel,
 } from '../../models/booking.model';
 import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
+import { ApiProblem, problemOf } from '../../services/api-problem';
 import { BookingsService } from '../../services/bookings.service';
+import { rejectionText } from '../../services/rejection-message';
 import { RoomsService } from '../../services/rooms.service';
 
 // Giorni prenotabili oltre oggi (assunzione A2).
@@ -46,8 +48,10 @@ const MAX_DAYS_AHEAD = 14;
 // Lunghezza massima del motivo, come in Bookings.
 export const MAX_PURPOSE_LENGTH = 200;
 
-// Messaggio di Bookings per il conflitto sullo spazio: solo con questo si propone la disponibilità.
-// Limite noto: il servizio non espone un codice di errore, quindi il confronto è sul testo.
+// Codice di motivo del conflitto sullo spazio: solo con questo si propone la disponibilità.
+const ROOM_OCCUPIED_CODE = 'room-occupied';
+
+// Ripiego per un servizio che non invia il codice: il conflitto si riconosce dal testo.
 export const ROOM_CONFLICT_DETAIL = 'Lo spazio è già prenotato in questa fascia.';
 
 export const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
@@ -100,9 +104,11 @@ export class RoomBooking implements OnInit {
 
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+  private readonly rejectionCode = signal<string | null>(null);
   protected readonly confirmation = signal<Confirmation | null>(null);
   protected readonly showAvailabilityLink = computed(
-    () => this.errorMessage() === ROOM_CONFLICT_DETAIL,
+    () =>
+      this.rejectionCode() === ROOM_OCCUPIED_CODE || this.errorMessage() === ROOM_CONFLICT_DETAIL,
   );
 
   // Giorni prenotabili: da oggi a oggi + 14 giorni, come date del campus.
@@ -232,6 +238,7 @@ export class RoomBooking implements OnInit {
     const trimmedPurpose = purpose.trim();
     this.submitting.set(true);
     this.errorMessage.set(null);
+    this.rejectionCode.set(null);
 
     this.bookingsService
       .create({
@@ -249,7 +256,9 @@ export class RoomBooking implements OnInit {
         },
         error: (error: unknown) => {
           this.submitting.set(false);
-          this.errorMessage.set(rejectionMessage(error));
+          const problem = problemOf(error);
+          this.errorMessage.set(rejectionMessage(problem));
+          this.rejectionCode.set(problem.code);
         },
       });
   }
@@ -265,6 +274,7 @@ export class RoomBooking implements OnInit {
   protected bookAnother(): void {
     this.form.reset();
     this.errorMessage.set(null);
+    this.rejectionCode.set(null);
     this.confirmation.set(null);
     this.focusAfterRender(() => this.dayInput()?.nativeElement);
   }
@@ -279,19 +289,15 @@ function toConfirmation(reservation: ReservationResponse): Confirmation {
   return { roomName: reservation.roomName, time: reservationTimeLabel(reservation) };
 }
 
-// 409 e 422 portano il motivo nel detail; il 401 lo porta quando presente, ma la sessione viene
+// 409 e 422 portano il motivo: il codice dà il messaggio in italiano con i suoi limiti e, senza
+// codice, vale il detail del servizio. Il 401 porta il detail quando presente, ma la sessione viene
 // comunque chiusa dall'interceptor. Ogni altro errore riceve il messaggio generico.
-function rejectionMessage(error: unknown): string | null {
-  if (!(error instanceof HttpErrorResponse)) {
-    return GENERIC_ERROR;
+function rejectionMessage(problem: ApiProblem): string | null {
+  if (problem.status === 409 || problem.status === 422) {
+    return rejectionText(problem) ?? GENERIC_ERROR;
   }
-  const detail: unknown = error.error?.detail;
-  const hasDetail = typeof detail === 'string' && detail.trim() !== '';
-  if (error.status === 409 || error.status === 422) {
-    return hasDetail ? detail : GENERIC_ERROR;
-  }
-  if (error.status === 401) {
-    return hasDetail ? detail : null;
+  if (problem.status === 401) {
+    return problem.detail !== null && problem.detail.trim() !== '' ? problem.detail : null;
   }
   return GENERIC_ERROR;
 }
