@@ -1,4 +1,12 @@
-import { campusDateTime, campusTime, campusToday, reservationTimeLabel } from './booking.model';
+import {
+  campusDateTime,
+  campusTime,
+  campusToday,
+  defaultSearchSlot,
+  halfHourSlots,
+  reservationTimeLabel,
+  toMinutes,
+} from './booking.model';
 
 // Variabile d'ambiente del fuso del processo di test, per simulare un dispositivo in un altro fuso.
 const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } })
@@ -96,6 +104,40 @@ describe('campus time helpers', () => {
           end: '2026-06-05T11:00:00+02:00',
         }),
       ).toBe('venerdì 5 giugno 2026, 10:00–11:00');
+    });
+  });
+
+  describe('halfHourSlots', () => {
+    it('generates half-hour slots between opening and closing hours', () => {
+      const slots = halfHourSlots('08:00', '10:00');
+      expect(slots).toEqual(['08:00', '08:30', '09:00', '09:30', '10:00']);
+    });
+  });
+
+  describe('toMinutes', () => {
+    it('converts HH:mm to minutes from midnight', () => {
+      expect(toMinutes('08:30')).toBe(510);
+      expect(toMinutes('20:00')).toBe(1200);
+    });
+  });
+
+  describe('defaultSearchSlot', () => {
+    it('proposes the next half hour after the current campus time', () => {
+      // 09:10 -> next start 09:30, end 10:30
+      const slot = defaultSearchSlot(new Date('2026-11-05T08:10:00Z')); // 09:10 in Rome
+      expect(slot).toEqual({ start: '09:30', end: '10:30' });
+    });
+
+    it('caps the end time at 20:00 when start is near campus closing', () => {
+      // 19:10 in Rome -> next start 19:30, end 20:00
+      const slot = defaultSearchSlot(new Date('2026-11-05T18:10:00Z'));
+      expect(slot).toEqual({ start: '19:30', end: '20:00' });
+    });
+
+    it('falls back to 09:00-10:00 when campus is closed for the day', () => {
+      // 21:00 in Rome
+      const slot = defaultSearchSlot(new Date('2026-11-05T20:00:00Z'));
+      expect(slot).toEqual({ start: '09:00', end: '10:00' });
     });
   });
 });

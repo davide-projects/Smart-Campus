@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { DailyAvailability } from '../models/availability.model';
+import { DailyAvailability, AvailableRoomResponse } from '../models/availability.model';
 import {
   CreateReservationRequest,
   MyReservationsResponse,
@@ -144,5 +144,43 @@ describe('BookingsService', () => {
     request.flush({ roomId: 'room-1', count: 7 });
 
     expect(await result).toBe(7);
+  });
+
+  it('cerca gli spazi liberi per fascia oraria inviando i parametri di query', async () => {
+    const mockResults: AvailableRoomResponse[] = [
+      {
+        roomId: 'room-1',
+        name: 'Aula A1',
+        buildingName: 'Edificio A',
+        type: 'Classroom',
+        capacity: 30,
+      },
+    ];
+
+    const result = new Promise((resolve) =>
+      service
+        .searchAvailableRooms({
+          date: '2026-11-04',
+          start: '10:00',
+          end: '12:00',
+          type: 'Classroom',
+          minCapacity: 20,
+        })
+        .subscribe(resolve),
+    );
+
+    const request = http.expectOne(
+      (req) =>
+        req.url === '/api/bookings/availability/search' &&
+        req.params.get('date') === '2026-11-04' &&
+        req.params.get('start') === '10:00' &&
+        req.params.get('end') === '12:00' &&
+        req.params.get('type') === 'Classroom' &&
+        req.params.get('minCapacity') === '20',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(mockResults);
+
+    expect(await result).toEqual(mockResults);
   });
 });

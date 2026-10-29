@@ -33,6 +33,13 @@ export const routes: Routes = [
       import('./components/room-booking/room-booking').then((m) => m.RoomBooking),
   },
   {
+    path: 'available-rooms',
+    title: 'Cerca spazi liberi',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./components/available-rooms/available-rooms').then((m) => m.AvailableRooms),
+  },
+  {
     path: 'my-bookings',
     title: 'Le mie prenotazioni',
     canActivate: [authGuard],
