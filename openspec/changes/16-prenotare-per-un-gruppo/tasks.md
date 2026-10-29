@@ -80,8 +80,8 @@ Area: `svc:bookings`.
 
 Area: `frontend`. Parte dopo il merge di #123 e #17.
 
-- [ ] 3.1 Aggiungere `StudentSummary` (`id`, `username`, `displayName`) in `models/user.model.ts` e `services/students.service.ts` con `search(text)` su `GET /api/identity/students?search=`. Aggiungere `memberIds: string[]` a `CreateReservationRequest`. Test Vitest con `HttpTestingController`: URL, parametro `search` codificato, metodo `GET`; corpo della `POST` con `memberIds`. Aggiornare i test esistenti di `bookings.service.spec.ts` e `room-booking.spec.ts` sul corpo della richiesta (`memberIds: []`).
-- [ ] 3.2 Nel modulo di `components/room-booking/` aggiungere il campo «Membri del gruppo» con `MatAutocomplete` e `MatChipGrid`:
+- [x] 3.1 Aggiungere `StudentSummary` (`id`, `username`, `displayName`) in `models/user.model.ts` e `services/students.service.ts` con `search(text)` su `GET /api/identity/students?search=`. Aggiungere `memberIds: string[]` a `CreateReservationRequest`. Test Vitest con `HttpTestingController`: URL, parametro `search` codificato, metodo `GET`; corpo della `POST` con `memberIds`. Aggiornare i test esistenti di `bookings.service.spec.ts` e `room-booking.spec.ts` sul corpo della richiesta (`memberIds: []`).
+- [x] 3.2 Nel modulo di `components/room-booking/` aggiungere il campo «Membri del gruppo» con `MatAutocomplete` e `MatChipGrid`:
   - ricerca con debounce di 300 ms da 2 caratteri dopo `trim`, con `switchMap`;
   - opzioni con nome visualizzato e username, senza i membri già scelti;
   - scelta → chip, input svuotato e pannello chiuso;
@@ -90,21 +90,34 @@ Area: `frontend`. Parte dopo il merge di #123 e #17.
   - «Nessuno studente trovato.» senza risultati e «Non è stato possibile cercare gli studenti. Riprova più tardi.» con `role="alert"` su errore diverso da `401`.
 
   Test con harness di Angular Material (`MatAutocompleteHarness`, `MatChipGridHarness`) e timer controllati: nessuna richiesta con 1 carattere, una richiesta con «bia», scelta e rimozione, membro già scelto non riproposto, Invio sul testo libero senza chip e senza `POST`, i due messaggi, `401` che chiude la sessione.
-- [ ] 3.3 Con `auth.isStaff()` non mostrare il campo «Membri del gruppo» (partecipanti fissi a 1, `memberIds` = `[]`). Con 10 membri disabilitare l'input e mostrare «Puoi aggiungere al massimo 10 membri.», che sparisce togliendo un chip. Test: Staff senza campo e con `memberIds` = `[]` nella `POST`; decimo membro che disabilita la ricerca e mostra il messaggio; rimozione che la riattiva.
-- [ ] 3.4 Mostrare «Partecipanti: N» (1 + membri) in un elemento `aria-live="polite"`. Con N oltre `room().capacity` mostrare «Lo spazio ospita al massimo N persone.» con `role="alert"`, e `submit()` non invia la richiesta. Test: 1 all'apertura, 3 con due membri, avviso e nessuna `POST` con capienza 4 e 4 membri, invio con 3 membri, avviso che sparisce rimuovendo un membro.
-- [ ] 3.5 Invio e risposta:
+- [x] 3.3 Con `auth.isStaff()` non mostrare il campo «Membri del gruppo» (partecipanti fissi a 1, `memberIds` = `[]`). Con 10 membri disabilitare l'input e mostrare «Puoi aggiungere al massimo 10 membri.», che sparisce togliendo un chip. Test: Staff senza campo e con `memberIds` = `[]` nella `POST`; decimo membro che disabilita la ricerca e mostra il messaggio; rimozione che la riattiva.
+- [x] 3.4 Mostrare «Partecipanti: N» (1 + membri) in un elemento `aria-live="polite"`. Con N oltre `room().capacity` mostrare «Lo spazio ospita al massimo N persone.» con `role="alert"`, e `submit()` non invia la richiesta. Test: 1 all'apertura, 3 con due membri, avviso e nessuna `POST` con capienza 4 e 4 membri, invio con 3 membri, avviso che sparisce rimuovendo un membro.
+- [x] 3.5 Invio e risposta:
   - `memberIds` nella `POST`;
-  - `rejectionMessage()` mostra il `detail` anche per `503`, e senza `detail` il messaggio generico;
+  - `rejectionMessage(problemOf(error))` accetta anche il `503` e usa `rejectionText` della #21, a cui si aggiunge `members-check-unavailable` (testi dell'handoff 6.2, numeri dai `limits`); altrimenti mostra il `detail`, e senza `detail` il messaggio generico;
   - i chip restano dopo un rifiuto;
   - la conferma mostra «Partecipanti: N» solo con `participants > 1`;
   - «Prenota un'altra fascia» svuota anche i membri.
 
   Test: `409` membro impegnato, `422` capienza, troppi membri e non studente, `503` con e senza `detail`, conferma di gruppo e singola, reset dei membri.
-- [ ] 3.6 Verificare a mano la tastiera (Tab sul campo, frecce e Invio sulle proposte, Esc, chip raggiungibili e rimossi con Canc o Backspace o con il pulsante, focus visibile, annuncio dei partecipanti) e la larghezza di 375px con quattro chip senza scorrimento orizzontale; riportarlo nella PR. `npx ng test --watch=false` verde.
-- [ ] 3.7 Verificare con `docker compose up --build`:
+- [x] 3.6 Verificare a mano la tastiera (Tab sul campo, frecce e Invio sulle proposte, Esc, chip raggiungibili e rimossi con Canc o Backspace o con il pulsante, focus visibile, annuncio dei partecipanti) e la larghezza di 375px con quattro chip senza scorrimento orizzontale; riportarlo nella PR. `npx ng test --watch=false` verde.
+- [x] 3.7 Verificare con `docker compose up --build`:
   - con `student1` prenotare uno spazio con `student2` e `student3`: conferma con «Partecipanti: 3» e prenotazione visibile in «Le mie prenotazioni» di `student2` come «Prenotazione di gruppo», senza «Cancella»;
   - cercare «Conti» non propone `staff1`;
   - superare la capienza di uno spazio piccolo mostra l'avviso;
   - un membro già impegnato mostra il `409`.
 
   Riportare l'esito nella PR.
+- [x] 3.8 Bookings, nome dei membri (decisione 8 del design):
+  - `DisplayName` (`string?`) in `ReservationMember`, `HasMaxLength(128)` in `ReservationMemberConfiguration`, migrazione `AddMemberDisplayName` con `dotnet ef migrations add` (colonna nullable, `Down` che la toglie);
+  - `IdentityClient.CheckStudentsAsync` restituisce, con «tutti studenti», il `displayName` di ogni id;
+  - `CreateReservationAsync` lo salva in ogni `ReservationMember`; mancante, vuoto dopo `Trim` o oltre 128 caratteri → `null`, senza rifiuto.
+
+  Test di integrazione con lo stub di Identity: nomi salvati; `displayName` assente, vuoto e di 129 caratteri → `201` e `DisplayName` `null`.
+- [x] 3.9 Bookings, `members` in `GET /api/bookings/mine`: record `MyReservationMember(Id, DisplayName)` e `MyReservationItem.Members`, nella stessa query; ordine per `displayName` (`OrdinalIgnoreCase`), `null` in fondo, poi `id`; `[]` per le singole. Test di integrazione: elenco visto dall'organizzatore (in ordine, organizzatore escluso) e da un membro (uguale, con il suo nome); singola `[]`; riga con `DisplayName` `null` in fondo; gruppo cancellato con i membri in `cancelled`. Aggiornare i test esistenti di `/mine` che confrontano le voci.
+- [x] 3.10 Frontend: `ReservationMemberSummary` e `members` in `MyReservationItem`; `membersLabel(item)` in `models/booking.model.ts` («Membri: A, B», «Nome non disponibile» per `null`, `null` per voci singole o senza membri); in `my-bookings` `<p class="members">` sotto l'organizzatore, con `overflow-wrap` per i 375px. Test Vitest: `membersLabel` (due nomi, nome `null`, singola); pagina con voce di gruppo, nome non noto e voce singola senza riga. Aggiornare le fixture esistenti con `members`.
+- [x] 3.11 Documentazione e verifica:
+  - `docs/endpoints.md`: `members` nella risposta di `GET /api/bookings/mine`;
+  - `docs/architettura.md` e `docs/handoff-architettura.md`: `DisplayName` di `ReservationMember`.
+
+  Eseguire `dotnet test SmartCampus.slnx` e `npx ng test --watch=false` e `npx ng build`; con `docker compose up --build` una prenotazione di `student1` con `student2` e `student3` mostra in «Le mie prenotazioni» di `student2` la riga «Membri: …» con entrambi i nomi. Riportare l'esito nella PR.

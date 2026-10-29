@@ -21,6 +21,11 @@ public static class RoomSearch
             query = query.Where(room => room.Capacity >= minCapacity);
         }
 
+        if (filter.MaxCapacity is { } maxCapacity)
+        {
+            query = query.Where(room => room.Capacity <= maxCapacity);
+        }
+
         if (filter.BuildingId is { } buildingId)
         {
             query = query.Where(room => room.BuildingId == buildingId);

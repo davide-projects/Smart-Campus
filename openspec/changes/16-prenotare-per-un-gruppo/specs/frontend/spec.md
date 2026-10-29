@@ -116,6 +116,25 @@ A 375px di larghezza il campo «Membri del gruppo», le proposte, i chip (che va
 - **WHEN** lo studente apre il modulo su uno schermo largo 375px e aggiunge quattro membri
 - **THEN** i quattro chip vanno a capo, e nomi, pulsanti di rimozione e «Partecipanti: 5» sono leggibili senza scorrere in orizzontale
 
+### Requirement: Membri nella voce di gruppo
+In «Le mie prenotazioni» le voci con `isGroup` = `true` SHALL mostrare, sotto l'organizzatore, «Membri: » seguito dai nomi di `members` separati da virgola, nell'ordine ricevuto. Un membro con `displayName` = `null` SHALL comparire come «Nome non disponibile». Le voci singole MUST NOT mostrare la riga dei membri. A 375px la riga SHALL andare a capo senza scorrimento orizzontale.
+
+#### Scenario: Voce di gruppo con i membri
+- **WHEN** una voce ha `isGroup` = `true` e `members` con Anna Bianchi e Luca Verdi
+- **THEN** la voce mostra «Prenotazione di gruppo», l'organizzatore e «Membri: Anna Bianchi, Luca Verdi»
+
+#### Scenario: Nome di un membro non noto
+- **WHEN** una voce di gruppo ha `members` con Anna Bianchi e un membro con `displayName` = `null`
+- **THEN** la voce mostra «Membri: Anna Bianchi, Nome non disponibile»
+
+#### Scenario: Prenotazione singola senza membri
+- **WHEN** una voce ha `isGroup` = `false` e `members` = `[]`
+- **THEN** la voce non mostra la riga dei membri
+
+#### Scenario: Dieci membri su schermo da 375px
+- **WHEN** lo studente apre la pagina su uno schermo largo 375px e una voce ha dieci membri
+- **THEN** la riga dei membri va a capo e tutti i nomi sono leggibili senza scorrere in orizzontale
+
 ## MODIFIED Requirements
 
 ### Requirement: Conferma della prenotazione
@@ -146,7 +165,7 @@ Dopo una risposta `201` la pagina SHALL mostrare, nella stessa pagina e al posto
 - **THEN** la conferma non mostra il numero di partecipanti
 
 ### Requirement: Messaggi di rifiuto della prenotazione
-Se `POST /api/bookings` risponde `409`, `422` o `503`, la pagina SHALL mostrare il messaggio `detail` della risposta, con `role="alert"`, mantenendo i valori inseriti nel modulo, compresi i membri scelti. Se il servizio non risponde o risponde con un altro errore SHALL mostrare «Non è stato possibile completare la prenotazione. Riprova più tardi.».
+Se `POST /api/bookings` risponde `409`, `422` o `503`, la pagina SHALL mostrare, con `role="alert"`, il messaggio scelto dal `code` della risposta come per gli altri rifiuti di Bookings, compresi i rifiuti dei gruppi (`too-many-members` con il numero da `limits.maxMembers`, `organizer-as-member`, `duplicate-members`, `members-not-students`, `members-check-unavailable`, `member-booking-in-progress`, `capacity-exceeded` con il numero da `limits.maxParticipants`, `members-occupied`), con i testi di `docs/handoff-architettura.md` 6.2. SHALL mostrare il `detail` della risposta se il `code` manca, non è previsto o mancano i limiti che servono al messaggio. In ogni caso MUST mantenere i valori inseriti nel modulo, compresi i membri scelti. Se il servizio non risponde, o risponde con un altro errore o senza `detail`, SHALL mostrare «Non è stato possibile completare la prenotazione. Riprova più tardi.».
 
 #### Scenario: Fuori dall'orario di apertura
 - **WHEN** lo studente chiede l'«Aula A1» dalle 19:00 alle 21:00 e il servizio risponde `422` con `detail` «Lo spazio è aperto dalle 08:00 alle 20:00.»
@@ -169,25 +188,25 @@ Se `POST /api/bookings` risponde `409`, `422` o `503`, la pagina SHALL mostrare 
 - **THEN** la pagina mostra «Non è stato possibile completare la prenotazione. Riprova più tardi.»
 
 #### Scenario: Membro già impegnato
-- **WHEN** lo studente prenota con Anna Bianchi e il servizio risponde `409` con `detail` «Uno o più membri hanno già una prenotazione in questa fascia.»
-- **THEN** la pagina mostra quel messaggio e il chip «Anna Bianchi» resta nel modulo
+- **WHEN** lo studente prenota con Anna Bianchi e il servizio risponde `409` con `code` = `members-occupied`
+- **THEN** la pagina mostra «Uno o più membri hanno già una prenotazione in questa fascia.» e il chip «Anna Bianchi» resta nel modulo
 
 #### Scenario: Capienza superata secondo il servizio
-- **WHEN** il servizio risponde `422` con `detail` «Lo spazio ospita al massimo 4 persone.»
-- **THEN** la pagina mostra quel messaggio
+- **WHEN** il servizio risponde `422` con `code` = `capacity-exceeded` e `limits.maxParticipants` = 4
+- **THEN** la pagina mostra «Lo spazio ospita al massimo 4 persone.»
 
 #### Scenario: Troppi membri secondo il servizio
-- **WHEN** il servizio risponde `422` con `detail` «Puoi aggiungere al massimo 10 membri.»
-- **THEN** la pagina mostra quel messaggio e i membri scelti restano nel modulo
+- **WHEN** il servizio risponde `422` con `code` = `too-many-members` e `limits.maxMembers` = 10
+- **THEN** la pagina mostra «Puoi aggiungere al massimo 10 membri.» e i membri scelti restano nel modulo
 
 #### Scenario: Membro non studente
-- **WHEN** il servizio risponde `422` con `detail` «Puoi aggiungere come membri solo studenti registrati.»
-- **THEN** la pagina mostra quel messaggio e i membri scelti restano nel modulo
+- **WHEN** il servizio risponde `422` con `code` = `members-not-students`
+- **THEN** la pagina mostra «Puoi aggiungere come membri solo studenti registrati.» e i membri scelti restano nel modulo
 
 #### Scenario: Verifica dei membri non disponibile
-- **WHEN** il servizio risponde `503` con `detail` «Non è possibile verificare i membri in questo momento. Riprova tra poco.»
-- **THEN** la pagina mostra quel messaggio e lo studente può riprovare con lo stesso modulo
+- **WHEN** il servizio risponde `503` con `code` = `members-check-unavailable`
+- **THEN** la pagina mostra «Non è possibile verificare i membri in questo momento. Riprova tra poco.» e lo studente può riprovare con lo stesso modulo
 
 #### Scenario: Servizio non disponibile senza messaggio
-- **WHEN** il servizio risponde `503` senza `detail`
+- **WHEN** il servizio risponde `503` senza `code` né `detail`
 - **THEN** la pagina mostra «Non è stato possibile completare la prenotazione. Riprova più tardi.»

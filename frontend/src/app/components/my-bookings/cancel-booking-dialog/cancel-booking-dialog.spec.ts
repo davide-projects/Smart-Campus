@@ -26,6 +26,7 @@ const RESERVATION: MyReservationItem = {
   organizerName: null,
   isOrganizer: true,
   checkedInAt: null,
+  members: [],
 };
 
 const GENERIC = 'Non è stato possibile cancellare la prenotazione. Riprova più tardi.';

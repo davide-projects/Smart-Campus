@@ -41,6 +41,7 @@ function reservation(overrides: Partial<MyReservationItem>): MyReservationItem {
     organizerName: 'Anna Bianchi',
     isOrganizer: true,
     checkedInAt: null,
+    members: [],
     ...overrides,
   };
 }
@@ -354,6 +355,45 @@ describe('MyBookings', () => {
       expect(card.organizer).toBeNull();
       expect(element.textContent).not.toContain('Organizzatore');
     });
+
+    it('lists the members of the group under the organizer', async () => {
+      await renderOne({
+        isGroup: true,
+        isOrganizer: false,
+        organizerName: 'Mario Rossi',
+        members: [
+          { id: 'u2', displayName: 'Anna Bianchi' },
+          { id: 'u3', displayName: 'Luca Verdi' },
+        ],
+      });
+
+      const organizer = element.querySelector('.organizer')!;
+      expect(organizer.nextElementSibling?.classList).toContain('members');
+      expect(membersText()).toBe('Membri: Anna Bianchi, Luca Verdi');
+    });
+
+    it('shows a fallback for a member whose name is not known', async () => {
+      await renderOne({
+        isGroup: true,
+        members: [
+          { id: 'u2', displayName: 'Anna Bianchi' },
+          { id: 'u3', displayName: null },
+        ],
+      });
+
+      expect(membersText()).toBe('Membri: Anna Bianchi, Nome non disponibile');
+    });
+
+    it('shows no members line on a single reservation', async () => {
+      await renderOne({ isGroup: false, members: [] });
+
+      expect(element.querySelector('.members')).toBeNull();
+      expect(element.textContent).not.toContain('Membri');
+    });
+
+    function membersText(): string | null | undefined {
+      return element.querySelector('.members')?.textContent?.trim();
+    }
   });
 
   describe('empty tabs', () => {
@@ -1259,6 +1299,7 @@ describe('MyBookings with an expired session', () => {
       organizerName: null,
       isOrganizer: true,
       checkedInAt: null,
+      members: [],
     };
     http.expectOne('/api/bookings/mine').flush({ upcoming: [upcoming], past: [], cancelled: [] });
     await harness.fixture.whenStable();
@@ -1314,6 +1355,7 @@ describe('MyBookings with an expired session', () => {
       organizerName: null,
       isOrganizer: true,
       checkedInAt: null,
+      members: [],
     };
     http.expectOne('/api/bookings/mine').flush({ upcoming: [upcoming], past: [], cancelled: [] });
     await harness.fixture.whenStable();

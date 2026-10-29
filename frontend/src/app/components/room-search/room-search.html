@@ -23,18 +23,26 @@
     </mat-form-field>
 
     <div class="capacity">
-      <span class="capacity-label" id="capacity-label">Capienza minima</span>
+      <span class="capacity-label" id="capacity-label">Capienza</span>
       <div class="capacity-control">
-        <mat-slider min="0" [max]="maxCapacity()" step="1" [displayWith]="capacityLabel">
+      @if (highestCapacity() > 0) {
+        <mat-slider min="0" [max]="highestCapacity()" step="1" [displayWith]="capacityLabel">
           <input
-            matSliderThumb
+            matSliderStartThumb
             formControlName="minCapacity"
             aria-labelledby="capacity-label"
             (change)="capacityChanged()"
           />
+          <input
+            matSliderEndThumb
+            formControlName="maxCapacity"
+            aria-labelledby="capacity-label"
+            (change)="capacityChanged()"
+          />
         </mat-slider>
-        <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
-      </div>
+      }
+      <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
+    </div>
     </div>
 
     <div class="actions">

@@ -25,3 +25,10 @@ export interface LoginResponse {
   expiresAt: string;
   user: UserProfile;
 }
+
+// Studente proposto come membro del gruppo (GET /api/identity/students).
+export interface StudentSummary {
+  id: string;
+  username: string;
+  displayName: string;
+}

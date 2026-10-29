@@ -19,6 +19,10 @@ internal sealed class ReservationMemberConfiguration : IEntityTypeConfiguration<
             .HasForeignKey(member => member.ReservationId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Stessa lunghezza di DisplayName in Identity e di OrganizerName.
+        builder.Property(member => member.DisplayName)
+            .HasMaxLength(128);
+
         // Per trovare in fretta le prenotazioni di uno studente come membro (INV-8, "le mie prenotazioni").
         builder.HasIndex(member => member.UserId);
     }

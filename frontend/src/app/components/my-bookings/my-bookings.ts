@@ -23,6 +23,7 @@ import {
   MyReservationItem,
   MyReservationsResponse,
   isInCheckInWindow,
+  membersLabel,
   organizerLabel,
   reservationTimeLabel,
 } from '../../models/booking.model';
@@ -30,13 +31,14 @@ import { problemOf } from '../../services/api-problem';
 import { BookingsService } from '../../services/bookings.service';
 import { CancelBookingDialog } from './cancel-booking-dialog/cancel-booking-dialog';
 
-// Voce come la mostra la pagina: organizer è null sulle prenotazioni singole.
+// Voce come la mostra la pagina: organizer e members sono null sulle prenotazioni singole.
 interface ReservationView {
   item: MyReservationItem;
   roomName: string;
   buildingName: string;
   time: string;
   organizer: string | null;
+  members: string | null;
   // Solo l'organizzatore, prima dell'inizio e senza check-in, vede «Cancella».
   canCancel: boolean;
   cancelLabel: string;
@@ -298,6 +300,7 @@ function toView(item: MyReservationItem, actions: ViewActions): ReservationView 
     buildingName: item.buildingName ?? '—',
     time,
     organizer: item.isGroup ? organizerLabel(item) : null,
+    members: membersLabel(item),
     canCancel: actions.canCancel,
     cancelLabel: `Cancella la prenotazione di ${item.roomName}, ${time}`,
     used: actions.showUsed && item.checkedInAt !== null,

@@ -125,14 +125,18 @@ public static class ReservationEndpoints
         // 4. INV-9: i membri sono studenti registrati, secondo Identity. La chiamata avviene prima della transazione
         // e fuori dalla strategia di retry: una risposta lenta non tiene bloccati spazio e persone, e un nuovo
         // tentativo della transazione non richiama Identity.
+        IReadOnlyDictionary<Guid, string?> memberNames = new Dictionary<Guid, string?>();
+
         if (memberIds.Count > 0)
         {
-            var outcome = await identityClient.CheckStudentsAsync(
+            var check = await identityClient.CheckStudentsAsync(
                 memberIds,
                 httpRequest.Headers.Authorization.ToString(),
                 cancellationToken);
 
-            switch (outcome)
+            memberNames = check.DisplayNames;
+
+            switch (check.Outcome)
             {
                 case StudentsCheckOutcome.Unavailable:
                     return ToProblem(ReservationRules.MembersCheckUnavailable());
@@ -261,7 +265,14 @@ public static class ReservationEndpoints
                 Status = ReservationStatus.Confirmed,
                 CreatedAt = now,
                 Members = memberIds
-                    .Select(memberId => new ReservationMember { ReservationId = reservationId, UserId = memberId })
+                    .Select(memberId => new ReservationMember
+                    {
+                        ReservationId = reservationId,
+                        UserId = memberId,
+                        // Nome del momento della creazione, come OrganizerName. Uno non utilizzabile si salva null
+                        // senza rifiutare: il membro è comunque uno studente confermato (decisione 8 del design).
+                        DisplayName = UsableUserName(memberNames.GetValueOrDefault(memberId))
+                    })
                     .ToList()
             };
 
@@ -345,9 +356,17 @@ public static class ReservationEndpoints
                     reservation.AttendanceRecords
                         .Where(record => record.Type == AttendanceType.CheckIn)
                         .Select(record => (DateTimeOffset?)record.RecordedAt)
-                        .FirstOrDefault())
+                        .FirstOrDefault(),
+                    reservation.Members
+                        .Select(member => new MyReservationMember(member.UserId, member.DisplayName))
+                        .ToList())
             })
             .ToListAsync(cancellationToken);
+
+        // Membri in ordine di nome, senza distinzione di maiuscole; i nomi non noti in fondo, a parità per id.
+        reservations = reservations
+            .Select(reservation => reservation with { Item = reservation.Item with { Members = SortMembers(reservation.Item.Members) } })
+            .ToList();
 
         // Una prenotazione è "passata" quando la sua fine è già arrivata: quelle in corso restano tra le future.
         var now = timeProvider.GetUtcNow();
@@ -575,10 +594,19 @@ public static class ReservationEndpoints
         exception.InnerException is SqlException { Number: 2601 or 2627 };
 
     // Nome visualizzato emesso da Identity. Null se il claim manca, è vuoto o è più lungo della colonna.
+    private static List<MyReservationMember> SortMembers(IEnumerable<MyReservationMember> members) =>
+        members
+            .OrderBy(member => member.DisplayName is null)
+            .ThenBy(member => member.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(member => member.Id)
+            .ToList();
+
     private static string? TryGetUserName(ClaimsPrincipal user) =>
-        user.FindFirstValue(JwtClaimNames.Name) is { } name
-        && !string.IsNullOrWhiteSpace(name)
-        && name.Length <= MaxUserNameLength
+        UsableUserName(user.FindFirstValue(JwtClaimNames.Name));
+
+    // Un nome è utilizzabile se non è vuoto e sta nella colonna (MaxUserNameLength).
+    private static string? UsableUserName(string? name) =>
+        !string.IsNullOrWhiteSpace(name) && name.Length <= MaxUserNameLength
             ? name
             : null;
 

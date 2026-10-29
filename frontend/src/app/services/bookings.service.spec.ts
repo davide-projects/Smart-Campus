@@ -25,6 +25,7 @@ const RESPONSE: MyReservationsResponse = {
       organizerName: 'Mario Rossi',
       isOrganizer: true,
       checkedInAt: null,
+      members: [],
     },
   ],
   past: [],
@@ -137,6 +138,7 @@ describe('BookingsService', () => {
       start: '2026-11-05T10:00:00+01:00',
       end: '2026-11-05T11:00:00+01:00',
       purpose: 'Ripasso di analisi',
+      memberIds: [],
     };
     const created: ReservationResponse = {
       id: 'p9',
@@ -155,6 +157,24 @@ describe('BookingsService', () => {
     request.flush(created, { status: 201, statusText: 'Created' });
 
     expect(await result).toEqual(created);
+  });
+
+  it('sends the members of the group in the body of POST /api/bookings', async () => {
+    const body: CreateReservationRequest = {
+      roomId: 'r1',
+      start: '2026-11-05T10:00:00+01:00',
+      end: '2026-11-05T11:00:00+01:00',
+      purpose: null,
+      memberIds: ['s2', 's3'],
+    };
+    const result = new Promise((resolve) => service.create(body).subscribe(resolve));
+
+    const request = http.expectOne('/api/bookings');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.memberIds).toEqual(['s2', 's3']);
+    request.flush(null, { status: 201, statusText: 'Created' });
+
+    await result;
   });
 
   it('reads the count of future reservations of a room from the API response', async () => {
