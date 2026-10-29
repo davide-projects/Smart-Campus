@@ -72,6 +72,106 @@ public sealed class ReservationRulesTests
         Assert.Equal("Troppo in anticipo", rejection?.Title);
     }
 
+    // --- Membri del gruppo (US-05) ---
+
+    [Fact]
+    public void ValidateMembers_Null_IsAccepted()
+    {
+        Assert.Null(ReservationRules.ValidateMembers(null, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ValidateMembers_Empty_IsAccepted()
+    {
+        Assert.Null(ReservationRules.ValidateMembers([], Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ValidateMembers_TenDistinctMembers_IsAccepted()
+    {
+        Assert.Null(ReservationRules.ValidateMembers(DistinctIds(10), Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ValidateMembers_ElevenDistinctMembers_IsRejected()
+    {
+        var rejection = ReservationRules.ValidateMembers(DistinctIds(11), Guid.NewGuid());
+
+        Assert.Equal(422, rejection?.StatusCode);
+        Assert.Equal("Membri non validi", rejection?.Title);
+        Assert.Equal("Puoi aggiungere al massimo 10 membri.", rejection?.Detail);
+    }
+
+    [Fact]
+    public void ValidateMembers_ElevenIdsWithDuplicates_IsRejectedForTheNumberBeforeTheDuplicates()
+    {
+        var ids = DistinctIds(10).Append(Guid.Empty).ToList();
+        ids[^1] = ids[0];
+
+        var rejection = ReservationRules.ValidateMembers(ids, Guid.NewGuid());
+
+        Assert.Equal("Puoi aggiungere al massimo 10 membri.", rejection?.Detail);
+    }
+
+    [Fact]
+    public void ValidateMembers_OrganizerAmongTheMembers_IsRejected()
+    {
+        var organizer = Guid.NewGuid();
+
+        var rejection = ReservationRules.ValidateMembers([Guid.NewGuid(), organizer], organizer);
+
+        Assert.Equal(422, rejection?.StatusCode);
+        Assert.Equal("Membri non validi", rejection?.Title);
+        Assert.Equal("Non puoi aggiungerti come membro: sei già l'organizzatore.", rejection?.Detail);
+    }
+
+    [Fact]
+    public void ValidateMembers_OrganizerAndDuplicate_ReportsTheOrganizerFirst()
+    {
+        var organizer = Guid.NewGuid();
+        var member = Guid.NewGuid();
+
+        var rejection = ReservationRules.ValidateMembers([member, member, organizer], organizer);
+
+        Assert.Equal("Non puoi aggiungerti come membro: sei già l'organizzatore.", rejection?.Detail);
+    }
+
+    [Fact]
+    public void ValidateMembers_SameMemberTwice_IsRejected()
+    {
+        var member = Guid.NewGuid();
+
+        var rejection = ReservationRules.ValidateMembers([member, Guid.NewGuid(), member], Guid.NewGuid());
+
+        Assert.Equal(422, rejection?.StatusCode);
+        Assert.Equal("Membri non validi", rejection?.Title);
+        Assert.Equal("Ogni studente può essere aggiunto una sola volta.", rejection?.Detail);
+    }
+
+    // --- Capienza (INV-5) ---
+
+    [Fact]
+    public void ValidateCapacity_ParticipantsEqualToCapacity_IsAccepted()
+    {
+        var room = Room();
+        room.Capacity = 4;
+
+        Assert.Null(ReservationRules.ValidateCapacity(4, room));
+    }
+
+    [Fact]
+    public void ValidateCapacity_OneParticipantOverCapacity_IsRejected()
+    {
+        var room = Room();
+        room.Capacity = 4;
+
+        var rejection = ReservationRules.ValidateCapacity(5, room);
+
+        Assert.Equal(422, rejection?.StatusCode);
+        Assert.Equal("Capienza superata", rejection?.Title);
+        Assert.Equal("Lo spazio ospita al massimo 4 persone.", rejection?.Detail);
+    }
+
     // --- Gruppo 2: regole sullo spazio ---
 
     [Fact]
@@ -481,6 +581,9 @@ public sealed class ReservationRulesTests
         });
         return room;
     }
+
+    private static List<Guid> DistinctIds(int count) =>
+        Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToList();
 
     private static CreateReservationRequest Request(DateOnly date, string start, string end) =>
         new(Guid.NewGuid(), At(date, start), At(date, end), Purpose: null);

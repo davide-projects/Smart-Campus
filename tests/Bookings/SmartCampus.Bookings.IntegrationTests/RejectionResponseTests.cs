@@ -14,7 +14,7 @@ namespace SmartCampus.Bookings.IntegrationTests;
 // US-06: ogni rifiuto restituisce un ProblemDetails con il codice di motivo e i limiti da rispettare;
 // con lo spazio occupato la risposta include anche le fasce libere dello stesso spazio nello stesso giorno
 // (o un elenco vuoto), verificato sull'endpoint reale con SQL Server (Testcontainers).
-// "members-occupied" e "capacity-exceeded" arrivano con le prenotazioni di gruppo (US-05).
+// I codici dei rifiuti delle prenotazioni di gruppo (US-05) sono verificati in GroupReservationTests.
 [Collection(BookingsApiCollection.Name)]
 public sealed class RejectionResponseTests(BookingsApiFixture fixture)
 {

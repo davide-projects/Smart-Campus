@@ -21,6 +21,9 @@ public static class ReservationRules
     public static readonly TimeSpan CheckInBefore = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan CheckInAfter = TimeSpan.FromMinutes(15);
 
+    // US-05: al massimo 10 membri (11 partecipanti), per limitare la verifica in Identity e i lock per richiesta.
+    public const int MaxMembers = 10;
+
     // Gruppo 1: regole sulla sola richiesta. Si controllano prima della transazione:
     // se la richiesta è sbagliata non serve prendere nessun lock.
     public static ReservationRejection? ValidateRequest(CreateReservationRequest request, DateTimeOffset now)
@@ -79,6 +82,78 @@ public static class ReservationRules
 
         return null;
     }
+
+    // Gruppo 1, membri del gruppo: regole pure sull'elenco dei membri, dopo ValidateRequest e prima di chiamare Identity.
+    // Il tetto si conta sugli id ricevuti, prima di togliere i duplicati. Null o vuoto: prenotazione singola.
+    public static ReservationRejection? ValidateMembers(IReadOnlyList<Guid>? memberIds, Guid organizerId)
+    {
+        if (memberIds is null || memberIds.Count == 0)
+        {
+            return null;
+        }
+
+        if (memberIds.Count > MaxMembers)
+        {
+            return Unprocessable(
+                RejectionCodes.TooManyMembers,
+                InvalidMembersTitle,
+                "Puoi aggiungere al massimo 10 membri.",
+                Limits(("maxMembers", MaxMembers)));
+        }
+
+        if (memberIds.Contains(organizerId))
+        {
+            return Unprocessable(
+                RejectionCodes.OrganizerAsMember,
+                InvalidMembersTitle,
+                "Non puoi aggiungerti come membro: sei già l'organizzatore.");
+        }
+
+        if (memberIds.Distinct().Count() != memberIds.Count)
+        {
+            return Unprocessable(
+                RejectionCodes.DuplicateMembers,
+                InvalidMembersTitle,
+                "Ogni studente può essere aggiunto una sola volta.");
+        }
+
+        return null;
+    }
+
+    // INV-5: organizzatore più membri non superano la capienza della copia locale dello spazio.
+    // Si controlla dentro la transazione, dopo il lock sulla riga dello spazio, come le altre regole sullo spazio.
+    public static ReservationRejection? ValidateCapacity(int participants, BookableRoom room) =>
+        participants > room.Capacity ? CapacityExceeded(room.Capacity) : null;
+
+    public static ReservationRejection CapacityExceeded(int capacity) =>
+        Unprocessable(
+            RejectionCodes.CapacityExceeded,
+            "Capienza superata",
+            $"Lo spazio ospita al massimo {capacity} persone.",
+            Limits(("maxParticipants", capacity)));
+
+    // Solo gli studenti creano prenotazioni di gruppo: è un permesso, quindi viene prima di ogni altra regola.
+    public static ReservationRejection StaffGroupForbidden() =>
+        new(
+            StatusCodes.Status403Forbidden,
+            "Prenotazione di gruppo non consentita",
+            "Il personale non può creare prenotazioni di gruppo.",
+            RejectionCodes.GroupBookingForbidden);
+
+    // INV-9: secondo Identity almeno un membro non è uno studente registrato. Il messaggio non dice quale.
+    public static ReservationRejection NotStudents() =>
+        Unprocessable(
+            RejectionCodes.MembersNotStudents,
+            InvalidMembersTitle,
+            "Puoi aggiungere come membri solo studenti registrati.");
+
+    // Identity non ha risposto in modo utilizzabile: non si sa se i membri sono studenti.
+    public static ReservationRejection MembersCheckUnavailable() =>
+        new(
+            StatusCodes.Status503ServiceUnavailable,
+            "Servizio non disponibile",
+            "Non è possibile verificare i membri in questo momento. Riprova tra poco.",
+            RejectionCodes.MembersCheckUnavailable);
 
     // Gruppo 2: regole sullo spazio. Si controllano dentro la transazione, dopo il lock sulla riga
     // dello spazio, così nessuno può cambiarlo mentre decidiamo.
@@ -142,6 +217,14 @@ public static class ReservationRules
 
     public static ReservationRejection UserLockTimeout() =>
         new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Hai un'altra prenotazione in corso, riprova tra qualche secondo.", RejectionCodes.BookingInProgress);
+
+    // INV-8: almeno un membro è già organizzatore o membro di una prenotazione confermata sovrapposta. Il messaggio non dice quale.
+    public static ReservationRejection MemberConflict() =>
+        new(StatusCodes.Status409Conflict, "Membro già impegnato", "Uno o più membri hanno già una prenotazione in questa fascia.", RejectionCodes.MembersOccupied);
+
+    // Dopo 10 secondi di attesa un'altra richiesta che coinvolge un membro è ancora in corso.
+    public static ReservationRejection MemberLockTimeout() =>
+        new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.", RejectionCodes.MemberBookingInProgress);
 
     // Cancellazione (US-08): l'ordine dei controlli è quello del design della change 25-cancella-prenotazione, decisione 2,
     // con il controllo sulla prenotazione usata della change 45-check-in, decisione 7.
@@ -250,6 +333,7 @@ public static class ReservationRules
                 "Il check-in di questa prenotazione è già stato registrato.");
 
     private const string CheckInRejectedTitle = "Check-in non consentito";
+    private const string InvalidMembersTitle = "Membri non validi";
 
     private static bool IsOnSlotBoundary(DateTimeOffset value) =>
         value.TimeOfDay.Ticks % SlotLength.Ticks == 0;

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.ServiceDefaults;
@@ -16,6 +17,20 @@ builder.AddServiceDefaults();
 builder.Services.AddSmartCampusJwtBearer(builder.Configuration);
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+// Verifica dei membri di una prenotazione di gruppo (INV-9): chiamata HTTP a Identity, l'unico che conosce utenti e ruoli.
+// L'indirizzo si legge da Services:Identity:BaseAddress; senza un URI assoluto il servizio non parte.
+// Timeout di 3 secondi, nessun retry: chi prenota può ritentare da sé.
+builder.Services.AddOptions<IdentityServiceOptions>()
+    .Bind(builder.Configuration.GetSection(IdentityServiceOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<IdentityServiceOptions>, IdentityServiceOptionsValidator>();
+builder.Services.AddHttpClient<IdentityClient>((provider, client) =>
+{
+    var options = provider.GetRequiredService<IOptions<IdentityServiceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseAddress!, UriKind.Absolute);
+    client.Timeout = IdentityClient.Timeout;
+});
 
 // Gli enum viaggiano come stringa ("Confirmed") e non come numero, come in Rooms.
 builder.Services.ConfigureHttpJsonOptions(options =>
