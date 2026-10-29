@@ -294,7 +294,9 @@ export class RoomBooking implements OnInit {
           const problem = problemOf(error);
           this.errorMessage.set(rejectionMessage(problem));
           this.rejectionCode.set(problem.code);
-          this.freeSlots.set(problem.code === ROOM_OCCUPIED_CODE ? problem.freeSlots : null);
+          this.freeSlots.set(
+            problem.code === ROOM_OCCUPIED_CODE ? this.bookableSlots(problem.freeSlots) : null,
+          );
         },
       });
   }
@@ -346,6 +348,32 @@ export class RoomBooking implements OnInit {
     this.clearRejection();
     this.confirmation.set(null);
     this.focusAfterRender(() => this.dayInput()?.nativeElement);
+  }
+
+  // Primo orario di inizio prenotabile dentro una fascia libera: oggi non sono prenotabili le mezz'ore
+  // già passate, quindi una fascia che comincia prima dell'ora attuale parte dalla prima valida.
+  private firstBookableStart(slot: FreeRange): string | null {
+    const slotMinutes = (new Date(slot.end).getTime() - new Date(slot.start).getTime()) / 60_000;
+    const from = toMinutes(campusTime(new Date(slot.start)));
+    return (
+      this.startOptions().find((time) => {
+        const minutes = toMinutes(time);
+        return minutes >= from && minutes < from + slotMinutes;
+      }) ?? null
+    );
+  }
+
+  // Delle fasce proposte si tengono quelle in cui si può davvero iniziare, tagliate al primo inizio
+  // prenotabile: così ogni pulsante mostrato funziona e dice l'orario da cui si parte.
+  private bookableSlots(slots: FreeRange[] | null): FreeRange[] | null {
+    const day = this.selectedDay();
+    if (slots === null || day === null) {
+      return slots;
+    }
+    return slots.flatMap((slot) => {
+      const start = this.firstBookableStart(slot);
+      return start === null ? [] : [{ start: campusDateTime(day, start), end: slot.end }];
+    });
   }
 
   // Toglie il rifiuto mostrato: messaggio, codice e fasce libere proposte.

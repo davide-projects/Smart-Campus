@@ -765,6 +765,36 @@ describe('RoomBooking', () => {
         request.flush(created(), { status: 201, statusText: 'Created' });
       });
 
+      it('starts from the first half hour still bookable when a slot began in the past', async () => {
+        await render();
+        // Oggi, giovedì 5 novembre, sono le 09:00 a Roma: la fascia 08:00-12:00 è già iniziata.
+        await fillAndSubmit(5, '10:00', '11:00');
+
+        await conflict([{ start: '2026-11-05T08:00:00+01:00', end: '2026-11-05T12:00:00+01:00' }]);
+
+        const buttons = await slotButtons();
+        expect(buttons).toHaveLength(1);
+        expect(await buttons[0].getText()).toContain('09:30–12:00');
+
+        await buttons[0].click();
+        await stable();
+
+        expect(await (await select('Ora di inizio')).getValueText()).toBe('09:30');
+        expect(await (await select('Ora di fine')).getValueText()).toBe('10:30');
+      });
+
+      it('does not offer a slot that is already over and says there are no free slots', async () => {
+        await render();
+        await fillAndSubmit(5, '10:00', '11:00');
+
+        await conflict([{ start: '2026-11-05T08:00:00+01:00', end: '2026-11-05T09:00:00+01:00' }]);
+
+        expect(await slotButtons()).toHaveLength(0);
+        expect(element().querySelector('.free-slots')?.textContent).toContain(
+          'Non ci sono fasce libere in questo giorno',
+        );
+      });
+
       it('says explicitly that there are no free slots when the list is empty', async () => {
         await render();
         await fillAndSubmit(9, '10:00', '11:00');
