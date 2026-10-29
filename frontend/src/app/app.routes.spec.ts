@@ -34,29 +34,19 @@ describe('app routes', () => {
         {
           provide: RoomsService,
           useValue: {
+            search: () => of([]),
             listFormOptions: () => of({ buildings: [], equipment: [] }),
-            getRoomById: () =>
-              of({
-                id: 'room-1',
-                name: 'Aula A1',
-                type: 'Classroom',
-                buildingId: 'b-1',
-                buildingName: 'Edificio A',
-                buildingCode: 'A',
-                floor: 0,
-                capacity: 10,
-                isBookable: true,
-                equipment: [],
-                openingHours: [],
-              }),
+            getRoomById: () => NEVER,
           },
         },
         {
           provide: BookingsService,
-          useValue: { getMine: () => of({ upcoming: [], past: [], cancelled: [] }) },
+          useValue: {
+            getMine: () => of({ upcoming: [], past: [], cancelled: [] }),
+            searchAvailableRooms: () => of([]),
+            getReservations: () => of([]),
+          },
         },
-        // La pagina di prenotazione resta in caricamento: qui conta solo la navigazione.
-        { provide: RoomsService, useValue: { getRoomById: () => NEVER } },
       ],
     });
     router = TestBed.inject(Router);
@@ -98,6 +88,15 @@ describe('app routes', () => {
 
     await router.navigateByUrl('/staff/rooms/room-1/edit');
     expect(router.url).toBe('/rooms');
+
+    await router.navigateByUrl('/staff/reservations');
+    expect(router.url).toBe('/rooms');
+  });
+
+  it('sends a guest from the reservations page to the login, remembering the page', async () => {
+    await router.navigateByUrl('/staff/reservations');
+
+    expect(router.url).toBe('/login?returnUrl=%2Fstaff%2Freservations');
   });
 
   it('opens the room management pages for the staff, with their titles', async () => {
@@ -111,6 +110,10 @@ describe('app routes', () => {
     await router.navigateByUrl('/staff/rooms/room-1/edit');
     expect(router.url).toBe('/staff/rooms/room-1/edit');
     expect(TestBed.inject(Title).getTitle()).toBe('Modifica spazio · SmartCampus');
+
+    await router.navigateByUrl('/staff/reservations');
+    expect(router.url).toBe('/staff/reservations');
+    expect(TestBed.inject(Title).getTitle()).toBe('Prenotazioni per spazio · SmartCampus');
   });
 
   it('sends a guest from the booking page to the login, remembering the page', async () => {
@@ -126,5 +129,20 @@ describe('app routes', () => {
 
     expect(router.url).toBe('/rooms/r1/book');
     expect(TestBed.inject(Title).getTitle()).toBe('Prenota spazio · SmartCampus');
+  });
+
+  it('sends a guest from the available rooms page to the login, remembering the page', async () => {
+    await router.navigateByUrl('/available-rooms');
+
+    expect(router.url).toBe('/login?returnUrl=%2Favailable-rooms');
+  });
+
+  it('opens the available rooms page with its title for a logged in user', async () => {
+    isLoggedIn.set(true);
+
+    await router.navigateByUrl('/available-rooms');
+
+    expect(router.url).toBe('/available-rooms');
+    expect(TestBed.inject(Title).getTitle()).toBe('Cerca spazi liberi · SmartCampus');
   });
 });

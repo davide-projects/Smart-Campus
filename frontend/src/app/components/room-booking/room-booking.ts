@@ -34,9 +34,11 @@ import {
   campusDateTime,
   campusTime,
   campusToday,
+  formatTimeRange,
+  halfHourSlots,
   pad,
   reservationTimeLabel,
-  timeRangeLabel,
+  toMinutes,
 } from '../../models/booking.model';
 import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
 import { ApiProblem, problemOf } from '../../services/api-problem';
@@ -224,6 +226,7 @@ export class RoomBooking implements OnInit {
         next: (room) => {
           this.room.set(room);
           this.isLoading.set(false);
+          this.applyQueryParams();
         },
         error: (error: unknown) => {
           this.isLoading.set(false);
@@ -234,6 +237,28 @@ export class RoomBooking implements OnInit {
           }
         },
       });
+  }
+
+  private applyQueryParams(): void {
+    const queryDate = this.route.snapshot.queryParamMap.get('date');
+    const queryStart = this.route.snapshot.queryParamMap.get('start');
+    const queryEnd = this.route.snapshot.queryParamMap.get('end');
+
+    if (queryDate) {
+      const [y, m, d] = queryDate.split('-').map(Number);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        const date = new Date(y, m - 1, d);
+        if (this.isOpenDay(date)) {
+          this.form.controls.day.setValue(date);
+        }
+      }
+    }
+    if (queryStart && this.startOptions().includes(queryStart)) {
+      this.form.controls.start.setValue(queryStart);
+      if (queryEnd && this.endOptions().includes(queryEnd)) {
+        this.form.controls.end.setValue(queryEnd);
+      }
+    }
   }
 
   protected submit(): void {
@@ -283,7 +308,7 @@ export class RoomBooking implements OnInit {
 
   // Etichetta di una fascia libera, es. «08:00–10:00», nell'ora del campus.
   protected freeSlotLabel(slot: FreeRange): string {
-    return timeRangeLabel(slot);
+    return formatTimeRange(slot.start, slot.end, '–');
   }
 
   // Sceglie una fascia libera proposta dopo un conflitto: l'inizio è quello della fascia e la fine
@@ -362,21 +387,4 @@ function openingHoursOn(room: RoomDetail, day: Date): OpeningHours | null {
     return null;
   }
   return hours;
-}
-
-// Orari «HH:mm» all'ora esatta o alla mezz'ora, dall'apertura alla chiusura comprese.
-function halfHourSlots(hours: OpeningHours): string[] {
-  const opens = toMinutes(hours.opensAt!);
-  const closes = toMinutes(hours.closesAt!);
-  const slots: string[] = [];
-  for (let minutes = Math.ceil(opens / 30) * 30; minutes <= closes; minutes += 30) {
-    slots.push(`${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`);
-  }
-  return slots;
-}
-
-// «08:00:00» → 480.
-function toMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
 }

@@ -156,12 +156,12 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 |---|---|---|---|
 | GET | `/api/bookings/availability?roomId=&date=` | autenticato | Fasce libere |
 | GET | `/api/bookings/availability/search?date=&start=&end=&type=&minCapacity=` | autenticato | Spazi liberi in una fascia oraria, filtrabili per tipo e capienza minima *(implementato)* |
-| POST | `/api/bookings` | Student, Staff | Crea (singola o con membri) → `201` oppure `409 Conflict` |
+| POST | `/api/bookings` | Student, Staff | Crea (singola o con membri, al massimo 10; con membri solo `Student`) → `201` oppure `409 Conflict` *(implementato, US-05 per i membri)* |
 | GET | `/api/bookings/mine` | autenticato | Le mie prenotazioni (come organizzatore o membro), divise in `upcoming`, `past`, `cancelled` *(implementato, US-07)* |
-| DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella (`Status = Cancelled`, `204`), solo prima dell'inizio, idempotente *(implementato, US-08)* |
+| DELETE | `/api/bookings/{id}` | organizzatore o Staff | Cancella (`Status = Cancelled`, `204`), solo prima dell'inizio e non se usata (check-in), idempotente *(implementato, US-08; check-in US-14)* |
 | GET | `/api/bookings?roomId=&date=` | Staff | Vista per spazio |
 | GET | `/api/bookings/rooms/{roomId}/future-reservations-count` | Staff | Conteggio delle prenotazioni confermate non ancora terminate di uno spazio (avviso prima della dismissione) |
-| POST | `/api/bookings/{id}/check-in` | organizzatore o membro | Check-in |
+| POST | `/api/bookings/{id}/check-in` | organizzatore, membro o Staff | Check-in (`200` con `checkedInAt`), nella finestra A6 tranne che per lo Staff *(implementato, US-14)* |
 | POST | `/api/bookings/{id}/no-show` | Staff | Segna no-show |
 | GET | `/api/bookings/reports/rooms?from=&to=&buildingId=` | Staff | Report aggregato |
 
@@ -181,15 +181,16 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 **Eventi:** consuma `Room*`. Non pubblica eventi.
 
 **Regole di check-in e report**
-- Check-in ammesso solo nella finestra `[Start − X min, Start + Y min]` *(X, Y da concordare)*.
-- Il check-in può farlo l'organizzatore o un membro; una prenotazione ha al massimo un check-in, valido per tutto il gruppo.
+- Check-in ammesso solo nella finestra `[Start − 15 min, Start + 15 min]`, estremi inclusi (assunzione A6). Lo `Staff` non ha limiti di finestra.
+- Il check-in può farlo l'organizzatore, un membro o lo `Staff`; una prenotazione ha al massimo un record di presenza (`CheckIn` o `NoShow`, indice unico su `ReservationId`), e il check-in vale per tutto il gruppo.
+- Una prenotazione con check-in (usata) non si può più cancellare.
 - Il report mostra per ogni spazio/periodo: ore prenotate, ore con check-in, no-show, **prenotazioni senza informazione**, e cancellazioni.
 - Il report **non** afferma che uno spazio sia "inutilizzato" se mancano informazioni; lo dichiara esplicitamente.
 - *(Opzione con riserva)* storico dei check-in su MongoDB: non implementato; MongoDB è già usato da Rooms per il catalogo e le assegnazioni delle attrezzature (vedi [architettura](architettura.md#rooms)).
 
 **Codici di errore da rendere comprensibili in UI**
 
-Ogni rifiuto di una prenotazione o di una cancellazione è un `ProblemDetails` con `status`, `title` e `detail`, più:
+Ogni rifiuto di una prenotazione, di una cancellazione o di un check-in è un `ProblemDetails` con `status`, `title` e `detail`, più:
 - `code`: il codice di motivo, stabile, con cui la UI sceglie il messaggio (il testo di `detail` serve come ripiego);
 - `limits`: i limiti da rispettare, quando ce ne sono (per esempio `{ "opensAt": "08:00", "closesAt": "20:00" }`);
 - `freeSlots`: solo per `room-occupied`, gli intervalli liberi dello stesso spazio nello stesso giorno, in ordine di orario e senza quelli già iniziati (`[{ "start": …, "end": … }]`). Un elenco vuoto vuol dire che quel giorno non ce ne sono: va detto esplicitamente.
@@ -200,11 +201,18 @@ Le risposte `401` e `404` non hanno `code`.
 |---|---|---|---|---|
 | Conflitto sullo spazio | 409 | `room-occupied` | `freeSlots` | "Lo spazio è già prenotato in questa fascia. Ecco le fasce libere…" (se `freeSlots` è vuoto: nessuna fascia libera quel giorno) |
 | Conflitto sulla persona | 409 | `person-occupied` | — | "Hai già una prenotazione in questa fascia" |
-| Conflitto sui membri del gruppo *(con US-05)* | 409 | `members-occupied` | — | "Uno o più membri hanno già una prenotazione in questa fascia" |
+| Conflitto sui membri del gruppo | 409 | `members-occupied` | — | "Uno o più membri hanno già una prenotazione in questa fascia." |
 | Altra prenotazione della stessa persona in elaborazione (lock oltre 10 secondi) | 409 | `booking-in-progress` | — | "Hai un'altra prenotazione in corso, riprova tra qualche secondo." |
+| Altra prenotazione di un membro in elaborazione (lock oltre 10 secondi) | 409 | `member-booking-in-progress` | — | "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo." |
 | Fuori orario | 422 | `outside-opening-hours` | `opensAt`, `closesAt` (`HH:mm`) | "Lo spazio è aperto dalle X alle Y" |
 | Spazio chiuso in quel giorno | 422 | `room-closed` | — | "Lo spazio è chiuso in questo giorno." |
-| Capienza superata *(con US-05)* | 422 | `capacity-exceeded` | capienza massima | "Lo spazio ospita al massimo N persone" |
+| Capienza superata | 422 | `capacity-exceeded` | `maxParticipants` (capienza dello spazio) | "Lo spazio ospita al massimo N persone." |
+| Più di 10 membri | 422 | `too-many-members` | `maxMembers` (10) | "Puoi aggiungere al massimo 10 membri." |
+| Organizzatore tra i membri | 422 | `organizer-as-member` | — | "Non puoi aggiungerti come membro: sei già l'organizzatore." |
+| Membro ripetuto | 422 | `duplicate-members` | — | "Ogni studente può essere aggiunto una sola volta." |
+| Membri inesistenti o non studenti (INV-9) | 422 | `members-not-students` | — | "Puoi aggiungere come membri solo studenti registrati." |
+| Prenotazione di gruppo chiesta dallo `Staff` | 403 | `group-booking-forbidden` | — | "Il personale non può creare prenotazioni di gruppo." |
+| Verifica dei membri non disponibile (Identity spento, lento oltre 3 secondi o in errore) | 503 | `members-check-unavailable` | — | "Non è possibile verificare i membri in questo momento. Riprova tra poco." |
 | Spazio non prenotabile/disattivato | 422 | `room-not-bookable` | — | "Questo spazio non è prenotabile" |
 | Durata eccessiva | 422 | `duration-exceeded` | `maxDurationMinutes` (240) | "Una prenotazione può durare al massimo 4 ore." |
 | Troppo in anticipo | 422 | `too-far-ahead` | `maxAdvanceDays` (14) | "Si può prenotare al massimo 14 giorni prima." |
@@ -215,6 +223,12 @@ Le risposte `401` e `404` non hanno `code`.
 | Motivo troppo lungo | 422 | `purpose-too-long` | `maxLength` (200) | "Il motivo può contenere al massimo 200 caratteri." |
 | Cancellazione di prenotazione altrui (anche da un membro non organizzatore) | 403 | `cancellation-forbidden` | — | "Non puoi cancellare questa prenotazione." |
 | Cancellazione di prenotazione già iniziata o passata | 422 | `cancellation-too-late` | — | "Non è possibile cancellare una prenotazione già iniziata o passata." |
+| Cancellazione di prenotazione già usata (con check-in) | 422 | `cancellation-already-used` | — | "Non è possibile cancellare una prenotazione già usata." |
+| Check-in di prenotazione altrui (né organizzatore, né membro, né Staff) | 403 | `check-in-forbidden` | — | "Non puoi fare il check-in di questa prenotazione." |
+| Check-in di prenotazione cancellata | 422 | `check-in-cancelled` | — | "Non è possibile fare il check-in di una prenotazione cancellata." |
+| Check-in di prenotazione segnata no-show | 422 | `check-in-no-show` | — | "La prenotazione è già stata segnata come non usata." |
+| Check-in già registrato | 422 | `check-in-already-recorded` | — | "Il check-in di questa prenotazione è già stato registrato." |
+| Check-in fuori dalla finestra | 422 | `check-in-outside-window` | — | "Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio." |
 | Prenotazione da cancellare inesistente | 404 | — | — | "La prenotazione richiesta non esiste." |
 
 ### 6.3 Identity
@@ -227,6 +241,8 @@ Le risposte `401` e `404` non hanno `code`.
 |---|---|---|
 | POST | `/api/identity/login` | Restituisce JWT |
 | GET | `/api/identity/me` | Profilo e ruolo |
+| GET | `/api/identity/students?search=` | Ricerca degli studenti per la prenotazione di gruppo (solo `Student`, almeno 2 caratteri, al massimo 10 risultati) |
+| POST | `/internal/users/students/check` | Verifica interna per Bookings: quali id sono studenti (INV-9); non instradata dal Gateway |
 
 - Utenti **solo sintetici**, caricati da seed.
 - Registrazione self-service **fuori perimetro** *(proposta)*.
@@ -248,7 +264,12 @@ Le risposte `401` e `404` non hanno `code`.
 ### F1. Prenotazione (singola o di gruppo)
 ```
 Angular → Gateway → Bookings
-  Bookings: lock BookableRoom → lock persona (sp_getapplock) → verifica INV-1..9 → INSERT Reservation + ReservationMember (1 transazione)
+  Bookings: Staff con membri → 403; regole sulla richiesta e sui membri (al massimo 10, niente organizzatore né ripetuti) → 422
+  [solo con membri] Bookings → Identity  POST /internal/users/students/check (token di chi prenota, 3 s, fuori dalla transazione)
+                    → membri non studenti 422 · Identity non disponibile 503
+  Bookings (1 transazione): lock BookableRoom → lock persone (sp_getapplock, organizzatore e membri in ordine di id)
+    → INV-3/4 → capienza INV-5 → INV-1 → INV-8 organizzatore, poi membri
+    → INSERT Reservation (Participants = 1 + membri) + ReservationMember → commit
   → 201 Created
 ```
 ### F2. Cancellazione
@@ -265,7 +286,7 @@ Staff → Gateway → Rooms: aggiorna Room + outbox
 
 ### F4. Check-in
 ```
-Student → Gateway → Bookings: verifica organizzatore o membro + finestra temporale → registra AttendanceRecord
+Student → Gateway → Bookings: verifica organizzatore, membro o Staff + finestra temporale (non per lo Staff) → registra AttendanceRecord
 ```
 
 **Implicazione per le storie:** una storia di E2 senza Rooms e senza copia locale non è dimostrabile. Il primo incremento deve includere almeno Rooms (lettura + seed) e Bookings.
@@ -381,7 +402,7 @@ Le storie devono indicare quali dati di seed richiedono. Base proposta:
 | I-6 | Limite di prenotazioni attive per studente? | Equità d'uso |
 | I-7 | Gli studenti possono prenotare i laboratori o solo il personale? | Regole per ruolo |
 | I-8 | Entro quando si può cancellare? | US-08. **Risolta con A5:** fino all'orario di inizio escluso, per l'organizzatore e per lo Staff; dopo l'inizio `422`. |
-| I-9 | Finestra di check-in (X, Y minuti) e chi può segnare il no-show? | US-14, US-15 |
+| I-9 | Finestra di check-in (X, Y minuti) e chi può segnare il no-show? | US-14, US-15. **Finestra risolta con A6:** da 15 minuti prima a 15 minuti dopo l'inizio, estremi inclusi, per organizzatore e membri (lo Staff non ha limiti). Ancora aperto chi segna il no-show (US-15). |
 | I-10 | Uno studente può vedere *chi* ha prenotato uno spazio? | Privacy: proposta di mostrare solo "occupato" |
 | I-11 | Fuso orario: tutto in ora locale del campus? | Persistenza (`DateTimeOffset`) |
 | I-12 | Il visitatore non autenticato può consultare il catalogo? | Gateway, E1 |

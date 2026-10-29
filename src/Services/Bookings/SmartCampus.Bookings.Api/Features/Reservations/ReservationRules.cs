@@ -17,6 +17,13 @@ public static class ReservationRules
 
     public const int MaxPurposeLength = 200;
 
+    // Assunzione A6: il check-in si fa da 15 minuti prima a 15 minuti dopo l'inizio, estremi inclusi.
+    public static readonly TimeSpan CheckInBefore = TimeSpan.FromMinutes(15);
+    public static readonly TimeSpan CheckInAfter = TimeSpan.FromMinutes(15);
+
+    // US-05: al massimo 10 membri (11 partecipanti), per limitare la verifica in Identity e i lock per richiesta.
+    public const int MaxMembers = 10;
+
     // Gruppo 1: regole sulla sola richiesta. Si controllano prima della transazione:
     // se la richiesta è sbagliata non serve prendere nessun lock.
     public static ReservationRejection? ValidateRequest(CreateReservationRequest request, DateTimeOffset now)
@@ -75,6 +82,78 @@ public static class ReservationRules
 
         return null;
     }
+
+    // Gruppo 1, membri del gruppo: regole pure sull'elenco dei membri, dopo ValidateRequest e prima di chiamare Identity.
+    // Il tetto si conta sugli id ricevuti, prima di togliere i duplicati. Null o vuoto: prenotazione singola.
+    public static ReservationRejection? ValidateMembers(IReadOnlyList<Guid>? memberIds, Guid organizerId)
+    {
+        if (memberIds is null || memberIds.Count == 0)
+        {
+            return null;
+        }
+
+        if (memberIds.Count > MaxMembers)
+        {
+            return Unprocessable(
+                RejectionCodes.TooManyMembers,
+                InvalidMembersTitle,
+                "Puoi aggiungere al massimo 10 membri.",
+                Limits(("maxMembers", MaxMembers)));
+        }
+
+        if (memberIds.Contains(organizerId))
+        {
+            return Unprocessable(
+                RejectionCodes.OrganizerAsMember,
+                InvalidMembersTitle,
+                "Non puoi aggiungerti come membro: sei già l'organizzatore.");
+        }
+
+        if (memberIds.Distinct().Count() != memberIds.Count)
+        {
+            return Unprocessable(
+                RejectionCodes.DuplicateMembers,
+                InvalidMembersTitle,
+                "Ogni studente può essere aggiunto una sola volta.");
+        }
+
+        return null;
+    }
+
+    // INV-5: organizzatore più membri non superano la capienza della copia locale dello spazio.
+    // Si controlla dentro la transazione, dopo il lock sulla riga dello spazio, come le altre regole sullo spazio.
+    public static ReservationRejection? ValidateCapacity(int participants, BookableRoom room) =>
+        participants > room.Capacity ? CapacityExceeded(room.Capacity) : null;
+
+    public static ReservationRejection CapacityExceeded(int capacity) =>
+        Unprocessable(
+            RejectionCodes.CapacityExceeded,
+            "Capienza superata",
+            $"Lo spazio ospita al massimo {capacity} persone.",
+            Limits(("maxParticipants", capacity)));
+
+    // Solo gli studenti creano prenotazioni di gruppo: è un permesso, quindi viene prima di ogni altra regola.
+    public static ReservationRejection StaffGroupForbidden() =>
+        new(
+            StatusCodes.Status403Forbidden,
+            "Prenotazione di gruppo non consentita",
+            "Il personale non può creare prenotazioni di gruppo.",
+            RejectionCodes.GroupBookingForbidden);
+
+    // INV-9: secondo Identity almeno un membro non è uno studente registrato. Il messaggio non dice quale.
+    public static ReservationRejection NotStudents() =>
+        Unprocessable(
+            RejectionCodes.MembersNotStudents,
+            InvalidMembersTitle,
+            "Puoi aggiungere come membri solo studenti registrati.");
+
+    // Identity non ha risposto in modo utilizzabile: non si sa se i membri sono studenti.
+    public static ReservationRejection MembersCheckUnavailable() =>
+        new(
+            StatusCodes.Status503ServiceUnavailable,
+            "Servizio non disponibile",
+            "Non è possibile verificare i membri in questo momento. Riprova tra poco.",
+            RejectionCodes.MembersCheckUnavailable);
 
     // Gruppo 2: regole sullo spazio. Si controllano dentro la transazione, dopo il lock sulla riga
     // dello spazio, così nessuno può cambiarlo mentre decidiamo.
@@ -139,14 +218,25 @@ public static class ReservationRules
     public static ReservationRejection UserLockTimeout() =>
         new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Hai un'altra prenotazione in corso, riprova tra qualche secondo.", RejectionCodes.BookingInProgress);
 
-    // Cancellazione (US-08): l'ordine dei controlli è quello del design della change 25-cancella-prenotazione, decisione 2.
+    // INV-8: almeno un membro è già organizzatore o membro di una prenotazione confermata sovrapposta. Il messaggio non dice quale.
+    public static ReservationRejection MemberConflict() =>
+        new(StatusCodes.Status409Conflict, "Membro già impegnato", "Uno o più membri hanno già una prenotazione in questa fascia.", RejectionCodes.MembersOccupied);
+
+    // Dopo 10 secondi di attesa un'altra richiesta che coinvolge un membro è ancora in corso.
+    public static ReservationRejection MemberLockTimeout() =>
+        new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.", RejectionCodes.MemberBookingInProgress);
+
+    // Cancellazione (US-08): l'ordine dei controlli è quello del design della change 25-cancella-prenotazione, decisione 2,
+    // con il controllo sulla prenotazione usata della change 45-check-in, decisione 7.
     // 1. chi può cancellare: prima di tutto, così un estraneo riceve sempre 403 e non scopre lo stato della prenotazione;
     // 2. già cancellata: nessuna modifica (idempotenza), anche se nel frattempo l'inizio è passato;
-    // 3. limite di tempo (assunzione A5): si cancella solo prima dell'inizio, Staff compreso.
+    // 3. con check-in: una prenotazione usata non si cancella più, nemmeno prima dell'inizio;
+    // 4. limite di tempo (assunzione A5): si cancella solo prima dell'inizio, Staff compreso.
     public static CancellationDecision ValidateCancellation(
         Reservation reservation,
         Guid userId,
         bool isStaff,
+        bool hasCheckIn,
         DateTimeOffset now)
     {
         if (reservation.OrganizerId != userId && !isStaff)
@@ -163,6 +253,14 @@ public static class ReservationRules
             return CancellationDecision.AlreadyCancelled;
         }
 
+        if (hasCheckIn)
+        {
+            return CancellationDecision.Reject(Unprocessable(
+                RejectionCodes.CancellationAlreadyUsed,
+                "Cancellazione non consentita",
+                "Non è possibile cancellare una prenotazione già usata."));
+        }
+
         if (reservation.Start <= now)
         {
             return CancellationDecision.Reject(Unprocessable(
@@ -173,6 +271,69 @@ public static class ReservationRules
 
         return CancellationDecision.Allowed;
     }
+
+    // Check-in (US-14): l'ordine dei controlli è quello del design della change 45-check-in, decisione 3.
+    // 1. chi può fare il check-in (organizzatore, membro o Staff): prima di tutto, come per la cancellazione;
+    // 2-4. stati definitivi (cancellata, no-show, già registrato): spiegano il rifiuto meglio della finestra;
+    // 5. finestra A6, solo per organizzatore e membri: lo Staff non ha limiti di finestra.
+    // existingRecord è il tipo dell'eventuale record di presenza già salvato (al massimo uno per prenotazione).
+    // Restituisce null se il check-in è consentito.
+    public static ReservationRejection? ValidateCheckIn(
+        Reservation reservation,
+        Guid userId,
+        bool isMember,
+        bool isStaff,
+        AttendanceType? existingRecord,
+        DateTimeOffset now)
+    {
+        if (reservation.OrganizerId != userId && !isMember && !isStaff)
+        {
+            return new ReservationRejection(
+                StatusCodes.Status403Forbidden,
+                CheckInRejectedTitle,
+                "Non puoi fare il check-in di questa prenotazione.",
+                RejectionCodes.CheckInForbidden);
+        }
+
+        if (reservation.Status == ReservationStatus.Cancelled)
+        {
+            return Unprocessable(
+                RejectionCodes.CheckInCancelled,
+                CheckInRejectedTitle,
+                "Non è possibile fare il check-in di una prenotazione cancellata.");
+        }
+
+        if (existingRecord is { } recorded)
+        {
+            return ExistingAttendance(recorded);
+        }
+
+        if (!isStaff && (now < reservation.Start - CheckInBefore || now > reservation.Start + CheckInAfter))
+        {
+            return Unprocessable(
+                RejectionCodes.CheckInOutsideWindow,
+                CheckInRejectedTitle,
+                "Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio.");
+        }
+
+        return null;
+    }
+
+    // Rifiuto del check-in per un record di presenza già salvato: usato anche dopo la violazione
+    // dell'indice unico, quando la rilettura trova il record scritto da un'altra richiesta.
+    public static ReservationRejection ExistingAttendance(AttendanceType recorded) =>
+        recorded == AttendanceType.NoShow
+            ? Unprocessable(
+                RejectionCodes.CheckInNoShow,
+                CheckInRejectedTitle,
+                "La prenotazione è già stata segnata come non usata.")
+            : Unprocessable(
+                RejectionCodes.CheckInAlreadyRecorded,
+                CheckInRejectedTitle,
+                "Il check-in di questa prenotazione è già stato registrato.");
+
+    private const string CheckInRejectedTitle = "Check-in non consentito";
+    private const string InvalidMembersTitle = "Membri non validi";
 
     private static bool IsOnSlotBoundary(DateTimeOffset value) =>
         value.TimeOfDay.Ticks % SlotLength.Ticks == 0;

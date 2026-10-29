@@ -22,6 +22,34 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SmartCampus.Bookings.Api.Entities.AttendanceRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("RecordedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ReservationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReservationId")
+                        .IsUnique();
+
+                    b.ToTable("AttendanceRecords", (string)null);
+                });
+
             modelBuilder.Entity("SmartCampus.Bookings.Api.Entities.BookableRoom", b =>
                 {
                     b.Property<Guid>("RoomId")
@@ -152,6 +180,17 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
                     b.ToTable("ReservationMembers", (string)null);
                 });
 
+            modelBuilder.Entity("SmartCampus.Bookings.Api.Entities.AttendanceRecord", b =>
+                {
+                    b.HasOne("SmartCampus.Bookings.Api.Entities.Reservation", "Reservation")
+                        .WithMany("AttendanceRecords")
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reservation");
+                });
+
             modelBuilder.Entity("SmartCampus.Bookings.Api.Entities.BookableRoomOpeningHours", b =>
                 {
                     b.HasOne("SmartCampus.Bookings.Api.Entities.BookableRoom", "Room")
@@ -192,6 +231,8 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
 
             modelBuilder.Entity("SmartCampus.Bookings.Api.Entities.Reservation", b =>
                 {
+                    b.Navigation("AttendanceRecords");
+
                     b.Navigation("Members");
                 });
 #pragma warning restore 612, 618

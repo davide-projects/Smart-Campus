@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { DailyAvailability } from '../models/availability.model';
+import { DailyAvailability, AvailableRoomResponse } from '../models/availability.model';
 import {
+  CheckInResponse,
   CreateReservationRequest,
   MyReservationsResponse,
+  ReservationListItem,
   ReservationResponse,
 } from '../models/booking.model';
 import { BookingsService } from './bookings.service';
@@ -22,6 +24,7 @@ const RESPONSE: MyReservationsResponse = {
       isGroup: false,
       organizerName: 'Mario Rossi',
       isOrganizer: true,
+      checkedInAt: null,
     },
   ],
   past: [],
@@ -110,6 +113,24 @@ describe('BookingsService', () => {
     await result;
   });
 
+  it('checks in a reservation with POST /api/bookings/{id}/check-in and an empty body', async () => {
+    const checkedIn: CheckInResponse = { checkedInAt: '2026-11-05T08:55:00+00:00' };
+    const result = new Promise((resolve) => service.checkIn('p1').subscribe(resolve));
+
+    const request = http.expectOne('/api/bookings/p1/check-in');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush(checkedIn);
+
+    expect(await result).toEqual(checkedIn);
+  });
+
+  it('encodes the id in the check-in URL', () => {
+    service.checkIn('a/b').subscribe();
+
+    http.expectOne('/api/bookings/a%2Fb/check-in').flush({ checkedInAt: '2026-11-05T08:55:00Z' });
+  });
+
   it('creates a reservation with POST /api/bookings and returns the confirmation', async () => {
     const body: CreateReservationRequest = {
       roomId: 'r1',
@@ -144,5 +165,83 @@ describe('BookingsService', () => {
     request.flush({ roomId: 'room-1', count: 7 });
 
     expect(await result).toBe(7);
+  });
+
+  it('cerca gli spazi liberi per fascia oraria inviando i parametri di query', async () => {
+    const mockResults: AvailableRoomResponse[] = [
+      {
+        roomId: 'room-1',
+        name: 'Aula A1',
+        buildingName: 'Edificio A',
+        type: 'Classroom',
+        capacity: 30,
+      },
+    ];
+
+    const result = new Promise((resolve) =>
+      service
+        .searchAvailableRooms({
+          date: '2026-11-04',
+          start: '10:00',
+          end: '12:00',
+          type: 'Classroom',
+          minCapacity: 20,
+        })
+        .subscribe(resolve),
+    );
+
+    const request = http.expectOne(
+      (req) =>
+        req.url === '/api/bookings/availability/search' &&
+        req.params.get('date') === '2026-11-04' &&
+        req.params.get('start') === '10:00' &&
+        req.params.get('end') === '12:00' &&
+        req.params.get('type') === 'Classroom' &&
+        req.params.get('minCapacity') === '20',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(mockResults);
+
+    expect(await result).toEqual(mockResults);
+  });
+
+  it('recupera le prenotazioni di uno spazio inviando roomId e date come parametri di query', async () => {
+    const list: ReservationListItem[] = [
+      {
+        id: 'res-1',
+        start: '2026-11-05T09:00:00+01:00',
+        end: '2026-11-05T10:00:00+01:00',
+        organizerId: 'user-1',
+        participants: 3,
+        memberIds: ['user-2', 'user-3'],
+        status: 'Confirmed',
+        cancelledAt: null,
+      },
+      {
+        id: 'res-2',
+        start: '2026-11-05T11:00:00+01:00',
+        end: '2026-11-05T12:00:00+01:00',
+        organizerId: 'user-4',
+        participants: 1,
+        memberIds: [],
+        status: 'Cancelled',
+        cancelledAt: '2026-11-04T18:00:00+01:00',
+      },
+    ];
+
+    const result = new Promise((resolve) =>
+      service.getReservations('room-123', '2026-11-05').subscribe(resolve),
+    );
+
+    const request = http.expectOne(
+      (req) =>
+        req.url === '/api/bookings' &&
+        req.params.get('roomId') === 'room-123' &&
+        req.params.get('date') === '2026-11-05',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(list);
+
+    expect(await result).toEqual(list);
   });
 });

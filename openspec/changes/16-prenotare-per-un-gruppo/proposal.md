@@ -23,7 +23,8 @@ Oggi `POST /api/bookings` crea solo prenotazioni per una persona (`participants`
   - `403` se chi prenota è `Staff`: solo gli studenti creano prenotazioni di gruppo;
   - `422` per più di 10 membri, membri ripetuti, organizzatore tra i membri, membri inesistenti o non studenti (INV-9) e capienza superata, con la capienza massima nel messaggio (INV-5);
   - `409` se un membro ha una prenotazione `Confirmed` sovrapposta, come organizzatore o come membro (INV-8);
-  - `503` se Identity non risponde.
+  - `503` se Identity non risponde;
+  - ogni nuovo rifiuto ha il suo `code` di motivo, come quelli introdotti da #20 (per esempio `members-occupied`, `capacity-exceeded`).
 
   Prima della transazione Bookings chiama Identity, inoltrando il token di chi prenota. Poi prende il lock `user:{id}` su organizzatore e membri, in ordine di id, e inserisce `Reservation` e `ReservationMember` nella stessa transazione: un rifiuto non lascia righe. La prenotazione compare in `GET /api/bookings/mine` di ogni membro. Un membro che tenta `DELETE /api/bookings/{id}` riceve `403`, come oggi.
 - **Frontend (#18):** nel modulo di `/rooms/:id/book`:

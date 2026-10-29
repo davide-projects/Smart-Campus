@@ -1,6 +1,6 @@
 import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { HarnessLoader } from '@angular/cdk/testing';
+import { HarnessLoader, TestKey } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -15,7 +15,11 @@ import { MatTabGroupHarness } from '@angular/material/tabs/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { Observable, Subject, of, throwError } from 'rxjs';
-import { MyReservationItem, MyReservationsResponse } from '../../models/booking.model';
+import {
+  CheckInResponse,
+  MyReservationItem,
+  MyReservationsResponse,
+} from '../../models/booking.model';
 import { authInterceptor } from '../../services/auth.interceptor';
 import { AuthService } from '../../services/auth.service';
 import { BookingsService } from '../../services/bookings.service';
@@ -36,6 +40,7 @@ function reservation(overrides: Partial<MyReservationItem>): MyReservationItem {
     isGroup: false,
     organizerName: 'Anna Bianchi',
     isOrganizer: true,
+    checkedInAt: null,
     ...overrides,
   };
 }
@@ -72,6 +77,11 @@ const CANCELLED = [
   }),
 ];
 
+// Istante sintetico del check-in, come lo invia Bookings (UTC).
+const CHECKED_IN_AT = '2026-11-05T08:55:00+00:00';
+
+const HINT = "Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio.";
+
 function response(overrides: Partial<MyReservationsResponse> = {}): MyReservationsResponse {
   return { upcoming: UPCOMING, past: PAST, cancelled: CANCELLED, ...overrides };
 }
@@ -96,13 +106,14 @@ describe('MyBookings', () => {
   let rootLoader: HarnessLoader;
   let getMine: ReturnType<typeof vi.fn<() => Observable<MyReservationsResponse>>>;
   let cancel: ReturnType<typeof vi.fn<(id: string) => Observable<void>>>;
+  let checkIn: ReturnType<typeof vi.fn<(id: string) => Observable<CheckInResponse>>>;
 
   async function render(): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [MyBookings],
       providers: [
         provideRouter([{ path: 'rooms', component: EmptyPage }]),
-        { provide: BookingsService, useValue: { getMine, cancel } },
+        { provide: BookingsService, useValue: { getMine, cancel, checkIn } },
         // Senza animazioni il contenuto della scheda cambia subito dopo la selezione.
         { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
@@ -152,10 +163,15 @@ describe('MyBookings', () => {
     return loader.getAllHarnesses(MatButtonHarness.with({ text: 'Cancella' }));
   }
 
+  // Pulsanti «Check-in» della scheda aperta.
+  async function checkInButtons(): Promise<MatButtonHarness[]> {
+    return loader.getAllHarnesses(MatButtonHarness.with({ text: 'Check-in' }));
+  }
+
   // Titoli delle voci della scheda aperta che mostrano «Cancella».
   function cancellableTitles(): string[] {
     return [...element.querySelectorAll('mat-card')]
-      .filter((card) => card.querySelector('mat-card-actions button') !== null)
+      .filter((card) => card.querySelector('button.cancel') !== null)
       .map((card) => text(card, 'mat-card-title')!);
   }
 
@@ -167,6 +183,7 @@ describe('MyBookings', () => {
     vi.setSystemTime(NOW);
     getMine = vi.fn(() => of(response()));
     cancel = vi.fn(() => of(undefined));
+    checkIn = vi.fn(() => of({ checkedInAt: CHECKED_IN_AT }));
   });
 
   afterEach(() => {
@@ -405,7 +422,7 @@ describe('MyBookings', () => {
       await render();
 
       expect(cancellableTitles()).toEqual(['Aula A1', 'Sala studio B2']);
-      const button = element.querySelector('mat-card-actions button')!;
+      const button = element.querySelector('button.cancel')!;
       expect(button.textContent!.trim()).toBe('Cancella');
       expect(button.getAttribute('aria-label')).toBe(
         'Cancella la prenotazione di Aula A1, giovedì 5 novembre 2026, 10:00–11:00',
@@ -639,6 +656,502 @@ describe('MyBookings', () => {
     });
   });
 
+  describe('used label', () => {
+    // Le 10:30 del campus, durante la prenotazione dell'«Aula A1» dalle 10:00 alle 11:00.
+    const DURING = new Date('2026-11-05T09:30:00Z');
+
+    function usedLabel(card: Element): HTMLElement | null {
+      return card.querySelector<HTMLElement>('.used');
+    }
+
+    it('is shown on an upcoming reservation with check-in, without Check-in and Cancella', async () => {
+      vi.setSystemTime(DURING);
+      getMine.mockReturnValue(
+        of(response({ upcoming: [reservation({ id: 'f1', checkedInAt: CHECKED_IN_AT })] })),
+      );
+      await render();
+
+      const card = element.querySelector('mat-card')!;
+      expect(usedLabel(card)!.textContent!.trim()).toBe('Usata');
+      expect(usedLabel(card)!.getAttribute('tabindex')).toBe('-1');
+      expect(await checkInButtons()).toEqual([]);
+      expect(await cancelButtons()).toEqual([]);
+    });
+
+    it('is shown on a past reservation with check-in', async () => {
+      getMine.mockReturnValue(
+        of(response({ past: [reservation({ ...PAST[0], checkedInAt: CHECKED_IN_AT })] })),
+      );
+      await render();
+
+      await selectTab('Passate');
+
+      expect(usedLabel(element.querySelector('mat-card')!)!.textContent!.trim()).toBe('Usata');
+    });
+
+    it('is not shown on reservations without check-in', async () => {
+      await render();
+
+      expect(element.querySelectorAll('.used').length).toBe(0);
+      expect(element.textContent).not.toContain('Usata');
+
+      await selectTab('Passate');
+      expect(titles()).toEqual(['Laboratorio C3']);
+      expect(element.textContent).not.toContain('Usata');
+    });
+
+    it('is shown to a member when another member of the group checked in', async () => {
+      vi.setSystemTime(new Date('2026-11-05T08:50:00Z'));
+      getMine.mockReturnValue(
+        of(
+          response({
+            upcoming: [
+              reservation({
+                isGroup: true,
+                isOrganizer: false,
+                organizerName: 'Mario Rossi',
+                checkedInAt: CHECKED_IN_AT,
+              }),
+            ],
+          }),
+        ),
+      );
+      await render();
+
+      expect(usedLabel(element.querySelector('mat-card')!)!.textContent!.trim()).toBe('Usata');
+      expect(await checkInButtons()).toEqual([]);
+    });
+
+    it('hides Cancella on an upcoming reservation of the organizer with check-in', async () => {
+      vi.setSystemTime(new Date('2026-11-05T08:50:00Z'));
+      getMine.mockReturnValue(
+        of(
+          response({
+            upcoming: [
+              reservation({ id: 'f1', checkedInAt: CHECKED_IN_AT }),
+              reservation({ id: 'f2', roomName: 'Sala studio B2' }),
+            ],
+          }),
+        ),
+      );
+      await render();
+
+      expect(cancellableTitles()).toEqual(['Sala studio B2']);
+    });
+  });
+
+  describe('check-in button', () => {
+    async function renderAt(now: string, item: Partial<MyReservationItem> = {}): Promise<void> {
+      vi.setSystemTime(new Date(now));
+      getMine.mockReturnValue(of(response({ upcoming: [reservation({ id: 'f1', ...item })] })));
+      await render();
+    }
+
+    async function onlyCheckInButton(): Promise<MatButtonHarness> {
+      const buttons = await checkInButtons();
+      expect(buttons.length).toBe(1);
+      return buttons[0];
+    }
+
+    function hint(): HTMLElement | null {
+      return element.querySelector<HTMLElement>('.check-in-hint');
+    }
+
+    async function expectEnabled(): Promise<void> {
+      const button = await onlyCheckInButton();
+      expect(await button.isDisabled()).toBe(false);
+      expect(hint()).toBeNull();
+      expect(element.textContent).not.toContain(HINT);
+      expect(await (await button.host()).getAttribute('aria-describedby')).toBeNull();
+    }
+
+    async function expectDisabledWithHint(): Promise<void> {
+      const button = await onlyCheckInButton();
+      expect(await button.isDisabled()).toBe(true);
+      expect(hint()!.textContent!.trim()).toBe(HINT);
+      const describedBy = await (await button.host()).getAttribute('aria-describedby');
+      expect(describedBy).toBe(hint()!.id);
+      expect(document.getElementById(describedBy!)!.textContent!.trim()).toBe(HINT);
+      // Disabilitato ma raggiungibile con Tab.
+      await button.focus();
+      expect(await button.isFocused()).toBe(true);
+    }
+
+    it('is enabled in the window with the expected accessible name', async () => {
+      // Le 09:50 del campus.
+      await renderAt('2026-11-05T08:50:00Z');
+
+      await expectEnabled();
+      const button = await onlyCheckInButton();
+      expect(await button.getText()).toBe('Check-in');
+      expect(await (await button.host()).getAttribute('aria-label')).toBe(
+        'Check-in per Aula A1, giovedì 5 novembre 2026, 10:00–11:00',
+      );
+    });
+
+    it('is enabled for a member of a group reservation in the window', async () => {
+      // Le 10:10 del campus.
+      await renderAt('2026-11-05T09:10:00Z', {
+        isGroup: true,
+        isOrganizer: false,
+        organizerName: 'Mario Rossi',
+      });
+
+      await expectEnabled();
+      expect(await cancelButtons()).toEqual([]);
+    });
+
+    it('is enabled exactly 15 minutes before the start', async () => {
+      await renderAt('2026-11-05T08:45:00Z');
+
+      await expectEnabled();
+    });
+
+    it('is enabled exactly 15 minutes after the start', async () => {
+      await renderAt('2026-11-05T09:15:00Z');
+
+      await expectEnabled();
+    });
+
+    it('is disabled with the explanation on a reservation of tomorrow', async () => {
+      await renderAt('2026-11-04T09:00:00Z');
+
+      await expectDisabledWithHint();
+    });
+
+    it('is disabled with the explanation an instant before the window', async () => {
+      await renderAt('2026-11-05T08:44:59.999Z');
+
+      await expectDisabledWithHint();
+    });
+
+    it('is disabled with the explanation on a reservation in progress past the window', async () => {
+      // Le 10:20 del campus.
+      await renderAt('2026-11-05T09:20:00Z');
+
+      await expectDisabledWithHint();
+    });
+
+    it('sends no request when the disabled button is clicked or activated from the keyboard', async () => {
+      await renderAt('2026-11-04T09:00:00Z');
+      const button = await onlyCheckInButton();
+
+      // jsdom non trasforma Invio e Spazio in un clic come fa il browser: il caso è coperto da
+      // button.click(), e la verifica da tastiera è nella prova manuale 2.5.
+      await button.click();
+      await button.focus();
+      await (await button.host()).sendKeys(TestKey.ENTER);
+      await (await button.host()).sendKeys(' ');
+      await fixture.whenStable();
+
+      expect(checkIn).not.toHaveBeenCalled();
+    });
+
+    it('is not shown on the Passate and Cancellate tabs', async () => {
+      await renderAt('2026-11-05T08:50:00Z');
+
+      await selectTab('Passate');
+      expect(titles()).toEqual(['Laboratorio C3']);
+      expect(await checkInButtons()).toEqual([]);
+
+      await selectTab('Cancellate');
+      expect(titles()).toEqual(['Aula D4']);
+      expect(await checkInButtons()).toEqual([]);
+    });
+
+    it('is shown together with Cancella on an upcoming reservation of the organizer', async () => {
+      await renderAt('2026-11-05T08:50:00Z');
+
+      expect(await checkInButtons()).toHaveLength(1);
+      expect(await cancelButtons()).toHaveLength(1);
+    });
+  });
+
+  describe('check-in window while the page is open', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    });
+
+    async function renderAt(now: string): Promise<void> {
+      vi.setSystemTime(new Date(now));
+      getMine.mockReturnValue(of(response({ upcoming: [reservation({ id: 'f1' })] })));
+      await render();
+    }
+
+    async function isDisabled(): Promise<boolean> {
+      return (await checkInButtons())[0].isDisabled();
+    }
+
+    it('enables the button when the window opens, without reloading the list', async () => {
+      // Le 09:44:40 del campus.
+      await renderAt('2026-11-05T08:44:40Z');
+      expect(await isDisabled()).toBe(true);
+
+      vi.advanceTimersByTime(30_000);
+      await fixture.whenStable();
+
+      expect(await isDisabled()).toBe(false);
+      expect(element.querySelector('.check-in-hint')).toBeNull();
+      expect(
+        await (await (await checkInButtons())[0].host()).getAttribute('aria-describedby'),
+      ).toBeNull();
+      expect(getMine).toHaveBeenCalledTimes(1);
+      expect(checkIn).not.toHaveBeenCalled();
+    });
+
+    it('disables the button when the window closes', async () => {
+      // Le 10:14:50 del campus.
+      await renderAt('2026-11-05T09:14:50Z');
+      expect(await isDisabled()).toBe(false);
+
+      vi.advanceTimersByTime(30_000);
+      await fixture.whenStable();
+
+      expect(await isDisabled()).toBe(true);
+      expect(element.querySelector('.check-in-hint')!.textContent!.trim()).toBe(HINT);
+      expect(getMine).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops the periodic refresh when the page is destroyed', async () => {
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+      const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+      await renderAt('2026-11-05T08:44:40Z');
+
+      // Il timer del ricalcolo: jsdom usa setInterval anche per requestAnimationFrame.
+      const index = setIntervalSpy.mock.calls.findIndex(([, delay]) => delay === 30_000);
+      expect(index).toBeGreaterThanOrEqual(0);
+      const handle = setIntervalSpy.mock.results[index].value;
+      expect(clearIntervalSpy).not.toHaveBeenCalledWith(handle);
+
+      fixture.destroy();
+
+      expect(clearIntervalSpy).toHaveBeenCalledWith(handle);
+    });
+  });
+
+  describe('checking in', () => {
+    // Le 09:55 del campus, nella finestra dell'«Aula A1» delle 10:00.
+    const IN_WINDOW = new Date('2026-11-05T08:55:00Z');
+
+    beforeEach(() => vi.setSystemTime(IN_WINDOW));
+
+    async function clickCheckIn(): Promise<void> {
+      const button = (await checkInButtons())[0];
+      await button.focus();
+      await button.click();
+      await fixture.whenStable();
+    }
+
+    function firstCard(): Element {
+      return element.querySelector('mat-card')!;
+    }
+
+    function problem(status: number, detail: string): HttpErrorResponse {
+      return new HttpErrorResponse({
+        status,
+        error: { title: 'Check-in non consentito', detail },
+      });
+    }
+
+    it('sends the request at once, without a confirmation dialog', async () => {
+      await render();
+
+      await clickCheckIn();
+
+      expect(checkIn).toHaveBeenCalledExactlyOnceWith('f1');
+      expect(await rootLoader.hasHarness(MatDialogHarness)).toBe(false);
+    });
+
+    it('sends a single request when activated twice while the request is pending', async () => {
+      const pending = new Subject<CheckInResponse>();
+      checkIn.mockReturnValue(pending);
+      await render();
+
+      const button = (await checkInButtons())[0];
+      await button.click();
+      await fixture.whenStable();
+      expect(await button.isDisabled()).toBe(true);
+      await button.click();
+      await fixture.whenStable();
+
+      expect(checkIn).toHaveBeenCalledTimes(1);
+      expect(await rootLoader.hasHarness(MatDialogHarness)).toBe(false);
+    });
+
+    it('shows Usata without Check-in and Cancella and does not reload the list', async () => {
+      await render();
+      expect(cancellableTitles()).toEqual(['Aula A1', 'Sala studio B2']);
+
+      await clickCheckIn();
+
+      const card = firstCard();
+      expect(text(card, 'mat-card-title')).toBe('Aula A1');
+      expect(text(card, '.used')).toBe('Usata');
+      expect(card.querySelector('button')).toBeNull();
+      expect(cancellableTitles()).toEqual(['Sala studio B2']);
+      expect(titles()).toEqual(['Aula A1', 'Sala studio B2']);
+      expect(await (await (await tabs()).getSelectedTab()).getLabel()).toBe('Future');
+      expect(getMine).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a snackbar without actions configured for 5 seconds', async () => {
+      await render();
+      const open = vi.spyOn(TestBed.inject(MatSnackBar), 'open');
+
+      await clickCheckIn();
+
+      expect(open).toHaveBeenCalledExactlyOnceWith('Check-in registrato.', undefined, {
+        duration: 5000,
+      });
+      const snackBar = await rootLoader.getHarness(MatSnackBarHarness);
+      expect(await snackBar.getMessage()).toBe('Check-in registrato.');
+      expect(await snackBar.hasAction()).toBe(false);
+    });
+
+    it('closes the snackbar by itself after 5 seconds', async () => {
+      // Stesso schema del test della snackbar di cancellazione.
+      vi.useFakeTimers({
+        toFake: ['Date', 'setTimeout', 'clearTimeout'],
+        shouldAdvanceTime: true,
+      });
+      vi.setSystemTime(IN_WINDOW);
+      await render();
+
+      await clickCheckIn();
+      expect(await rootLoader.hasHarness(MatSnackBarHarness)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(4000);
+      await fixture.whenStable();
+      expect(await rootLoader.hasHarness(MatSnackBarHarness)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await fixture.whenStable();
+      expect(await rootLoader.hasHarness(MatSnackBarHarness)).toBe(false);
+    });
+
+    it('moves the focus to the Usata label of the same reservation', async () => {
+      await render();
+
+      await clickCheckIn();
+
+      const used = firstCard().querySelector('.used');
+      expect(used).not.toBeNull();
+      expect(document.activeElement).toBe(used);
+    });
+
+    it.each([
+      [403, 'Non puoi fare il check-in di questa prenotazione.'],
+      [404, 'La prenotazione richiesta non esiste.'],
+      [422, HINT],
+      [422, 'Il check-in di questa prenotazione è già stato registrato.'],
+      [422, 'Non è possibile fare il check-in di una prenotazione cancellata.'],
+    ])('shows the detail of the %i response in the card', async (status, detail) => {
+      checkIn.mockReturnValue(throwError(() => problem(status, detail)));
+      await render();
+
+      await clickCheckIn();
+
+      const alert = firstCard().querySelector('[role="alert"]')!;
+      expect(alert.textContent!.trim()).toBe(detail);
+      expect(firstCard().querySelector('.used')).toBeNull();
+      expect(await (await checkInButtons())[0].isDisabled()).toBe(false);
+      expect(element.querySelectorAll('[role="alert"]').length).toBe(1);
+    });
+
+    it.each([
+      ['a 500 response', new HttpErrorResponse({ status: 500, statusText: 'Server Error' })],
+      ['no response', new HttpErrorResponse({ status: 0 })],
+    ])('shows the generic message on %s', async (_case, error) => {
+      checkIn.mockReturnValue(throwError(() => error));
+      await render();
+
+      await clickCheckIn();
+
+      expect(firstCard().querySelector('[role="alert"]')!.textContent!.trim()).toBe(
+        'Non è stato possibile registrare il check-in. Riprova più tardi.',
+      );
+      expect(firstCard().querySelector('.used')).toBeNull();
+    });
+
+    it('removes the alert on the next attempt', async () => {
+      const pending = new Subject<CheckInResponse>();
+      checkIn
+        .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 500 })))
+        .mockReturnValueOnce(pending);
+      await render();
+
+      await clickCheckIn();
+      expect(firstCard().querySelector('[role="alert"]')).not.toBeNull();
+
+      await clickCheckIn();
+      expect(checkIn).toHaveBeenCalledTimes(2);
+      expect(firstCard().querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('keeps the other reservations active while one check-in is pending', async () => {
+      const first = new Subject<CheckInResponse>();
+      const second = new Subject<CheckInResponse>();
+      checkIn.mockReturnValueOnce(first).mockReturnValueOnce(second);
+      getMine.mockReturnValue(
+        of(
+          response({
+            upcoming: [
+              reservation({ id: 'f1' }),
+              reservation({ id: 'f2', roomId: 'r2', roomName: 'Sala studio B2' }),
+            ],
+          }),
+        ),
+      );
+      await render();
+
+      const [buttonA, buttonB] = await checkInButtons();
+      await buttonA.click();
+      await fixture.whenStable();
+      expect(await buttonA.isDisabled()).toBe(true);
+      expect(await buttonB.isDisabled()).toBe(false);
+
+      await buttonB.click();
+      await fixture.whenStable();
+      expect(checkIn.mock.calls).toEqual([['f1'], ['f2']]);
+      expect(await buttonB.isDisabled()).toBe(true);
+
+      // La fine della prima richiesta non riattiva la seconda, ancora in corso.
+      first.error(new HttpErrorResponse({ status: 500 }));
+      await fixture.whenStable();
+      expect(await buttonA.isDisabled()).toBe(false);
+      expect(await buttonB.isDisabled()).toBe(true);
+    });
+
+    it('removes the check-in alerts when the list is reloaded', async () => {
+      checkIn.mockReturnValue(
+        throwError(() =>
+          problem(422, 'Il check-in di questa prenotazione è già stato registrato.'),
+        ),
+      );
+      getMine
+        .mockReturnValueOnce(of(response()))
+        .mockReturnValueOnce(
+          of(response({ upcoming: [UPCOMING[0]], cancelled: [UPCOMING[1], ...CANCELLED] })),
+        );
+      await render();
+
+      await clickCheckIn();
+      expect(element.querySelectorAll('[role="alert"]').length).toBe(1);
+
+      // Il ricaricamento dopo la cancellazione della «Sala studio B2».
+      await (await cancelButtons())[1].click();
+      await fixture.whenStable();
+      await (
+        await rootLoader.getHarness(MatButtonHarness.with({ text: 'Cancella prenotazione' }))
+      ).click();
+      await fixture.whenStable();
+
+      expect(getMine).toHaveBeenCalledTimes(2);
+      expect(titles()).toEqual(['Aula A1']);
+      expect(element.querySelectorAll('[role="alert"]').length).toBe(0);
+    });
+  });
+
   describe('loading and errors', () => {
     it('shows a progress bar while loading', async () => {
       const pending = new Subject<MyReservationsResponse>();
@@ -745,6 +1258,7 @@ describe('MyBookings with an expired session', () => {
       isGroup: false,
       organizerName: null,
       isOrganizer: true,
+      checkedInAt: null,
     };
     http.expectOne('/api/bookings/mine').flush({ upcoming: [upcoming], past: [], cancelled: [] });
     await harness.fixture.whenStable();
@@ -762,6 +1276,56 @@ describe('MyBookings with an expired session', () => {
     await harness.fixture.whenStable();
 
     expect(await loader.hasHarness(MatDialogHarness)).toBe(false);
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(await loader.hasHarness(MatSnackBarHarness)).toBe(false);
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(TestBed.inject(Router).url).toBe('/login?reason=expired&returnUrl=%2Fmy-bookings');
+    http.verify();
+  });
+
+  it('goes back to the login without alert on 401 when checking in', async () => {
+    sessionStorage.setItem('smartcampus.session', JSON.stringify(SESSION));
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'login', component: EmptyPage },
+          { path: 'my-bookings', component: MyBookings },
+        ]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
+      ],
+    });
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+    const harness = await RouterTestingHarness.create('/my-bookings');
+    const loader = TestbedHarnessEnvironment.documentRootLoader(harness.fixture);
+
+    // Qui l'ora del dispositivo è quella reale: prenotazione sintetica che inizia fra 5 minuti.
+    const start = Date.now() + 5 * 60_000;
+    const upcoming: MyReservationItem = {
+      id: 'f1',
+      roomId: 'r1',
+      roomName: 'Aula A1',
+      buildingName: 'Edificio A',
+      start: new Date(start).toISOString(),
+      end: new Date(start + 60 * 60_000).toISOString(),
+      isGroup: false,
+      organizerName: null,
+      isOrganizer: true,
+      checkedInAt: null,
+    };
+    http.expectOne('/api/bookings/mine').flush({ upcoming: [upcoming], past: [], cancelled: [] });
+    await harness.fixture.whenStable();
+
+    await (await loader.getHarness(MatButtonHarness.with({ text: 'Check-in' }))).click();
+    await harness.fixture.whenStable();
+
+    const request = http.expectOne('/api/bookings/f1/check-in');
+    expect(request.request.method).toBe('POST');
+    request.flush(null, { status: 401, statusText: 'Unauthorized' });
+    await harness.fixture.whenStable();
+
     expect(document.querySelector('[role="alert"]')).toBeNull();
     expect(await loader.hasHarness(MatSnackBarHarness)).toBe(false);
     expect(auth.isLoggedIn()).toBe(false);

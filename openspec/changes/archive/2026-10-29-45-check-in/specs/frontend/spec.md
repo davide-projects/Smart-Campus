@@ -145,7 +145,7 @@ A 375px di larghezza il pulsante «Check-in», il testo di spiegazione, l'etiche
 ## MODIFIED Requirements
 
 ### Requirement: Azione «Cancella» nelle prenotazioni future
-Nella scheda «Future» di «Le mie prenotazioni», le voci con `isOrganizer` = `true`, `checkedInAt` = `null` e inizio successivo all'ora del dispositivo, valutata al caricamento dell'elenco, SHALL mostrare il pulsante «Cancella». Le voci di cui l'utente è solo membro, quelle già iniziate, quelle con check-in (anche registrato nella pagina dopo il caricamento) e tutte le voci di «Passate» e «Cancellate» MUST NOT mostrarlo. Il nome accessibile del pulsante SHALL indicare spazio, giorno e orario della prenotazione.
+Nella scheda «Future» di «Le mie prenotazioni», le voci con `isOrganizer` = `true`, `checkedInAt` = `null` e inizio successivo all'ora del dispositivo al caricamento SHALL mostrare il pulsante «Cancella», con nome accessibile che indica spazio, giorno e orario. MUST NOT mostrarlo le voci di cui l'utente è solo membro, quelle già iniziate, quelle con check-in (anche registrato dopo il caricamento) e tutte le voci di «Passate» e «Cancellate».
 
 #### Scenario: Prenotazione futura creata dallo studente
 - **WHEN** Studente1 apre la pagina e nella scheda «Future» c'è la sua prenotazione dell'«Aula A1» di giovedì 5 novembre 2026 dalle 10:00 alle 11:00, non ancora iniziata e senza check-in

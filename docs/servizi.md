@@ -61,7 +61,7 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 **Cosa fa:** è il **cuore del prodotto**.
 - Registra le prenotazioni (`Reservation`): chi usa quale spazio e quando, **da solo o in gruppo**. In una prenotazione di gruppo chi prenota (organizzatore, `OrganizerId`) aggiunge altri studenti come membri (`ReservationMember`).
 - Calcola le fasce libere e garantisce le regole più importanti: **due prenotazioni confermate dello stesso spazio non si sovrappongono mai**, nemmeno se due persone premono "Prenota" nello stesso istante, e **nessuno può essere in due prenotazioni nello stesso orario**.
-- Registra ciò che è **successo davvero**: il check-in (fatto dall'organizzatore o da un membro) e le mancate presentazioni (`AttendanceRecord`).
+- Registra ciò che è **successo davvero**: il check-in (fatto dall'organizzatore, da un membro o dallo Staff, uno solo per prenotazione e valido per tutto il gruppo) e le mancate presentazioni (`AttendanceRecord`).
 - Produce i riepiloghi per il personale distinguendo sempre tre casi: *usato*, *non usato*, *nessuna informazione*. Quest'ultimo caso **non** viene mai trattato come "spazio vuoto".
 
 **Archivio:** prenotazioni, membri, check-in e mancate presentazioni, più una copia ridotta degli spazi prenotabili (`BookableRoom`: nome, nome dell'edificio, capienza, orari) ricevuta da Rooms. Così una prenotazione, e l'elenco «le mie prenotazioni» con spazio ed edificio, non dipendono dal fatto che Rooms risponda in quel momento. Con ogni prenotazione si salva anche il nome dell'organizzatore al momento della creazione.
@@ -69,13 +69,15 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 
 ### Come Bookings evita le sovrapposizioni (INV-1 e INV-8)
 
-Ogni nuova prenotazione viene creata dentro una transazione che prende **due lock** prima dei controlli:
+Ogni nuova prenotazione viene creata dentro una transazione che prende **due tipi di lock** prima dei controlli:
 
 1. **Lock sullo spazio (INV-1).** La riga dello spazio in `BookableRooms` si legge con `UPDLOCK, ROWLOCK`. Due richieste sullo stesso spazio passano una alla volta: la seconda aspetta che la prima abbia salvato, poi vede la fascia occupata e riceve `409`.
 2. **Lock sulla persona (INV-8).** Il lock sullo spazio non basta, perché la stessa persona potrebbe prenotare due spazi **diversi** nello stesso orario. Per questo si usa `sp_getapplock` di SQL Server su una risorsa `user:{id}`.
    - Non serve una tabella né una migrazione: il lock esiste solo nella memoria di SQL Server.
    - È legato alla transazione (`@LockOwner = 'Transaction'`): si libera da solo al commit o al rollback, anche se il servizio va in errore.
    - Se dopo **10 secondi** di attesa il lock non è ancora libero, la richiesta termina con `409` e il messaggio "Hai un'altra prenotazione in corso, riprova tra qualche secondo."; non resta nulla di salvato a metà.
+   - In una **prenotazione di gruppo** (US-05) il lock si prende su ogni persona coinvolta: organizzatore **e** membri, uno alla volta e in **ordine crescente di id**. Così due richieste che coinvolgono le stesse persone (per esempio Mario con Anna come membro e, nello stesso istante, Anna con Mario) prendono i lock nello stesso ordine: la seconda aspetta la prima invece di bloccarsi a vicenda. Se il lock di un membro non arriva entro 10 secondi il messaggio è "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.". L'ordine complessivo resta "prima lo spazio, poi le persone per id": nessun ciclo, nessun deadlock.
+   - Al massimo 10 membri per prenotazione, quindi al massimo 11 lock sulle persone per richiesta.
 
 L'alternativa scartata è un vincolo nel database: SQL Server non ha un vincolo nativo "intervalli che non si sovrappongono", e simularlo con le fasce da 30 minuti avrebbe richiesto una tabella in più.
 
@@ -87,8 +89,20 @@ L'alternativa scartata è un vincolo nel database: SQL Server non ha un vincolo 
 
 Ci sono due modi:
 
-1. **Domanda e risposta (HTTP):** "dammi gli spazi con almeno 30 posti". Chi chiede aspetta la risposta. Lo usa il Web, tramite il Gateway.
+1. **Domanda e risposta (HTTP):** "dammi gli spazi con almeno 30 posti". Chi chiede aspetta la risposta. Lo usa il Web, tramite il Gateway, e in un solo caso un servizio verso un altro (vedi sotto).
 2. **Messaggi (eventi):** un servizio annuncia "è successo questo" e chi è interessato lo riceve. Chi annuncia non aspetta nessuno. I messaggi passano da **RabbitMQ**, una specie di bacheca/postino.
+
+| Chiamata HTTP tra servizi | Chi chiama | Chi risponde | Quando | Perché |
+|---|---|---|---|---|
+| `POST /internal/users/students/check` | Bookings | Identity | Solo per una prenotazione con membri, **prima** di aprire la transazione e di prendere i lock | Sapere se i membri sono studenti registrati (INV-9): utenti e ruoli li conosce solo Identity |
+
+È la **prima e unica chiamata sincrona tra servizi** del progetto. Le regole:
+- passa sulla rete interna, senza il Gateway: `/internal/**` non ha una route nel Gateway, che risponde `404`. L'indirizzo è nella configurazione di Bookings, `Services:Identity:BaseAddress` (`http://localhost:5101` in locale, `http://identity:8080` in Docker Compose); senza un indirizzo `http`/`https` assoluto Bookings non parte;
+- Bookings inoltra il token di chi prenota (intestazione `Authorization`), senza credenziali proprie né segreti nuovi; il token non finisce mai nei log;
+- attesa massima **3 secondi**, nessun nuovo tentativo: se Identity è spento, lento, risponde con un errore o con una risposta non leggibile, la prenotazione di gruppo riceve `503` "Non è possibile verificare i membri in questo momento. Riprova tra poco." e non salva nulla. Le prenotazioni **singole** non chiamano Identity e funzionano anche con Identity spento;
+- il ruolo è letto un istante prima del commit: se cambiasse proprio in quell'istante, la prenotazione userebbe il ruolo precedente. Oggi i ruoli non cambiano a runtime.
+
+L'alternativa scartata è una copia degli utenti in Bookings aggiornata con eventi (come `BookableRoom` per gli spazi): più robusta, ma con eventi, outbox, tabella e migrazione nuovi, e con consistenza eventuale su un controllo di sicurezza. Dettagli nel design della change `16-prenotare-per-un-gruppo`.
 
 | Messaggio | Significato | Chi lo manda | Chi lo riceve | Perché |
 |---|---|---|---|---|

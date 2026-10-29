@@ -1,11 +1,13 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
-import { DailyAvailability } from '../models/availability.model';
+import { DailyAvailability, AvailabilitySearchFilter, AvailableRoomResponse } from '../models/availability.model';
 import {
+  CheckInResponse,
   CreateReservationRequest,
   FutureReservationsCountResponse,
   MyReservationsResponse,
+  ReservationListItem,
   ReservationResponse,
 } from '../models/booking.model';
 
@@ -32,6 +34,14 @@ export class BookingsService {
     return this.http.delete<void>(`/api/bookings/${encodeURIComponent(id)}`);
   }
 
+  // Registra il check-in di una prenotazione, valido per tutto il gruppo. Richiesta senza corpo.
+  checkIn(id: string): Observable<CheckInResponse> {
+    return this.http.post<CheckInResponse>(
+      `/api/bookings/${encodeURIComponent(id)}/check-in`,
+      null,
+    );
+  }
+
   // Crea una prenotazione singola confermata a nome dell'utente autenticato.
   create(request: CreateReservationRequest): Observable<ReservationResponse> {
     return this.http.post<ReservationResponse>('/api/bookings', request);
@@ -42,5 +52,30 @@ export class BookingsService {
     return this.http
       .get<FutureReservationsCountResponse>(`/api/bookings/rooms/${roomId}/future-reservations-count`)
       .pipe(map((response) => response.count));
+  }
+
+  // Cerca gli spazi liberi in una data e fascia oraria, con filtri opzionali per tipo e capienza.
+  searchAvailableRooms(filter: AvailabilitySearchFilter): Observable<AvailableRoomResponse[]> {
+    let params = new HttpParams()
+      .set('date', filter.date)
+      .set('start', filter.start)
+      .set('end', filter.end);
+
+    if (filter.type) {
+      params = params.set('type', filter.type);
+    }
+    if (filter.minCapacity != null && filter.minCapacity > 0) {
+      params = params.set('minCapacity', filter.minCapacity.toString());
+    }
+
+    return this.http.get<AvailableRoomResponse[]>('/api/bookings/availability/search', { params });
+  }
+
+  // Elenco delle prenotazioni di uno spazio in un giorno (riservato al personale).
+  getReservations(roomId: string, date: string): Observable<ReservationListItem[]> {
+    const params = new HttpParams()
+      .set('roomId', roomId)
+      .set('date', date);
+    return this.http.get<ReservationListItem[]>('/api/bookings', { params });
   }
 }

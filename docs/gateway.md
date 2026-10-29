@@ -34,6 +34,8 @@ Note:
 - Su una route anonima (catalogo) un token scaduto o non valido **non** blocca la richiesta: viene ignorato.
 - **Ogni nuova route deve dichiarare la propria `AuthorizationPolicy`.** Un test (`EveryRoute_DeclaresItsAccessPolicy`) fallisce se manca, così nessuna route resta aperta per dimenticanza.
 - Gli endpoint `/health/live` e `/health/ready` del Gateway sono anonimi.
+- `GET /api/identity/students` (ricerca degli studenti, US-05) è coperta dalla route `identity`: il Gateway inoltra i token `Student` e `Staff`, e il `403` per lo `Staff` lo restituisce Identity.
+- **`/internal/**` non ha route.** Gli endpoint interni dei servizi (per esempio `POST /internal/users/students/check` di Identity, usato da Bookings) stanno fuori da `/api`: il Gateway risponde `404`, con o senza token, e la richiesta non arriva al servizio. Non c'è una regola che li blocca: semplicemente nessuna route li raggiunge, quindi non va aggiunta una route con un percorso che li includa.
 
 ## Configurazione
 
@@ -62,6 +64,9 @@ Con Identity, Rooms, Bookings e Gateway avviati:
 6. `GET http://localhost:5000/api/bookings/rooms/<id dello spazio>/future-reservations-count`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con il conteggio (o `404` se lo spazio non esiste).
 7. `GET http://localhost:5000/api/bookings?roomId=<id dello spazio>&date=2026-11-03`: senza token → `401`, con il token di `student1` → `403`, con quello di `staff1` → `200` con l'elenco delle prenotazioni di quel giorno (o `404` se lo spazio non esiste).
 8. `DELETE http://localhost:5000/api/bookings/<id della prenotazione>` su una prenotazione futura di `student1` (creata con `POST /api/bookings` e il suo token): senza token → `401` dal Gateway; con il token di un altro studente (per esempio `student2`) → `403` «Non puoi cancellare questa prenotazione.»; con il token di `student1` → `204`, e la fascia torna libera in `GET /api/bookings/availability`.
+9. `POST http://localhost:5000/api/bookings/<id della prenotazione>/check-in`, senza corpo, su una prenotazione di `student1` che inizia entro 15 minuti. Si prenota solo alla mezz'ora e non nel passato, quindi va creata con `POST /api/bookings` nei 15 minuti prima di una fascia (per esempio alle 10:50 per le 11:00). Senza token → `401` dal Gateway; con il token di `student2` (estraneo) → `403` «Non puoi fare il check-in di questa prenotazione.»; con il token di `student1` → `200` con `checkedInAt`; secondo invio → `422` «Il check-in di questa prenotazione è già stato registrato.»; poi `DELETE` della stessa prenotazione con il token di `student1` → `422` «Non è possibile cancellare una prenotazione già usata.».
+10. `GET http://localhost:5000/api/identity/students?search=bia`: senza token → `401`; con il token di `student1` → `200` con Anna Bianchi; con quello di `staff1` → `403` «Ricerca non consentita» da Identity.
+11. `POST http://localhost:5000/internal/users/students/check` con il token di `student1` e corpo `{ "userIds": ["a0000000-0000-0000-0000-000000000002"] }` → `404`: l'endpoint interno non è raggiungibile dal Gateway.
 
 ### Avvio senza chiave
 
@@ -82,7 +87,7 @@ dotnet test tests/Gateway/SmartCampus.Gateway.IntegrationTests
 
 ## Limiti noti
 
-- **Rooms e Bookings rivalidano il token** con `AddSmartCampusJwtBearer` (stessa configurazione `Jwt` del Gateway), anche quando la richiesta passa dal Gateway. Rooms applica inoltre il ruolo `Staff` alle route di scrittura; Bookings richiede un utente autenticato su tutte le route di `/api/bookings` e ricava chi prenota dal claim `sub` del token verificato. Chiamare direttamente la porta di Bookings in locale, senza token valido, dà `401`; per Rooms vale per le route `Staff` (il catalogo resta pubblico). Identity valida il token solo per `GET /api/identity/me`. In Docker Compose solo il Gateway è esposto all'host.
+- **Rooms e Bookings rivalidano il token** con `AddSmartCampusJwtBearer` (stessa configurazione `Jwt` del Gateway), anche quando la richiesta passa dal Gateway. Rooms applica inoltre il ruolo `Staff` alle route di scrittura; Bookings richiede un utente autenticato su tutte le route di `/api/bookings` e ricava chi prenota dal claim `sub` del token verificato. Chiamare direttamente la porta di Bookings in locale, senza token valido, dà `401`; per Rooms vale per le route `Staff` (il catalogo resta pubblico). Identity valida il token per `GET /api/identity/me`, `GET /api/identity/students` (dove richiede anche il ruolo `Student`) e per l'endpoint interno `POST /internal/users/students/check`, che non passa dal Gateway. In Docker Compose solo il Gateway è esposto all'host.
 - **Il ruolo `Staff` su `future-reservations-count` è controllato solo dal Gateway:** Bookings, chiamato direttamente, lo accetta da qualsiasi utente autenticato.
 - Il ruolo letto dal Gateway è quello scritto nel token al momento del login: se cambia, vale il vecchio fino alla scadenza.
 - Nessuna revoca dei token: vale quanto scritto in [identity.md](identity.md#limiti-noti).

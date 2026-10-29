@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using SmartCampus.Bookings.Api.Consumers;
+using SmartCampus.Bookings.Api.Features.Reservations;
 using Testcontainers.MsSql;
 
 namespace SmartCampus.Bookings.IntegrationTests;
@@ -39,6 +40,9 @@ public sealed class BookingsApiFixture : IAsyncLifetime
 
     // "Adesso" del servizio: i test lo fissano per controllare la divisione tra future e passate.
     public TestClock Clock { get; } = new();
+
+    // Identity finta: risponde alla verifica dei membri al posto del servizio vero.
+    public FakeIdentity Identity { get; } = new();
 
     // Connection string del container, per i test che creano un database a parte (es. la migrazione).
     public string ConnectionString => _database.GetConnectionString();
@@ -73,6 +77,10 @@ public sealed class BookingsApiFixture : IAsyncLifetime
 
                     // Orologio controllabile al posto di TimeProvider.System.
                     services.AddSingleton<TimeProvider>(Clock);
+
+                    // IdentityClient parla con la Identity finta invece che con la rete.
+                    services.AddHttpClient<IdentityClient>()
+                        .ConfigurePrimaryHttpMessageHandler(() => new FakeIdentityHandler(Identity));
                 });
             });
 

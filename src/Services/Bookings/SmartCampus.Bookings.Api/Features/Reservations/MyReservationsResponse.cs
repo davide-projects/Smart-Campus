@@ -8,6 +8,7 @@ public sealed record MyReservationsResponse(
 
 // Una prenotazione dell'utente, come organizzatore o come membro.
 // BuildingName e OrganizerName sono null quando Bookings non li conosce (dati precedenti a US-07).
+// CheckedInAt è l'istante del check-in (US-14), fatto da chiunque; null se la prenotazione non ce l'ha.
 public sealed record MyReservationItem(
     Guid Id,
     Guid RoomId,
@@ -17,4 +18,5 @@ public sealed record MyReservationItem(
     DateTimeOffset End,
     bool IsGroup,
     string? OrganizerName,
-    bool IsOrganizer);
+    bool IsOrganizer,
+    DateTimeOffset? CheckedInAt);

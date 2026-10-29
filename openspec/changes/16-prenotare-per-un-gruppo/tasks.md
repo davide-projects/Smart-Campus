@@ -6,33 +6,33 @@ Ordine: gruppo 1 (#123) → gruppo 2 (#17) → gruppo 3 (#18). Il gruppo 2 usa u
 
 Area: `svc:identity`.
 
-- [ ] 1.1 Mappare in `Program.cs` un gruppo `/internal` con `RequireAuthorization()`, separato da `/api/identity`, e registrare `POST /internal/users/students/check` (nuovo file in `Endpoints/`, es. `InternalUserEndpoints.cs`). Richiesta `{ userIds }`, risposta `{ students: [{ id, displayName }], notStudents: [...] }` con una sola query sugli id distinti; `400` ValidationProblem per corpo mancante, `userIds` mancante o vuoto. Verificare con i test 1.3.
-- [ ] 1.2 Aggiungere `GET /api/identity/students?search=` in `IdentityEndpoints` con `RequireAuthorization()`. Chi cerca con claim `role` diverso da `Student` → `403` «Ricerca non consentita» / «Solo gli studenti possono cercare altri studenti.». Risultati solo `Role = Student`, escluso il `sub` (con `sub` non GUID → `401`), `Contains` su `DisplayName` o `Username`, ordine per `DisplayName` e poi `Username`, `Take(10)`, campi `id`, `username`, `displayName`. Testo con meno di 2 caratteri dopo `Trim()` → `400` sul campo `search` con «Scrivi almeno 2 caratteri per cercare.». Verificare con i test 1.4.
-- [ ] 1.3 Test di integrazione in `tests/Identity/SmartCampus.Identity.IntegrationTests` (nuova classe, es. `StudentsCheckTests`) con i token degli utenti di seed: tutti studenti; `Staff` e id inesistente in `notStudents`; id ripetuto una sola volta; `401` senza token e con token firmato con un'altra chiave; `200` con token `Student`; `400` con `userIds` vuoto e con un valore non GUID; `POST /api/identity/internal/users/students/check` → `404`. `dotnet test tests/Identity/SmartCampus.Identity.IntegrationTests` verde.
-- [ ] 1.4 Test di integrazione della ricerca (es. `StudentSearchTests`): per nome (`bia`) e per username senza distinzione di maiuscole (`STUDENT3`); `Staff` esclusi (`Conti` → `[]`); chi cerca escluso (`Rossi` cercato da Mario Rossi); solo i tre campi nel JSON; `400` con un carattere e senza `search`; al massimo 10 risultati nell'ordine previsto, inserendo nel database del test altri studenti sintetici fino a superare 10; `401` senza token; `403` con il token di `staff1` e il messaggio della spec. Test verdi.
-- [ ] 1.5 Test in `tests/Gateway/SmartCampus.Gateway.IntegrationTests` (in `AccessRulesTests` o in una nuova classe): `POST /internal/users/students/check` sul Gateway, con un token valido e senza token, riceve `404` e il servizio a valle finto non riceve richieste; `GET /api/identity/students?search=bia` senza token → `401`, con token `Student` o `Staff` → inoltrata (il `403` dello `Staff` lo dà Identity). Nessuna modifica a `appsettings.json` del Gateway. `dotnet test tests/Gateway/SmartCampus.Gateway.IntegrationTests` verde.
-- [ ] 1.6 Documentazione:
+- [x] 1.1 Mappare in `Program.cs` un gruppo `/internal` con `RequireAuthorization()`, separato da `/api/identity`, e registrare `POST /internal/users/students/check` (nuovo file in `Endpoints/`, es. `InternalUserEndpoints.cs`). Richiesta `{ userIds }`, risposta `{ students: [{ id, displayName }], notStudents: [...] }` con una sola query sugli id distinti; `400` ValidationProblem per corpo mancante, `userIds` mancante o vuoto. Verificare con i test 1.3.
+- [x] 1.2 Aggiungere `GET /api/identity/students?search=` in `IdentityEndpoints` con `RequireAuthorization()`. Chi cerca con claim `role` diverso da `Student` → `403` «Ricerca non consentita» / «Solo gli studenti possono cercare altri studenti.». Risultati solo `Role = Student`, escluso il `sub` (con `sub` non GUID → `401`), `Contains` su `DisplayName` o `Username`, ordine per `DisplayName` e poi `Username`, `Take(10)`, campi `id`, `username`, `displayName`. Testo con meno di 2 caratteri dopo `Trim()` → `400` sul campo `search` con «Scrivi almeno 2 caratteri per cercare.». Verificare con i test 1.4.
+- [x] 1.3 Test di integrazione in `tests/Identity/SmartCampus.Identity.IntegrationTests` (nuova classe, es. `StudentsCheckTests`) con i token degli utenti di seed: tutti studenti; `Staff` e id inesistente in `notStudents`; id ripetuto una sola volta; `401` senza token e con token firmato con un'altra chiave; `200` con token `Student`; `400` con `userIds` vuoto e con un valore non GUID; `POST /api/identity/internal/users/students/check` → `404`. `dotnet test tests/Identity/SmartCampus.Identity.IntegrationTests` verde.
+- [x] 1.4 Test di integrazione della ricerca (es. `StudentSearchTests`): per nome (`bia`) e per username senza distinzione di maiuscole (`STUDENT3`); `Staff` esclusi (`Conti` → `[]`); chi cerca escluso (`Rossi` cercato da Mario Rossi); solo i tre campi nel JSON; `400` con un carattere e senza `search`; al massimo 10 risultati nell'ordine previsto, inserendo nel database del test altri studenti sintetici fino a superare 10; `401` senza token; `403` con il token di `staff1` e il messaggio della spec. Test verdi.
+- [x] 1.5 Test in `tests/Gateway/SmartCampus.Gateway.IntegrationTests` (in `AccessRulesTests` o in una nuova classe): `POST /internal/users/students/check` sul Gateway, con un token valido e senza token, riceve `404` e il servizio a valle finto non riceve richieste; `GET /api/identity/students?search=bia` senza token → `401`, con token `Student` o `Staff` → inoltrata (il `403` dello `Staff` lo dà Identity). Nessuna modifica a `appsettings.json` del Gateway. `dotnet test tests/Gateway/SmartCampus.Gateway.IntegrationTests` verde.
+- [x] 1.6 Documentazione:
   - `docs/endpoints.md`: riga `GET /api/identity/students` nella tabella di Identity, più una sottosezione «Endpoint interni (non instradati dal Gateway)» con `POST /internal/users/students/check` (accesso, corpo, risposta, `400`/`401`);
   - `docs/identity.md`: tabella API, endpoint interno, limiti della ricerca (solo per gli studenti, `403` per lo `Staff`; 2 caratteri, 10 risultati, solo studenti nei risultati, escluso chi cerca);
   - `docs/gateway.md`: `/internal/**` non ha route e riceve `404`; in «Limiti noti», Identity valida il token anche sulle nuove route; passo di prova manuale;
   - `docs/handoff-architettura.md` 6.3: le due route.
 
   Verificare che route e messaggi citati coincidano con il codice.
-- [ ] 1.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
+- [x] 1.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
 
 ## 2. Bookings: prenotazione con membri del gruppo (#17)
 
 Area: `svc:bookings`.
 
-- [ ] 2.1 Aggiungere `MemberIds` (`IReadOnlyList<Guid>?`) a `CreateReservationRequest` e `ReservationRules.ValidateMembers(memberIds, organizerId)` (più di `MaxMembers` = 10 id, poi organizzatore tra i membri, poi membri ripetuti → `422` «Membri non validi» con i tre messaggi della spec), chiamata dopo `ValidateRequest`. Aggiungere i rifiuti `StaffGroupForbidden()` (`403` «Prenotazione di gruppo non consentita» / «Il personale non può creare prenotazioni di gruppo.»), `CapacityExceeded(capacity)` («Capienza superata» / «Lo spazio ospita al massimo N persone.»), `MemberConflict()` («Membro già impegnato» / «Uno o più membri hanno già una prenotazione in questa fascia.»), `MemberLockTimeout()`, `NotStudents()` e `MembersCheckUnavailable()` (`503`). Unit test in `ReservationRulesTests`: `null` e vuoto validi, 10 membri validi, 11 rifiutati (anche con duplicati tra gli 11), organizzatore incluso, duplicato, capienza uguale (valida) e superata di uno.
-- [ ] 2.2 Creare `IdentityClient` (HttpClient tipizzato) registrato con `AddHttpClient` in `Program.cs`:
-  - `BaseAddress` da `Services:Identity:BaseAddress`, che all'avvio deve essere un URI assoluto, altrimenti il servizio si ferma con un messaggio che nomina la chiave;
+- [x] 2.1 Aggiungere `MemberIds` (`IReadOnlyList<Guid>?`) a `CreateReservationRequest` e `ReservationRules.ValidateMembers(memberIds, organizerId)` (più di `MaxMembers` = 10 id, poi organizzatore tra i membri, poi membri ripetuti → `422` «Membri non validi» con i tre messaggi della spec), chiamata dopo `ValidateRequest`. Aggiungere i rifiuti `StaffGroupForbidden()` (`403` «Prenotazione di gruppo non consentita» / «Il personale non può creare prenotazioni di gruppo.»), `CapacityExceeded(capacity)` («Capienza superata» / «Lo spazio ospita al massimo N persone.»), `MemberConflict()` («Membro già impegnato» / «Uno o più membri hanno già una prenotazione in questa fascia.»), `MemberLockTimeout()`, `NotStudents()` e `MembersCheckUnavailable()` (`503`). Ogni rifiuto ha il `code` della tabella «Codici di motivo» del design: aggiungere a `RejectionCodes` `group-booking-forbidden`, `too-many-members`, `organizer-as-member`, `duplicate-members`, `members-not-students`, `members-check-unavailable`, `member-booking-in-progress`, `capacity-exceeded`, `members-occupied` (togliendo il commento che li annuncia), con `limits` `maxMembers` per i troppi membri e `maxParticipants` per la capienza. Unit test in `ReservationRulesTests`: `null` e vuoto validi, 10 membri validi, 11 rifiutati (anche con duplicati tra gli 11), organizzatore incluso, duplicato, capienza uguale (valida) e superata di uno; per ogni rifiuto `Code` e `Limits` attesi (anche in `RejectionCodesTests`).
+- [x] 2.2 Creare `IdentityClient` (HttpClient tipizzato) registrato con `AddHttpClient` in `Program.cs`:
+  - `BaseAddress` da `Services:Identity:BaseAddress`, che all'avvio deve essere un URI assoluto `http` o `https`, altrimenti il servizio si ferma con un messaggio che nomina la chiave;
   - `Timeout` 3 s, nessun retry e nessun pacchetto nuovo;
   - inoltra l'intestazione `Authorization` ricevuta;
   - riduce timeout, errori di rete, risposte non `200` e JSON non leggibile all'esito «non disponibile», con un `LogWarning` senza id, nomi né token.
 
   Aggiungere `"Services": { "Identity": { "BaseAddress": "http://localhost:5101" } }` in `appsettings.json`. Verificare con i test 2.4.
-- [ ] 2.3 Aggiornare `CreateReservationAsync` nell'ordine della decisione 4 del design:
+- [x] 2.3 Aggiornare `CreateReservationAsync` nell'ordine della decisione 4 del design:
   - subito dopo il controllo del token, `403` se `user.IsInRole(StaffRole)` e `memberIds` non è vuoto;
   - verifica dei membri con Identity solo se ce ne sono, prima della transazione e fuori da `strategy.ExecuteAsync` (`503` / `422`);
   - lock `user:{id}` per organizzatore e membri in ordine crescente di id, con il messaggio di timeout dell'organizzatore o del membro;
@@ -42,7 +42,7 @@ Area: `svc:bookings`.
   - `.ProducesProblem(403)` e `.ProducesProblem(503)` sulla route.
 
   Verificare con i test 2.4 e 2.5.
-- [ ] 2.4 Test di integrazione (Testcontainers) in una nuova classe (es. `GroupReservationTests`). Nella fixture Identity è finta: `ConfigureTestServices` sostituisce l'handler primario di `IdentityClient` con uno stub che risponde a seconda del caso e registra le richieste ricevute. Casi:
+- [x] 2.4 Test di integrazione (Testcontainers) in una nuova classe (es. `GroupReservationTests`). Nella fixture Identity è finta: `ConfigureTestServices` sostituisce l'handler primario di `IdentityClient` con uno stub che risponde a seconda del caso e registra le richieste ricevute. Casi:
   - `201` con 2 membri e `participants` = 3, membri salvati e visibili nella lista Staff;
   - stub chiamato una sola volta, con gli id e con la stessa intestazione `Authorization`;
   - nessuna chiamata senza membri o con `memberIds` = `[]`;
@@ -57,8 +57,8 @@ Area: `svc:bookings`.
   - Identity che non risponde entro 3 s, risponde `500`, risponde JSON non valido o è irraggiungibile → `503` con il messaggio della spec;
   - prenotazione singola con lo stub che fallirebbe → `201`.
 
-  In ogni rifiuto, verificare nel database che non esistano né `Reservation` né `ReservationMembers` nuovi. `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` verde.
-- [ ] 2.5 Test di permessi, visibilità e concorrenza:
+  In ogni rifiuto, verificare `code` (e `limits` per troppi membri e capienza) nel `ProblemDetails`, e nel database che non esistano né `Reservation` né `ReservationMembers` nuovi. Togliere da `RejectionResponseTests` il commento che rimanda a US-05. `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` verde.
+- [x] 2.5 Test di permessi, visibilità e concorrenza:
   - prenotazione di gruppo creata con la `POST`, poi `GET /api/bookings/mine` di ogni membro (`upcoming`, `isGroup` = `true`, `isOrganizer` = `false`, `organizerName`) e dell'organizzatore (una sola volta);
   - `DELETE` del membro → `403` con la prenotazione invariata;
   - `PUT` e `PATCH` su `/api/bookings/{id}` → `405` con membri invariati;
@@ -66,15 +66,15 @@ Area: `svc:bookings`.
   - timeout del lock di un membro, tenendo `sp_getapplock` su `user:{membro}` da una connessione separata → `409` con il messaggio del membro.
 
   Eseguire la suite tre volte consecutive con esito verde.
-- [ ] 2.6 Configurazione e documentazione:
+- [x] 2.6 Configurazione e documentazione:
   - `docker-compose.yml`: `Services__Identity__BaseAddress: http://identity:8080` e `identity` in `depends_on` di `bookings`;
   - `docs/endpoints.md`: riga della `POST` con `memberIds` (al massimo 10), `participants`, il `403` per lo `Staff` con membri, i nuovi `422`, `409` e `503`;
   - `docs/servizi.md`: chiamata HTTP Bookings → Identity in «Come si parlano i servizi», lock sui membri in «Come Bookings evita le sovrapposizioni»;
   - `docs/architettura.md`: Bookings, verifica dei membri e chiave `Services:Identity:BaseAddress`;
-  - `docs/handoff-architettura.md`: F1 con la verifica dei membri, tabella degli errori 6.2 con i messaggi definitivi.
+  - `docs/handoff-architettura.md`: F1 con la verifica dei membri, tabella degli errori 6.2 con i messaggi definitivi e i `code` dei nuovi rifiuti (tolto «*(con US-05)*», `maxParticipants` per la capienza).
 
   Verificare con `docker compose up --build`: una prenotazione con `student2` come membro dà `201` e compare in «Le mie prenotazioni» di `student2`; con `identity` fermo (`docker compose stop identity`) la stessa richiesta dà `503` e una prenotazione singola dà `201`. Riportare l'esito nella PR.
-- [ ] 2.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
+- [x] 2.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
 
 ## 3. Frontend: scelta dei membri nel modulo di prenotazione (#18)
 

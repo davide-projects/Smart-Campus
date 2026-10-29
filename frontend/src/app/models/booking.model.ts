@@ -10,6 +10,8 @@ export interface MyReservationItem {
   isGroup: boolean;
   organizerName: string | null;
   isOrganizer: boolean;
+  // Istante del check-in (ISO 8601, UTC); null se la prenotazione non è ancora stata usata.
+  checkedInAt: string | null;
 }
 
 // Risposta di GET /api/bookings/mine: le tre sezioni della pagina «Le mie prenotazioni».
@@ -42,10 +44,39 @@ export interface ReservationResponse {
   status: ReservationStatus;
 }
 
+// Risposta di POST /api/bookings/{id}/check-in con il 200.
+export interface CheckInResponse {
+  checkedInAt: string;
+}
+
+// Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio, estremi inclusi.
+const CHECK_IN_BEFORE_MS = 15 * 60_000;
+const CHECK_IN_AFTER_MS = 15 * 60_000;
+
+// Vero se l'istante now (millisecondi dall'epoca) è nella finestra del check-in della prenotazione.
+// Confronta istanti assoluti, quindi non dipende dal fuso del dispositivo.
+export function isInCheckInWindow(item: Pick<MyReservationItem, 'start'>, now: number): boolean {
+  const start = Date.parse(item.start);
+  return start - CHECK_IN_BEFORE_MS <= now && now <= start + CHECK_IN_AFTER_MS;
+}
+
 // Risposta di GET /api/bookings/rooms/{id}/future-reservations-count (solo personale).
 export interface FutureReservationsCountResponse {
   roomId: string;
   count: number;
+}
+
+// Elemento dell'elenco delle prenotazioni di uno spazio per un giorno (GET /api/bookings?roomId=...&date=...).
+export interface ReservationListItem {
+  id: string;
+  start: string;
+  end: string;
+  organizerId: string;
+  organizerName?: string | null;
+  participants: number;
+  memberIds: string[];
+  status: ReservationStatus;
+  cancelledAt: string | null;
 }
 
 // Intervallo libero dello stesso spazio e giorno di una prenotazione rifiutata per conflitto: le fasce
@@ -72,18 +103,17 @@ const TIME_FORMAT = new Intl.DateTimeFormat('it-IT', {
   minute: '2-digit',
 });
 
+// Orario della fascia in ora del campus, es. «10:00 – 11:00» o con separatore personalizzato.
+export function formatTimeRange(startIso: string, endIso: string, separator = ' – '): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  return `${TIME_FORMAT.format(start)}${separator}${TIME_FORMAT.format(end)}`;
+}
+
 // Es. «giovedì 5 novembre 2026, 10:00–11:00».
 export function reservationTimeLabel(item: { start: string; end: string }): string {
   const start = new Date(item.start);
-  const end = new Date(item.end);
-  return `${DAY_FORMAT.format(start)}, ${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
-}
-
-// Es. «08:00–10:00»: inizio e fine nell'ora del campus.
-export function timeRangeLabel(range: { start: string; end: string }): string {
-  const start = new Date(range.start);
-  const end = new Date(range.end);
-  return `${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
+  return `${DAY_FORMAT.format(start)}, ${formatTimeRange(item.start, item.end, '–')}`;
 }
 
 // Scostamento dall'ora UTC del campus in un istante, es. «GMT+01:00» (solo «GMT» quando è zero).
@@ -187,4 +217,45 @@ export function toIsoDate(date: Date): string {
 // Aggiunge un numero di giorni a una data (es. per calcolare la finestra massima di 14 giorni)
 export function addDays(day: Date, days: number): Date {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate() + days);
+}
+
+// «08:00:00» o «08:30» → 480 / 510 minuti da mezzanotte.
+export function toMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// Orari «HH:mm» all'ora esatta o alla mezz'ora, da opensAt a closesAt compresi.
+export function halfHourSlots(
+  opensOrHours: string | { opensAt: string | null; closesAt: string | null } = '08:00',
+  closesAtParam = '20:00',
+): string[] {
+  let opensAt = '08:00';
+  let closesAt = closesAtParam;
+  if (typeof opensOrHours === 'object' && opensOrHours !== null) {
+    opensAt = opensOrHours.opensAt ?? '08:00';
+    closesAt = opensOrHours.closesAt ?? '20:00';
+  } else if (typeof opensOrHours === 'string') {
+    opensAt = opensOrHours;
+  }
+  const opens = toMinutes(opensAt);
+  const closes = toMinutes(closesAt);
+  const slots: string[] = [];
+  for (let minutes = Math.ceil(opens / 30) * 30; minutes <= closes; minutes += 30) {
+    slots.push(`${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`);
+  }
+  return slots;
+}
+
+// Calcola la fascia oraria di ricerca predefinita per oggi in ora del campus (prossima mezz'ora utile).
+export function defaultSearchSlot(now: Date = new Date()): { start: string; end: string } {
+  const nowCampus = campusTime(now);
+  const starts = halfHourSlots('08:00', '19:30').filter((slot) => slot > nowCampus);
+  if (starts.length === 0) {
+    return { start: '09:00', end: '10:00' };
+  }
+  const start = starts[0];
+  const endMinutes = Math.min(toMinutes(start) + 60, 20 * 60);
+  const end = `${pad(Math.floor(endMinutes / 60))}:${pad(endMinutes % 60)}`;
+  return { start, end };
 }

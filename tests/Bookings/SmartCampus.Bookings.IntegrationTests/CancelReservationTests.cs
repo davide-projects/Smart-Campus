@@ -22,6 +22,11 @@ public sealed class CancelReservationTests : IDisposable
     private const int Repetitions = 5;
     private const int ParallelRequests = 5;
 
+    // Check-in contro cancellazione: più ripetizioni per far emergere un'eventuale gara (design della change 45-check-in, decisione 4).
+    private const int CheckInRaceRepetitions = 20;
+
+    private const string UsedDetail = "Non è possibile cancellare una prenotazione già usata.";
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly TimeZoneInfo Rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
 
@@ -395,7 +400,164 @@ public sealed class CancelReservationTests : IDisposable
         }
     }
 
+    // --- Prenotazione usata (US-14) ---
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancel_FutureReservationWithCheckIn_Returns422AndLeavesItConfirmedInUpcoming(bool asStaff)
+    {
+        var organizer = Guid.NewGuid();
+        var reservation = await SeedReservationAsync(organizer, DayAfterTomorrowAt10);
+        var checkedInAt = Now.AddMinutes(-10);
+        await SeedCheckInAsync(reservation.Id, checkedInAt);
+
+        var response = await DeleteAsync(asStaff ? StaffClient() : ClientFor(organizer), reservation.Id);
+
+        await AssertUsedAsync(response);
+        var stored = await LoadAsync(reservation.Id);
+        Assert.Equal(ReservationStatus.Confirmed, stored.Status);
+        Assert.Null(stored.CancelledAt);
+        var item = Assert.Single((await GetMineAsync(organizer)).Upcoming, item => item.Id == reservation.Id);
+        Assert.Equal(checkedInAt, item.CheckedInAt);
+    }
+
+    [Fact]
+    public async Task Cancel_StartedReservationWithCheckIn_Returns422AsUsed()
+    {
+        // Il controllo sull'uso viene prima del limite di tempo.
+        var organizer = Guid.NewGuid();
+        var reservation = await SeedReservationAsync(organizer, Now.AddMinutes(-30));
+        await SeedCheckInAsync(reservation.Id, Now.AddMinutes(-35));
+
+        var response = await DeleteAsync(ClientFor(organizer), reservation.Id);
+
+        await AssertUsedAsync(response);
+        Assert.Equal(ReservationStatus.Confirmed, (await LoadAsync(reservation.Id)).Status);
+    }
+
+    [Fact]
+    public async Task Cancel_ByStrangerOnUsedReservation_Returns403()
+    {
+        var reservation = await SeedReservationAsync(Guid.NewGuid(), DayAfterTomorrowAt10);
+        await SeedCheckInAsync(reservation.Id, Now);
+
+        var response = await DeleteAsync(ClientFor(Guid.NewGuid()), reservation.Id);
+
+        await AssertForbiddenAsync(response);
+        Assert.Equal(ReservationStatus.Confirmed, (await LoadAsync(reservation.Id)).Status);
+    }
+
+    // Con il clock 5 minuti prima dell'inizio, l'organizzatore cancella e un membro fa il check-in in parallelo:
+    // al massimo una delle due riesce e mai una prenotazione cancellata ha un check-in.
+    [Fact]
+    public async Task CancelAndCheckInInParallel_OnlyOneSucceedsAndNeverCancelledWithCheckIn()
+    {
+        var start = DayAfterTomorrowAt10;
+        _fixture.Clock.Set(start.AddMinutes(-5));
+
+        for (var repetition = 1; repetition <= CheckInRaceRepetitions; repetition++)
+        {
+            var organizer = Guid.NewGuid();
+            var member = Guid.NewGuid();
+            var reservation = await SeedReservationAsync(organizer, start, members: [member]);
+            var organizerClient = ClientFor(organizer);
+            var memberClient = ClientFor(member);
+            var go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            HttpResponseMessage delete;
+            HttpResponseMessage checkIn;
+            try
+            {
+                var deleteTask = Task.Run(async () =>
+                {
+                    await go.Task;
+                    return await DeleteAsync(organizerClient, reservation.Id);
+                });
+                var checkInTask = Task.Run(async () =>
+                {
+                    await go.Task;
+                    return await memberClient.PostAsync($"/api/bookings/{reservation.Id}/check-in", content: null);
+                });
+
+                go.SetResult();
+                delete = await deleteTask;
+                checkIn = await checkInTask;
+            }
+            finally
+            {
+                organizerClient.Dispose();
+                memberClient.Dispose();
+            }
+
+            var stored = await LoadAsync(reservation.Id);
+            var records = await AttendanceAsync(reservation.Id);
+
+            if (delete.StatusCode == HttpStatusCode.NoContent)
+            {
+                // Ha vinto la cancellazione.
+                Assert.Equal(HttpStatusCode.UnprocessableEntity, checkIn.StatusCode);
+                var problem = await ReadProblemAsync(checkIn);
+                Assert.Equal("Check-in non consentito", problem.Title);
+                Assert.Equal("Non è possibile fare il check-in di una prenotazione cancellata.", problem.Detail);
+                AssertCode(problem, RejectionCodes.CheckInCancelled);
+                Assert.Equal(ReservationStatus.Cancelled, stored.Status);
+                Assert.Empty(records);
+            }
+            else
+            {
+                // Ha vinto il check-in.
+                Assert.Equal(HttpStatusCode.OK, checkIn.StatusCode);
+                await AssertUsedAsync(delete);
+                Assert.Equal(ReservationStatus.Confirmed, stored.Status);
+                Assert.Equal(AttendanceType.CheckIn, Assert.Single(records).Type);
+            }
+        }
+    }
+
     // --- Supporto ---
+
+    private static async Task AssertUsedAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var problem = await ReadProblemAsync(response);
+        Assert.Equal("Cancellazione non consentita", problem.Title);
+        Assert.Equal(UsedDetail, problem.Detail);
+        AssertCode(problem, RejectionCodes.CancellationAlreadyUsed);
+    }
+
+    // Codice di motivo (US-06): proprietà "code" del ProblemDetails.
+    private static void AssertCode(ProblemDetails problem, string code)
+    {
+        Assert.True(problem.Extensions.TryGetValue("code", out var value));
+        Assert.Equal(code, Assert.IsType<JsonElement>(value).GetString());
+    }
+
+    // Check-in inserito direttamente, per i test che non riguardano l'endpoint del check-in.
+    private async Task SeedCheckInAsync(Guid reservationId, DateTimeOffset recordedAt)
+    {
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        db.AttendanceRecords.Add(new AttendanceRecord
+        {
+            Id = Guid.NewGuid(),
+            ReservationId = reservationId,
+            Type = AttendanceType.CheckIn,
+            RecordedAt = recordedAt,
+            RecordedBy = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<List<AttendanceRecord>> AttendanceAsync(Guid reservationId)
+    {
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        return await db.AttendanceRecords
+            .AsNoTracking()
+            .Where(record => record.ReservationId == reservationId)
+            .ToListAsync();
+    }
 
     private async Task AssertAllCancelledAsync(IReadOnlyList<HttpResponseMessage> responses, Guid reservationId)
     {

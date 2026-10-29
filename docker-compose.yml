@@ -82,10 +82,14 @@ services:
       RabbitMq__Host: rabbitmq
       RabbitMq__Username: ${RABBITMQ_USER}
       RabbitMq__Password: ${RABBITMQ_PASSWORD}
+      # Verifica dei membri delle prenotazioni di gruppo: Identity raggiunto sulla rete interna, senza il Gateway.
+      Services__Identity__BaseAddress: http://identity:8080
     depends_on:
       sqlserver:
         condition: service_healthy
       rabbitmq:
+        condition: service_started
+      identity:
         condition: service_started
 
   gateway:

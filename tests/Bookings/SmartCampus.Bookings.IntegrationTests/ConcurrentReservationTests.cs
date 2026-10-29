@@ -15,8 +15,9 @@ using SmartCampus.Bookings.Api.Features.Reservations;
 namespace SmartCampus.Bookings.IntegrationTests;
 
 // Prova su SQL Server reale (Testcontainers) che i due lock della POST reggono con richieste contemporanee:
-// UPDLOCK sulla riga dello spazio (INV-1) e sp_getapplock sulla persona (INV-8). Design della change
-// 12-prenotare-uno-spazio, decisione 2. Ogni ripetizione usa spazi e utenti nuovi, così l'ordine dei test non conta.
+// UPDLOCK sulla riga dello spazio (INV-1) e sp_getapplock sulle persone (INV-8). Design della change
+// 12-prenotare-uno-spazio, decisione 2, e per i membri del gruppo della change 16-prenotare-per-un-gruppo, decisione 4.
+// Ogni ripetizione usa spazi e utenti nuovi, così l'ordine dei test non conta.
 [Collection(BookingsApiCollection.Name)]
 public sealed class ConcurrentReservationTests(BookingsApiFixture fixture)
 {
@@ -157,7 +158,7 @@ public sealed class ConcurrentReservationTests(BookingsApiFixture fixture)
         var groupRoom = await SeedRoomAsync();
         var requestedRoom = await SeedRoomAsync();
 
-        // Nessuna API crea ancora membri (US-05): la prenotazione di gruppo si inserisce direttamente nel database.
+        // La prenotazione di gruppo si inserisce direttamente nel database: qui interessa solo il conflitto dell'organizzatore.
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
@@ -184,6 +185,150 @@ public sealed class ConcurrentReservationTests(BookingsApiFixture fixture)
         var problem = await ReadProblemAsync(response);
         Assert.Equal("Hai già una prenotazione in questa fascia oraria.", problem.Detail);
         Assert.Equal(0, await CountReservationsAsync(requestedRoom));
+    }
+
+    // --- Prenotazioni di gruppo (US-05) ---
+
+    [Fact]
+    public async Task Create_SameMemberInTwoGroupsAtTheSameTime_ConfirmsOnlyOne()
+    {
+        fixture.Identity.Reset();
+
+        for (var repetition = 1; repetition <= Repetitions; repetition++)
+        {
+            var anna = Guid.NewGuid();
+            var firstRoom = await SeedRoomAsync();
+            var secondRoom = await SeedRoomAsync();
+
+            var results = await SendInParallelAsync(
+            [
+                (Guid.NewGuid(), Request(firstRoom, "10:00", "11:00", anna)),
+                (Guid.NewGuid(), Request(secondRoom, "10:00", "11:00", anna))
+            ]);
+
+            Assert.Single(results, result => result.Response.StatusCode == HttpStatusCode.Created);
+            var rejected = Assert.Single(results, result => result.Response.StatusCode != HttpStatusCode.Created);
+            Assert.Equal(HttpStatusCode.Conflict, rejected.Response.StatusCode);
+
+            // Con due sole richieste l'attesa del lock non deve arrivare a 10 secondi.
+            var problem = await ReadProblemAsync(rejected.Response);
+            if (problem.Title == "Prenotazione in corso")
+            {
+                Assert.True(
+                    rejected.Elapsed > UserLockTimeout,
+                    $"«Prenotazione in corso» dopo {rejected.Elapsed.TotalSeconds:F1} s, prima del timeout del lock.");
+            }
+            else
+            {
+                Assert.Equal("Membro già impegnato", problem.Title);
+            }
+
+            Assert.Equal(1, await CountConfirmedForPersonInSlotAsync(anna, "10:00", "11:00"));
+        }
+    }
+
+    [Fact]
+    public async Task Create_CrossedOrganizers_ConfirmsOneWithoutWaitingForTheLockTimeout()
+    {
+        fixture.Identity.Reset();
+
+        for (var repetition = 1; repetition <= Repetitions; repetition++)
+        {
+            var mario = Guid.NewGuid();
+            var anna = Guid.NewGuid();
+            var marioRoom = await SeedRoomAsync();
+            var annaRoom = await SeedRoomAsync();
+
+            // Mario prenota con Anna come membro e, nello stesso istante, Anna prenota con Mario come membro:
+            // i lock sulle persone in ordine di id evitano che le due richieste si blocchino a vicenda.
+            var results = await SendInParallelAsync(
+            [
+                (mario, Request(marioRoom, "10:00", "11:00", anna)),
+                (anna, Request(annaRoom, "10:00", "11:00", mario))
+            ]);
+
+            Assert.Single(results, result => result.Response.StatusCode == HttpStatusCode.Created);
+            var rejected = Assert.Single(results, result => result.Response.StatusCode != HttpStatusCode.Created);
+            Assert.Equal(HttpStatusCode.Conflict, rejected.Response.StatusCode);
+            Assert.All(results, result => Assert.True(
+                result.Elapsed < UserLockTimeout,
+                $"Richiesta durata {result.Elapsed.TotalSeconds:F1} s: ha atteso il timeout del lock."));
+
+            Assert.Equal(1, await CountConfirmedForPersonInSlotAsync(mario, "10:00", "11:00"));
+            Assert.Equal(1, await CountConfirmedForPersonInSlotAsync(anna, "10:00", "11:00"));
+        }
+    }
+
+    [Fact]
+    public async Task Create_WhileAnotherTransactionHoldsAMemberLock_Returns409WithTheMemberMessage()
+    {
+        fixture.Identity.Reset();
+        var anna = Guid.NewGuid();
+        var roomId = await SeedRoomAsync();
+
+        await using var connection = await OpenServiceDatabaseConnectionAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+        await HoldUserLockAsync(connection, transaction, anna);
+
+        var response = await ClientFor(Guid.NewGuid()).PostAsJsonAsync("/api/bookings", Request(roomId, "10:00", "11:00", anna));
+
+        await transaction.RollbackAsync();
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var problem = document.RootElement;
+        Assert.Equal("Prenotazione in corso", problem.GetProperty("title").GetString());
+        Assert.Equal(
+            "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.",
+            problem.GetProperty("detail").GetString());
+        Assert.Equal(RejectionCodes.MemberBookingInProgress, problem.GetProperty("code").GetString());
+        Assert.Equal(0, await CountReservationsAsync(roomId));
+    }
+
+    // Connessione separata allo stesso database del servizio: il lock deve stare dove la POST lo cerca.
+    private async Task<SqlConnection> OpenServiceDatabaseConnectionAsync()
+    {
+        string connectionString;
+        string serviceDatabase;
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+            connectionString = db.Database.GetConnectionString()!;
+            serviceDatabase = await db.Database.SqlQuery<string>($"SELECT DB_NAME() AS [Value]").SingleAsync();
+        }
+
+        var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        Assert.Equal(serviceDatabase, connection.Database);
+        return connection;
+    }
+
+    // Stessa risorsa e stessa modalità della POST: il lock resta finché la transazione è aperta.
+    private static async Task HoldUserLockAsync(SqlConnection connection, SqlTransaction transaction, Guid userId)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 0;
+            SELECT @result;
+            """;
+        command.Parameters.AddWithValue("@resource", $"user:{userId}");
+        var lockResult = (int)(await command.ExecuteScalarAsync())!;
+        Assert.True(lockResult >= 0, $"sp_getapplock ha restituito {lockResult}.");
+    }
+
+    // Prenotazioni confermate della persona, come organizzatore o come membro, sovrapposte alla fascia [start, end).
+    private async Task<int> CountConfirmedForPersonInSlotAsync(Guid userId, string start, string end)
+    {
+        var (from, to) = (At(start), At(end));
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        return await db.Reservations.CountAsync(reservation =>
+            (reservation.OrganizerId == userId || reservation.Members.Any(member => member.UserId == userId)) &&
+            reservation.Status == ReservationStatus.Confirmed &&
+            reservation.Start < to &&
+            reservation.End > from);
     }
 
     // --- Richieste in parallelo ---
@@ -290,8 +435,8 @@ public sealed class ConcurrentReservationTests(BookingsApiFixture fixture)
     // Client con un token valido, firmato con la chiave che Bookings usa nei test.
     private HttpClient ClientFor(Guid userId) => fixture.CreateClientFor(userId);
 
-    private static CreateReservationRequest Request(Guid roomId, string start, string end) =>
-        new(roomId, At(start), At(end), Purpose: null);
+    private static CreateReservationRequest Request(Guid roomId, string start, string end, params Guid[] memberIds) =>
+        new(roomId, At(start), At(end), Purpose: null, memberIds.Length == 0 ? null : memberIds);
 
     private static DateTimeOffset At(string time)
     {
