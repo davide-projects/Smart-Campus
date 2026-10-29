@@ -54,6 +54,7 @@ export interface ReservationListItem {
   start: string;
   end: string;
   organizerId: string;
+  organizerName?: string | null;
   participants: number;
   memberIds: string[];
   status: ReservationStatus;
@@ -77,18 +78,17 @@ const TIME_FORMAT = new Intl.DateTimeFormat('it-IT', {
   minute: '2-digit',
 });
 
+// Orario della fascia in ora del campus, es. «10:00 – 11:00» o con separatore personalizzato.
+export function formatTimeRange(startIso: string, endIso: string, separator = ' – '): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  return `${TIME_FORMAT.format(start)}${separator}${TIME_FORMAT.format(end)}`;
+}
+
 // Es. «giovedì 5 novembre 2026, 10:00–11:00».
 export function reservationTimeLabel(item: { start: string; end: string }): string {
   const start = new Date(item.start);
-  const end = new Date(item.end);
-  return `${DAY_FORMAT.format(start)}, ${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
-}
-
-// Orario della fascia in ora del campus, es. «10:00 – 11:00».
-export function formatTimeRange(startIso: string, endIso: string): string {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  return `${TIME_FORMAT.format(start)} – ${TIME_FORMAT.format(end)}`;
+  return `${DAY_FORMAT.format(start)}, ${formatTimeRange(item.start, item.end, '–')}`;
 }
 
 // Scostamento dall'ora UTC del campus in un istante, es. «GMT+01:00» (solo «GMT» quando è zero).

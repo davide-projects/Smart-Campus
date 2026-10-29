@@ -72,7 +72,13 @@
                   </span>
                 </td>
                 <td class="organizer-col">
-                  <span class="user-id" [title]="item.organizerId">{{ item.organizerId }}</span>
+                  <span
+                    [class.user-name]="item.organizerName"
+                    [class.user-id]="!item.organizerName"
+                    [title]="item.organizerName || item.organizerId"
+                  >
+                    {{ item.organizerName || item.organizerId }}
+                  </span>
                 </td>
                 <td class="participants-col">
                   {{ participantsLabel(item.participants) }}

@@ -2,6 +2,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { Subject, catchError, merge, of, startWith, switchMap } from 'rxjs';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -65,6 +66,8 @@ export class RoomReservations implements OnInit {
     date: new FormControl<Date | null>(campusToday(), { validators: [Validators.required] }),
   });
 
+  private readonly reloadTrigger$ = new Subject<void>();
+
   ngOnInit(): void {
     const queryRoomId = this.route.snapshot.queryParamMap.get('roomId');
     if (queryRoomId) {
@@ -78,10 +81,6 @@ export class RoomReservations implements OnInit {
         next: (rooms) => {
           this.rooms.set(rooms);
           this.loadingRooms.set(false);
-
-          if (this.form.valid) {
-            this.loadReservations();
-          }
         },
         error: () => {
           this.loadingRooms.set(false);
@@ -89,41 +88,57 @@ export class RoomReservations implements OnInit {
         },
       });
 
-    this.form.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        if (this.form.valid) {
-          this.loadReservations();
+    merge(this.form.valueChanges, this.reloadTrigger$)
+      .pipe(
+        startWith(null),
+        switchMap(() => {
+          const roomId = this.form.controls.roomId.value;
+          const date = this.form.controls.date.value;
+
+          // Se il form non è valido (es. data non valida scritta a mano o spazio mancante):
+          // svuotiamo la tabella per non mostrare dati obsoleti della selezione precedente (Note 5).
+          if (
+            this.form.invalid ||
+            !roomId ||
+            !date ||
+            !(date instanceof Date) ||
+            isNaN(date.getTime())
+          ) {
+            this.reservations.set([]);
+            this.loadingReservations.set(false);
+            if (!roomId) {
+              this.hasSearched.set(false);
+            }
+            return of(null);
+          }
+
+          this.loadingReservations.set(true);
+          this.errorMessage.set(null);
+
+          return this.bookingsService.getReservations(roomId, toIsoDate(date)).pipe(
+            catchError(() => {
+              this.errorMessage.set(
+                'Non è stato possibile caricare le prenotazioni. Riprova più tardi.',
+              );
+              this.loadingReservations.set(false);
+              this.hasSearched.set(true);
+              return of(null);
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((items) => {
+        if (items !== null) {
+          this.reservations.set(items);
+          this.loadingReservations.set(false);
+          this.hasSearched.set(true);
         }
       });
   }
 
   protected loadReservations(): void {
-    const roomId = this.form.controls.roomId.value;
-    const date = this.form.controls.date.value;
-
-    if (!roomId || !date) {
-      return;
-    }
-
-    this.loadingReservations.set(true);
-    this.errorMessage.set(null);
-
-    this.bookingsService
-      .getReservations(roomId, toIsoDate(date))
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (items) => {
-          this.reservations.set(items);
-          this.loadingReservations.set(false);
-          this.hasSearched.set(true);
-        },
-        error: () => {
-          this.errorMessage.set('Non è stato possibile caricare le prenotazioni. Riprova più tardi.');
-          this.loadingReservations.set(false);
-          this.hasSearched.set(true);
-        },
-      });
+    this.reloadTrigger$.next();
   }
 
   protected formatTime(start: string, end: string): string {

@@ -112,6 +112,11 @@
   }
 }
 
+.user-name {
+  font-weight: 500;
+  color: var(--mat-sys-on-surface);
+}
+
 .user-id {
   font-family: monospace;
   font-size: 0.9em;
