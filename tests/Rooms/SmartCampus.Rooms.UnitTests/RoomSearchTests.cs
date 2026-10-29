@@ -51,6 +51,26 @@ public sealed class RoomSearchTests
     }
 
     [Fact]
+    public void Search_ByMaximumCapacity_IncludesBoundary()
+    {
+        var result = Search(new RoomFilter(MaxCapacity: 24));
+
+        // Aula A2 (24) è inclusa: il filtro è "al massimo", non "meno di".
+        Assert.Equal(3, result.Count);
+        Assert.All(result, room => Assert.True(room.Capacity <= 24));
+        Assert.Contains(result, room => room.Name == "Aula A2");
+    }
+
+    [Fact]
+    public void Search_ByCapacityRange_IncludesBothBoundaries()
+    {
+        var result = Search(new RoomFilter(MinCapacity: 20, MaxCapacity: 30));
+
+        Assert.Equal(3, result.Count);
+        Assert.All(result, room => Assert.True(room.Capacity >= 20 && room.Capacity <= 30));
+    }
+
+    [Fact]
     public void Search_ByBuilding_ReturnsOnlyRoomsInBuilding()
     {
         var result = Search(new RoomFilter(BuildingId: BuildingBId));
