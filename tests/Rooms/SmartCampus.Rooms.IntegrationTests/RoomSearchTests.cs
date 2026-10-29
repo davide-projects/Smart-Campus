@@ -169,6 +169,24 @@ public sealed class RoomSearchTests(RoomsApiFixture fixture) : IClassFixture<Roo
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/rooms/?maxCapacity=0")]
+    [InlineData("/api/rooms/?maxCapacity=-5")]
+    public async Task Search_WithInvalidMaximumCapacity_ReturnsBadRequest(string url)
+    {
+        var response = await fixture.Client.GetAsync(url);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_WithMaximumCapacityBelowMinimum_ReturnsBadRequest()
+    {
+        var response = await fixture.Client.GetAsync("/api/rooms/?minCapacity=30&maxCapacity=20");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task HealthReady_WhenDatabaseIsAvailable_ReturnsOk()
     {
