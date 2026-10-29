@@ -15,8 +15,8 @@ function textOfDetail(detail: string | null): string | null {
   return detail !== null && detail.trim() !== '' ? detail : null;
 }
 
-// «members-occupied» e «capacity-exceeded» arrivano con le prenotazioni di gruppo (US-05): il servizio
-// oggi non li produce, ma sono già nel contratto.
+// I motivi di gruppo (US-05) li produce Bookings, ma il modulo di prenotazione non invia ancora i
+// membri, quindi oggi non compaiono da questa pagina. Le parole sono quelle del servizio.
 function textOfCode(code: string | null, limits: Record<string, unknown> | null): string | null {
   switch (code) {
     case 'room-occupied':
@@ -24,13 +24,19 @@ function textOfCode(code: string | null, limits: Record<string, unknown> | null)
     case 'person-occupied':
       return 'Hai già una prenotazione in questa fascia oraria.';
     case 'members-occupied':
-      return 'Uno o più membri hanno già una prenotazione in questa fascia oraria.';
+      return 'Uno o più membri hanno già una prenotazione in questa fascia.';
+    case 'member-booking-in-progress':
+      return "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.";
     case 'booking-in-progress':
       return "Hai un'altra prenotazione in corso, riprova tra qualche secondo.";
     case 'room-closed':
       return 'Lo spazio è chiuso in questo giorno.';
-    case 'capacity-exceeded':
-      return 'I partecipanti superano la capienza dello spazio.';
+    case 'organizer-as-member':
+      return "Non puoi aggiungerti come membro: sei già l'organizzatore.";
+    case 'duplicate-members':
+      return 'Ogni studente può essere aggiunto una sola volta.';
+    case 'members-not-students':
+      return 'Puoi aggiungere come membri solo studenti registrati.';
     case 'room-not-bookable':
       return 'Questo spazio non è prenotabile.';
     case 'invalid-time-range':
@@ -66,6 +72,18 @@ function textOfCode(code: string | null, limits: Record<string, unknown> | null)
       return minutes === 30
         ? "Le prenotazioni iniziano e finiscono all'ora esatta o alla mezz'ora."
         : `Le prenotazioni iniziano e finiscono ogni ${minutes} minuti.`;
+    }
+    case 'capacity-exceeded': {
+      const capacity = numberOf(limits, 'maxParticipants');
+      return capacity === null
+        ? null
+        : `Lo spazio ospita al massimo ${capacity === 1 ? '1 persona' : `${capacity} persone`}.`;
+    }
+    case 'too-many-members': {
+      const maxMembers = numberOf(limits, 'maxMembers');
+      return maxMembers === null
+        ? null
+        : `Puoi aggiungere al massimo ${maxMembers === 1 ? '1 membro' : `${maxMembers} membri`}.`;
     }
     case 'purpose-too-long': {
       const maxLength = numberOf(limits, 'maxLength');

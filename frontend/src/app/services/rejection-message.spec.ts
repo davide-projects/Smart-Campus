@@ -6,18 +6,31 @@ type Case = [code: string, limits: Record<string, unknown> | null, expected: str
 const CASES: Case[] = [
   ['room-occupied', null, 'Lo spazio è già prenotato in questa fascia.'],
   ['person-occupied', null, 'Hai già una prenotazione in questa fascia oraria.'],
+  ['members-occupied', null, 'Uno o più membri hanno già una prenotazione in questa fascia.'],
   [
-    'members-occupied',
+    'member-booking-in-progress',
     null,
-    'Uno o più membri hanno già una prenotazione in questa fascia oraria.',
+    "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.",
   ],
+  [
+    'organizer-as-member',
+    null,
+    "Non puoi aggiungerti come membro: sei già l'organizzatore.",
+  ],
+  ['duplicate-members', null, 'Ogni studente può essere aggiunto una sola volta.'],
+  ['members-not-students', null, 'Puoi aggiungere come membri solo studenti registrati.'],
   [
     'booking-in-progress',
     null,
     "Hai un'altra prenotazione in corso, riprova tra qualche secondo.",
   ],
   ['room-closed', null, 'Lo spazio è chiuso in questo giorno.'],
-  ['capacity-exceeded', null, 'I partecipanti superano la capienza dello spazio.'],
+  [
+    'capacity-exceeded',
+    { maxParticipants: 30 },
+    'Lo spazio ospita al massimo 30 persone.',
+  ],
+  ['too-many-members', { maxMembers: 10 }, 'Puoi aggiungere al massimo 10 membri.'],
   ['room-not-bookable', null, 'Questo spazio non è prenotabile.'],
   ['invalid-time-range', null, "L'orario di fine deve essere successivo a quello di inizio."],
   ['in-the-past', null, 'Non è possibile prenotare nel passato.'],
@@ -69,6 +82,21 @@ describe('rejectionText', () => {
     expect(
       rejectionText({ code: 'too-far-ahead', limits: { maxAdvanceDays: 1 }, detail: null }),
     ).toBe('Si può prenotare al massimo 1 giorno prima.');
+  });
+
+  it('uses the singular for a capacity of one person and for one member', () => {
+    expect(
+      rejectionText({ code: 'capacity-exceeded', limits: { maxParticipants: 1 }, detail: null }),
+    ).toBe('Lo spazio ospita al massimo 1 persona.');
+    expect(
+      rejectionText({ code: 'too-many-members', limits: { maxMembers: 1 }, detail: null }),
+    ).toBe('Puoi aggiungere al massimo 1 membro.');
+  });
+
+  it('falls back to the text of the service when the capacity limit is missing', () => {
+    expect(
+      rejectionText({ code: 'capacity-exceeded', limits: null, detail: 'Capienza superata.' }),
+    ).toBe('Capienza superata.');
   });
 
   it('describes a slot that is not the half hour with its length', () => {
