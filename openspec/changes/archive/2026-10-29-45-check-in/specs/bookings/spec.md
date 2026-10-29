@@ -230,7 +230,7 @@ Bookings SHALL esporre `DELETE /api/bookings/{id}` (`id` = GUID della prenotazio
 - **THEN** la risposta è `422` con messaggio «Non è possibile cancellare una prenotazione già usata.» (`code` = `cancellation-already-used`) e la prenotazione resta in `upcoming`
 
 ### Requirement: Cancellazione solo prima dell'inizio
-Bookings MUST rifiutare con `422`, titolo «Cancellazione non consentita» e messaggio «Non è possibile cancellare una prenotazione già iniziata o passata.», la cancellazione di una prenotazione `Confirmed` senza check-in il cui inizio è uguale o precedente all'istante della richiesta (assunzione A5), per l'organizzatore e per lo Staff. La prenotazione MUST restare invariata. Una prenotazione con check-in riceve invece il rifiuto di «Nessuna cancellazione di una prenotazione usata», che viene prima di questo controllo.
+Bookings MUST rifiutare con `422`, titolo «Cancellazione non consentita» e messaggio «Non è possibile cancellare una prenotazione già iniziata o passata.» la cancellazione di una prenotazione `Confirmed` senza check-in con inizio uguale o precedente all'istante della richiesta (assunzione A5), anche per lo Staff, lasciandola invariata. Con check-in vale prima «Nessuna cancellazione di una prenotazione usata».
 
 #### Scenario: Prenotazione già iniziata
 - **WHEN** Studente1 ha una prenotazione confermata senza check-in dalle 10:00 alle 11:00 e alle 10:15 invia `DELETE /api/bookings/{id}`
