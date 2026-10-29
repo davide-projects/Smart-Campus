@@ -11,6 +11,8 @@ export interface MyReservationItem {
   isGroup: boolean;
   organizerName: string | null;
   isOrganizer: boolean;
+  // Istante del check-in (ISO 8601, UTC); null se la prenotazione non è ancora stata usata.
+  checkedInAt: string | null;
   members: ReservationMemberSummary[];
 }
 
@@ -42,41 +44,6 @@ export interface CreateReservationRequest {
 // Numero massimo di membri di una prenotazione di gruppo, come in Bookings (organizzatore escluso).
 export const MAX_MEMBERS = 10;
 
-// Limiti che Bookings allega a un rifiuto (proprietà "limits" del ProblemDetails).
-export type RejectionLimits = Record<string, unknown>;
-
-// Messaggi dei rifiuti delle prenotazioni di gruppo, scelti dal codice di motivo ("code") del
-// ProblemDetails di Bookings e non dal testo. null se mancano i limiti che servono al messaggio.
-const GROUP_REJECTION_MESSAGES: Record<string, (limits: RejectionLimits) => string | null> = {
-  'members-occupied': () => 'Uno o più membri hanno già una prenotazione in questa fascia.',
-  'member-booking-in-progress': () =>
-    "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.",
-  'capacity-exceeded': (limits) =>
-    typeof limits['maxParticipants'] === 'number'
-      ? `Lo spazio ospita al massimo ${limits['maxParticipants']} persone.`
-      : null,
-  'too-many-members': (limits) => {
-    const maxMembers =
-      typeof limits['maxMembers'] === 'number' ? limits['maxMembers'] : MAX_MEMBERS;
-    return `Puoi aggiungere al massimo ${maxMembers} membri.`;
-  },
-  'organizer-as-member': () => "Non puoi aggiungerti come membro: sei già l'organizzatore.",
-  'duplicate-members': () => 'Ogni studente può essere aggiunto una sola volta.',
-  'members-not-students': () => 'Puoi aggiungere come membri solo studenti registrati.',
-  'members-check-unavailable': () =>
-    'Non è possibile verificare i membri in questo momento. Riprova tra poco.',
-};
-
-// Messaggio per l'utente di un rifiuto di prenotazione di gruppo; null per un codice non previsto.
-export function groupRejectionMessage(code: unknown, limits: unknown): string | null {
-  if (typeof code !== 'string' || !Object.hasOwn(GROUP_REJECTION_MESSAGES, code)) {
-    return null;
-  }
-  const safeLimits =
-    typeof limits === 'object' && limits !== null ? (limits as RejectionLimits) : {};
-  return GROUP_REJECTION_MESSAGES[code](safeLimits);
-}
-
 // Stato di una prenotazione come lo invia Bookings (es. "Confirmed").
 export type ReservationStatus = 'Confirmed' | 'Cancelled';
 
@@ -91,10 +58,46 @@ export interface ReservationResponse {
   status: ReservationStatus;
 }
 
+// Risposta di POST /api/bookings/{id}/check-in con il 200.
+export interface CheckInResponse {
+  checkedInAt: string;
+}
+
+// Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio, estremi inclusi.
+const CHECK_IN_BEFORE_MS = 15 * 60_000;
+const CHECK_IN_AFTER_MS = 15 * 60_000;
+
+// Vero se l'istante now (millisecondi dall'epoca) è nella finestra del check-in della prenotazione.
+// Confronta istanti assoluti, quindi non dipende dal fuso del dispositivo.
+export function isInCheckInWindow(item: Pick<MyReservationItem, 'start'>, now: number): boolean {
+  const start = Date.parse(item.start);
+  return start - CHECK_IN_BEFORE_MS <= now && now <= start + CHECK_IN_AFTER_MS;
+}
+
 // Risposta di GET /api/bookings/rooms/{id}/future-reservations-count (solo personale).
 export interface FutureReservationsCountResponse {
   roomId: string;
   count: number;
+}
+
+// Elemento dell'elenco delle prenotazioni di uno spazio per un giorno (GET /api/bookings?roomId=...&date=...).
+export interface ReservationListItem {
+  id: string;
+  start: string;
+  end: string;
+  organizerId: string;
+  organizerName?: string | null;
+  participants: number;
+  memberIds: string[];
+  status: ReservationStatus;
+  cancelledAt: string | null;
+}
+
+// Intervallo libero dello stesso spazio e giorno di una prenotazione rifiutata per conflitto: le fasce
+// che Bookings propone con il rifiuto «room-occupied» (proprietà «freeSlots» del ProblemDetails).
+export interface FreeRange {
+  start: string;
+  end: string;
 }
 
 // Giorno e orario si mostrano sempre nell'ora del campus, qualunque sia il fuso del dispositivo.
@@ -114,11 +117,17 @@ const TIME_FORMAT = new Intl.DateTimeFormat('it-IT', {
   minute: '2-digit',
 });
 
+// Orario della fascia in ora del campus, es. «10:00 – 11:00» o con separatore personalizzato.
+export function formatTimeRange(startIso: string, endIso: string, separator = ' – '): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  return `${TIME_FORMAT.format(start)}${separator}${TIME_FORMAT.format(end)}`;
+}
+
 // Es. «giovedì 5 novembre 2026, 10:00–11:00».
 export function reservationTimeLabel(item: { start: string; end: string }): string {
   const start = new Date(item.start);
-  const end = new Date(item.end);
-  return `${DAY_FORMAT.format(start)}, ${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
+  return `${DAY_FORMAT.format(start)}, ${formatTimeRange(item.start, item.end, '–')}`;
 }
 
 // Scostamento dall'ora UTC del campus in un istante, es. «GMT+01:00» (solo «GMT» quando è zero).

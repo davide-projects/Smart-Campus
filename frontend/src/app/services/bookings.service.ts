@@ -3,9 +3,11 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { DailyAvailability, AvailabilitySearchFilter, AvailableRoomResponse } from '../models/availability.model';
 import {
+  CheckInResponse,
   CreateReservationRequest,
   FutureReservationsCountResponse,
   MyReservationsResponse,
+  ReservationListItem,
   ReservationResponse,
 } from '../models/booking.model';
 
@@ -30,6 +32,14 @@ export class BookingsService {
   // Cancella una prenotazione: la riga resta, con stato «cancellata». Risposta 204 senza corpo.
   cancel(id: string): Observable<void> {
     return this.http.delete<void>(`/api/bookings/${encodeURIComponent(id)}`);
+  }
+
+  // Registra il check-in di una prenotazione, valido per tutto il gruppo. Richiesta senza corpo.
+  checkIn(id: string): Observable<CheckInResponse> {
+    return this.http.post<CheckInResponse>(
+      `/api/bookings/${encodeURIComponent(id)}/check-in`,
+      null,
+    );
   }
 
   // Crea una prenotazione singola confermata a nome dell'utente autenticato.
@@ -59,5 +69,13 @@ export class BookingsService {
     }
 
     return this.http.get<AvailableRoomResponse[]>('/api/bookings/availability/search', { params });
+  }
+
+  // Elenco delle prenotazioni di uno spazio in un giorno (riservato al personale).
+  getReservations(roomId: string, date: string): Observable<ReservationListItem[]> {
+    const params = new HttpParams()
+      .set('roomId', roomId)
+      .set('date', date);
+    return this.http.get<ReservationListItem[]>('/api/bookings', { params });
   }
 }

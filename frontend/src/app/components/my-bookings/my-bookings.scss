@@ -51,3 +51,39 @@ mat-card {
 .members {
   overflow-wrap: anywhere;
 }
+
+.used {
+  display: inline-block;
+  margin: 12px 0 0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background-color: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font: var(--mat-sys-label-medium);
+}
+
+.error {
+  margin: 12px 0 0;
+  color: var(--mat-sys-error);
+}
+
+// Su schermi stretti i pulsanti vanno a capo; la spiegazione sta sotto «Check-in».
+.actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.check-in-hint {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+  text-align: end;
+}
+
+// Il pulsante disabilitato resta raggiungibile da tastiera, ma Material gli toglie lo stato di focus: serve un contorno.
+.used:focus-visible,
+.check-in:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
+}

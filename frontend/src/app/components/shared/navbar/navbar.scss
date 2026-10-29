@@ -8,6 +8,8 @@
   margin-right: auto;
   color: inherit;
   font: var(--mat-sys-title-large);
+  font-family: var(--app-brand-font);
+  font-weight: 600;
   text-decoration: none;
 
   &:focus-visible {

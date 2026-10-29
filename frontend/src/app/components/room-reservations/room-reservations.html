@@ -1,0 +1,103 @@
+<section class="room-reservations">
+  <header class="page-header">
+    <h1>Prenotazioni per spazio</h1>
+    <p class="subtitle">Consulta l'elenco delle prenotazioni giornaliere per ciascuno spazio del campus.</p>
+  </header>
+
+  <mat-card appearance="outlined" class="filters-card">
+    <mat-card-content>
+      <form [formGroup]="form" class="filters-form">
+        <mat-form-field appearance="outline" class="room-select-field">
+          <mat-label>Spazio</mat-label>
+          <mat-select formControlName="roomId" placeholder="Scegli uno spazio" aria-label="Seleziona spazio">
+            @for (room of rooms(); track room.id) {
+              <mat-option [value]="room.id">
+                {{ room.name }} ({{ room.buildingName }})
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="date-field">
+          <mat-label>Giorno</mat-label>
+          <input
+            matInput
+            [matDatepicker]="picker"
+            formControlName="date"
+            placeholder="GG/MM/AAAA"
+            aria-label="Seleziona giorno"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  @if (loadingReservations() || loadingRooms()) {
+    <div class="loading-bar">
+      <mat-progress-bar mode="indeterminate" aria-label="Caricamento in corso"></mat-progress-bar>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <p class="message error-message" role="alert">
+      {{ errorMessage() }}
+    </p>
+  } @else if (hasSearched()) {
+    @if (reservations().length > 0) {
+      <div class="table-container">
+        <table class="reservations-table" aria-label="Elenco delle prenotazioni">
+          <thead>
+            <tr>
+              <th scope="col">Orario</th>
+              <th scope="col">Stato</th>
+              <th scope="col">Organizzatore</th>
+              <th scope="col">Partecipanti</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of reservations(); track item.id) {
+              <tr [class.cancelled-row]="item.status === 'Cancelled'">
+                <td class="time-col">
+                  <strong>{{ formatTime(item.start, item.end) }}</strong>
+                </td>
+                <td class="status-col">
+                  <span
+                    class="status-badge"
+                    [class.confirmed]="item.status === 'Confirmed'"
+                    [class.cancelled]="item.status === 'Cancelled'"
+                  >
+                    {{ statusLabel(item.status) }}
+                  </span>
+                </td>
+                <td class="organizer-col">
+                  <span
+                    [class.user-name]="item.organizerName"
+                    [class.user-id]="!item.organizerName"
+                    [title]="item.organizerName || item.organizerId"
+                  >
+                    {{ item.organizerName || item.organizerId }}
+                  </span>
+                </td>
+                <td class="participants-col">
+                  {{ participantsLabel(item.participants) }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state" role="status">
+        <mat-icon fontSet="material-symbols-outlined" class="empty-icon">event_busy</mat-icon>
+        <p>Nessuna prenotazione presente per questo spazio nel giorno selezionato.</p>
+      </div>
+    }
+  } @else if (!form.controls.roomId.value) {
+    <div class="prompt-state" role="status">
+      <mat-icon fontSet="material-symbols-outlined" class="prompt-icon">calendar_month</mat-icon>
+      <p>Seleziona uno spazio per visualizzare le relative prenotazioni.</p>
+    </div>
+  }
+</section>

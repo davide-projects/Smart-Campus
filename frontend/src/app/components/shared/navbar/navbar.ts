@@ -21,6 +21,7 @@ const LINKS: NavLink[] = [
   { path: '/rooms', label: 'Cerca spazi' },
   { path: '/available-rooms', label: 'Spazi liberi', access: 'user' },
   { path: '/my-bookings', label: 'Le mie prenotazioni', access: 'user' },
+  { path: '/staff/reservations', label: 'Prenotazioni', access: 'staff' },
   { path: '/staff/rooms/new', label: 'Nuovo spazio', access: 'staff' },
 ];
 

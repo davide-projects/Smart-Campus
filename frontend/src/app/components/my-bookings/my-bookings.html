@@ -34,17 +34,43 @@
                           <p class="members">{{ item.members }}</p>
                         }
                       }
+                      @if (item.used) {
+                        <p class="used" tabindex="-1" [id]="item.usedId">Usata</p>
+                      }
+                      @if (checkInErrors()[item.item.id]; as message) {
+                        <p class="error" role="alert">{{ message }}</p>
+                      }
                     </mat-card-content>
-                    @if (item.canCancel) {
-                      <mat-card-actions align="end">
-                        <button
-                          matButton="outlined"
-                          type="button"
-                          [attr.aria-label]="item.cancelLabel"
-                          (click)="openCancelDialog(item.item)"
-                        >
-                          Cancella
-                        </button>
+                    @if (item.canCancel || item.showCheckIn) {
+                      <mat-card-actions align="end" class="actions">
+                        @if (item.canCancel) {
+                          <button
+                            matButton="outlined"
+                            type="button"
+                            class="cancel"
+                            [attr.aria-label]="item.cancelLabel"
+                            (click)="openCancelDialog(item.item)"
+                          >
+                            Cancella
+                          </button>
+                        }
+                        @if (item.showCheckIn) {
+                          <button
+                            matButton="filled"
+                            type="button"
+                            class="check-in"
+                            [attr.aria-label]="item.checkInLabel"
+                            [attr.aria-describedby]="item.canCheckIn ? null : item.checkInHintId"
+                            [disabled]="!item.canCheckIn || checkingIn().has(item.item.id)"
+                            disabledInteractive
+                            (click)="checkIn(item)"
+                          >
+                            Check-in
+                          </button>
+                          @if (!item.canCheckIn) {
+                            <p class="check-in-hint" [id]="item.checkInHintId">{{ checkInHint }}</p>
+                          }
+                        }
                       </mat-card-actions>
                     }
                   </mat-card>

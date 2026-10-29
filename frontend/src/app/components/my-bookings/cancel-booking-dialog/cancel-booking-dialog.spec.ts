@@ -25,6 +25,7 @@ const RESERVATION: MyReservationItem = {
   isGroup: false,
   organizerName: null,
   isOrganizer: true,
+  checkedInAt: null,
   members: [],
 };
 
