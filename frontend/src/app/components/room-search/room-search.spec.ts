@@ -1,4 +1,4 @@
-import { HarnessLoader } from '@angular/cdk/testing';
+﻿import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -304,7 +304,7 @@ describe('RoomSearch', () => {
         type: 'Aula',
         building: 'Edificio A',
         capacity: '40 posti',
-        bookable: 'S+�',
+        bookable: 'Sì',
       },
       {
         name: 'Sala studio B',
@@ -372,7 +372,7 @@ describe('RoomSearch', () => {
     await render();
 
     expect(element.querySelector('[role="alert"]')!.textContent).toContain(
-      'Non +� stato possibile caricare gli spazi.',
+      'Non è stato possibile caricare gli spazi.',
     );
   });
 });
