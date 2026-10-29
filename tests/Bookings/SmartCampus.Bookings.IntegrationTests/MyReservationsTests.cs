@@ -177,6 +177,7 @@ public sealed class MyReservationsTests : IDisposable
         var item = body.RootElement.GetProperty("upcoming").EnumerateArray().Single();
         Assert.Equal(JsonValueKind.Null, item.GetProperty("buildingName").ValueKind);
         Assert.Equal(JsonValueKind.Null, item.GetProperty("organizerName").ValueKind);
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("checkedInAt").ValueKind);
         Assert.Equal("Aula senza edificio", item.GetProperty("roomName").GetString());
         Assert.True(item.GetProperty("isOrganizer").GetBoolean());
     }
@@ -288,7 +289,73 @@ public sealed class MyReservationsTests : IDisposable
         Assert.False(item.IsGroup);
     }
 
+    // --- Check-in (US-14) ---
+
+    [Fact]
+    public async Task Mine_WithCheckIn_ShowsCheckedInAtInUpcomingAndPast()
+    {
+        var room = await SeedRoomAsync();
+        var user = Guid.NewGuid();
+        var inProgress = NewReservation(room, user, Now.AddMinutes(-30)); // 10:00-11:00, ora sono le 10:30
+        var yesterday = NewReservation(room, user, Now.AddDays(-1));
+        await SeedAsync(inProgress, yesterday);
+        var inProgressCheckIn = Now.AddMinutes(-25);
+        var yesterdayCheckIn = yesterday.Start.AddMinutes(-10);
+        await SeedAttendanceAsync(inProgress.Id, AttendanceType.CheckIn, inProgressCheckIn);
+        await SeedAttendanceAsync(yesterday.Id, AttendanceType.CheckIn, yesterdayCheckIn);
+
+        var result = await GetMineAsync(user);
+
+        Assert.Equal(inProgressCheckIn, Assert.Single(result.Upcoming).CheckedInAt);
+        Assert.Equal(yesterdayCheckIn, Assert.Single(result.Past).CheckedInAt);
+    }
+
+    [Fact]
+    public async Task Mine_WithoutCheckIn_ReturnsNullCheckedInAt()
+    {
+        var room = await SeedRoomAsync();
+        var user = Guid.NewGuid();
+        await SeedAsync(NewReservation(room, user, Now.AddDays(1)), NewReservation(room, user, Now.AddDays(-1)));
+
+        var result = await GetMineAsync(user);
+
+        Assert.Null(Assert.Single(result.Upcoming).CheckedInAt);
+        Assert.Null(Assert.Single(result.Past).CheckedInAt);
+    }
+
+    [Fact]
+    public async Task Mine_WithOnlyNoShow_ReturnsNullCheckedInAt()
+    {
+        var room = await SeedRoomAsync();
+        var user = Guid.NewGuid();
+        var yesterday = NewReservation(room, user, Now.AddDays(-1));
+        await SeedAsync(yesterday);
+        await SeedAttendanceAsync(yesterday.Id, AttendanceType.NoShow, yesterday.Start.AddMinutes(20));
+
+        var result = await GetMineAsync(user);
+
+        var item = Assert.Single(result.Past);
+        Assert.Equal(yesterday.Id, item.Id);
+        Assert.Null(item.CheckedInAt);
+    }
+
     // --- Supporto ---
+
+    // Record di presenza inserito direttamente: nessuna API crea ancora i NoShow (US-15).
+    private async Task SeedAttendanceAsync(Guid reservationId, AttendanceType type, DateTimeOffset recordedAt)
+    {
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        db.AttendanceRecords.Add(new AttendanceRecord
+        {
+            Id = Guid.NewGuid(),
+            ReservationId = reservationId,
+            Type = type,
+            RecordedAt = recordedAt,
+            RecordedBy = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+    }
 
     private static async Task AssertUnauthorizedAsync(HttpResponseMessage response)
     {
