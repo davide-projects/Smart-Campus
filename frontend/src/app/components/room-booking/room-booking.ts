@@ -14,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Subject, catchError, of, switchMap, tap } from 'rxjs';
 
 // Componenti di Angular Material
 import { MatButtonModule } from '@angular/material/button';
@@ -27,6 +28,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 
 // Servizi e modelli
+import { DailyAvailability } from '../../models/availability.model';
 import {
   ReservationResponse,
   addDays,
@@ -36,10 +38,12 @@ import {
   halfHourSlots,
   pad,
   reservationTimeLabel,
+  toIsoDate,
 } from '../../models/booking.model';
 import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
 import { BookingsService } from '../../services/bookings.service';
 import { RoomsService } from '../../services/rooms.service';
+import { AvailabilityTimeline } from '../shared/availability-timeline/availability-timeline';
 
 // Giorni prenotabili oltre oggi (assunzione A2).
 const MAX_DAYS_AHEAD = 14;
@@ -67,6 +71,7 @@ interface Confirmation {
 
 @Component({
   imports: [
+    AvailabilityTimeline,
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
@@ -123,6 +128,17 @@ export class RoomBooking implements OnInit {
   private readonly selectedDay = signal<Date | null>(null);
   private readonly selectedStart = signal<string | null>(null);
 
+  // Disponibilità del giorno scelto, mostrata come linea del tempo sopra gli orari: chi prenota
+  // vede le fasce libere senza tornare al dettaglio dello spazio. Se non si carica, la
+  // prenotazione resta possibile: l'ultima parola sui conflitti è comunque di Bookings.
+  protected readonly hasDay = computed(() => this.selectedDay() !== null);
+  protected readonly availability = signal<DailyAvailability | null>(null);
+  protected readonly isLoadingAvailability = signal(false);
+  protected readonly availabilityFailed = signal(false);
+
+  // `keepCurrent`: l'aggiornamento dopo un rifiuto non svuota la linea del tempo mentre ricarica.
+  private readonly availabilityRequests = new Subject<{ day: Date | null; keepCurrent: boolean }>();
+
   // Orario di apertura del giorno scelto; null se non c'è un giorno o lo spazio è chiuso.
   protected readonly dayHours = computed(() => {
     const room = this.room();
@@ -165,11 +181,44 @@ export class RoomBooking implements OnInit {
   private readonly dayInput = viewChild<ElementRef<HTMLInputElement>>('dayInput');
 
   constructor() {
+    // switchMap: scegliendo un altro giorno la richiesta precedente viene annullata.
+    this.availabilityRequests
+      .pipe(
+        tap(({ day, keepCurrent }) => {
+          this.availabilityFailed.set(false);
+          if (!keepCurrent) {
+            this.availability.set(null);
+            this.isLoadingAvailability.set(day !== null);
+          }
+        }),
+        switchMap(({ day }) => {
+          const roomId = this.roomId();
+          if (day === null || roomId === null) {
+            return of(null);
+          }
+          return this.bookingsService.getDailyAvailability(roomId, toIsoDate(day)).pipe(
+            catchError(() => {
+              this.availabilityFailed.set(true);
+              return of(null);
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((availability) => {
+        this.isLoadingAvailability.set(false);
+        // Un errore durante l'aggiornamento lascia visibile l'ultima linea del tempo caricata.
+        if (availability !== null || !this.availabilityFailed()) {
+          this.availability.set(availability);
+        }
+      });
+
     // Al cambio di giorno si azzerano gli orari che non sono più dentro l'apertura.
     this.form.controls.day.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((day) => {
         this.selectedDay.set(day);
+        this.availabilityRequests.next({ day, keepCurrent: false });
         const { start, end } = this.form.controls;
         if (end.value !== null && !this.endOptions().includes(end.value)) {
           end.reset(null);
@@ -274,6 +323,10 @@ export class RoomBooking implements OnInit {
         error: (error: unknown) => {
           this.submitting.set(false);
           this.errorMessage.set(rejectionMessage(error));
+          // Un conflitto vuol dire che la disponibilità è cambiata: la linea del tempo la aggiorna.
+          if (error instanceof HttpErrorResponse && error.status === 409) {
+            this.availabilityRequests.next({ day: this.form.controls.day.value, keepCurrent: true });
+          }
         },
       });
   }

@@ -16,6 +16,7 @@ import { MatSelectHarness } from '@angular/material/select/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { Observable, of, throwError } from 'rxjs';
+import { DailyAvailability } from '../../models/availability.model';
 import { ReservationResponse } from '../../models/booking.model';
 import { RoomDetail } from '../../models/room.model';
 import { authInterceptor } from '../../services/auth.interceptor';
@@ -53,6 +54,24 @@ const ROOM: RoomDetail = {
 const NOW = new Date('2026-11-05T08:00:00Z');
 
 const ROOM_CONFLICT = 'Lo spazio è già prenotato in questa fascia.';
+
+// Richiesta della linea del tempo: la pagina la fa a ogni giorno scelto.
+const isAvailabilityRequest = (request: { url: string }): boolean =>
+  request.url === '/api/bookings/availability';
+
+// Disponibilità sintetica del 5 novembre dalle 08:00, in fasce da 30 minuti (true = libera).
+function availabilityOf(states: boolean[], isOpen = true): DailyAvailability {
+  const time = (index: number): string => {
+    const hours = String(8 + Math.floor(index / 2)).padStart(2, '0');
+    return `2026-11-05T${hours}:${index % 2 === 0 ? '00' : '30'}:00+01:00`;
+  };
+  return {
+    roomId: 'r1',
+    date: '2026-11-05',
+    isOpen,
+    slots: states.map((isFree, index) => ({ start: time(index), end: time(index + 1), isFree })),
+  };
+}
 const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
 
 function created(overrides: Partial<ReservationResponse> = {}): ReservationResponse {
@@ -178,6 +197,8 @@ describe('RoomBooking', () => {
   });
 
   afterEach(() => {
+    // Le richieste della linea del tempo non interessano i test che non le verificano: si scartano.
+    http?.match(isAvailabilityRequest);
     http?.verify();
     vi.useRealTimers();
     if (originalTimeZone === undefined) {
@@ -423,6 +444,98 @@ describe('RoomBooking', () => {
     });
   });
 
+  describe('availability of the day', () => {
+    function availabilityRequest(date: string) {
+      return http.expectOne(
+        (request) => isAvailabilityRequest(request) && request.params.get('date') === date,
+      );
+    }
+
+    function srTexts(): string[] {
+      return [...element().querySelectorAll('app-availability-timeline .block .sr-only')].map(
+        (node) => node.textContent!.trim(),
+      );
+    }
+
+    it('shows nothing before a day is chosen', async () => {
+      await render();
+
+      expect(element().querySelector('.day-availability')).toBeNull();
+      http.expectNone(isAvailabilityRequest);
+    });
+
+    it('asks for the availability of the chosen day and shows it as a timeline', async () => {
+      await render();
+      await chooseDay(5);
+
+      const request = availabilityRequest('2026-11-05');
+      expect(request.request.params.get('roomId')).toBe('r1');
+      expect(element().querySelector('.day-availability mat-spinner')).not.toBeNull();
+
+      request.flush(availabilityOf([true, true, false, false]));
+      await stable();
+
+      expect(element().querySelector('.day-availability mat-spinner')).toBeNull();
+      expect(srTexts()).toEqual(['Libera dalle 08:00 alle 09:00', 'Occupata dalle 09:00 alle 10:00']);
+      // La linea del tempo sta tra il campo «Giorno» e gli orari.
+      const section = element().querySelector('.day-availability')!;
+      expect(section.previousElementSibling!.tagName).toBe('MAT-FORM-FIELD');
+      expect(section.nextElementSibling!.classList).toContain('times');
+    });
+
+    it('asks for the availability of the day taken from the query parameters', async () => {
+      await render('/rooms/r1/book?date=2026-11-05&start=10:00&end=11:00');
+
+      availabilityRequest('2026-11-05').flush(availabilityOf([true, true]));
+      await stable();
+
+      expect(srTexts()).toEqual(['Libera dalle 08:00 alle 09:00']);
+    });
+
+    it('cancels the earlier request when another day is chosen', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseDay(6);
+
+      expect(availabilityRequest('2026-11-05').cancelled).toBe(true);
+      const second = availabilityRequest('2026-11-06');
+      expect(second.cancelled).toBe(false);
+
+      second.flush(availabilityOf([false, false]));
+      await stable();
+
+      expect(srTexts()).toEqual(['Occupata dalle 08:00 alle 09:00']);
+    });
+
+    it('says that the space is closed when the service reports no opening', async () => {
+      await render();
+      await chooseDay(5);
+
+      availabilityRequest('2026-11-05').flush(availabilityOf([], false));
+      await stable();
+
+      expect(element().querySelector('app-availability-timeline')).toBeNull();
+      expect(element().querySelector('.day-availability')!.textContent).toContain(
+        'Lo spazio non è aperto nel giorno scelto.',
+      );
+    });
+
+    it('lets the student book when the availability does not load', async () => {
+      await render();
+      await chooseDay(5);
+
+      availabilityRequest('2026-11-05').flush(null, { status: 500, statusText: 'Server Error' });
+      await stable();
+
+      expect(element().querySelector('app-availability-timeline')).toBeNull();
+      expect(element().querySelector('.day-availability')!.textContent).toContain(
+        'Non è stato possibile caricare le fasce orarie',
+      );
+      expect(element().querySelector('[role="alert"]')).toBeNull();
+      expect(await (await confirmButton()).isDisabled()).toBe(false);
+    });
+  });
+
   describe('form', () => {
     it('marks the missing required fields and sends no request', async () => {
       await render();
@@ -556,6 +669,7 @@ describe('RoomBooking', () => {
       await stable();
 
       expect(element().querySelector('.confirmation')).toBeNull();
+      expect(element().querySelector('.day-availability')).toBeNull();
       expect(element().querySelector('.room-name')!.textContent!.trim()).toBe('Aula A1');
       expect(await (await dayInput()).getValue()).toBe('');
       expect(await (await select('Ora di inizio')).getValueText()).toBe('');
@@ -615,6 +729,42 @@ describe('RoomBooking', () => {
 
       expect(alertText()).toBe(detail);
       expect(await availabilityLink()).toBeNull();
+    });
+
+    it('updates the timeline after a room conflict, without emptying it while it loads', async () => {
+      await render();
+      await fillAndSubmit();
+      const first = http.expectOne(isAvailabilityRequest);
+      first.flush(availabilityOf([true, true, true, true]));
+      await stable();
+      expect(element().querySelectorAll('app-availability-timeline .block')).toHaveLength(1);
+
+      await respond(...problem(409, 'Spazio già prenotato', ROOM_CONFLICT));
+
+      const refresh = http.expectOne(
+        (request) => isAvailabilityRequest(request) && request.params.get('date') === '2026-11-05',
+      );
+      expect(element().querySelector('app-availability-timeline')).not.toBeNull();
+      expect(element().querySelector('.day-availability mat-spinner')).toBeNull();
+
+      refresh.flush(availabilityOf([true, true, false, false]));
+      await stable();
+
+      expect(
+        [...element().querySelectorAll('app-availability-timeline .block .sr-only')].map((node) =>
+          node.textContent!.trim(),
+        ),
+      ).toEqual(['Libera dalle 08:00 alle 09:00', 'Occupata dalle 09:00 alle 10:00']);
+    });
+
+    it('does not ask for the availability again after a rejection that is not a conflict', async () => {
+      await render();
+      await fillAndSubmit(5, '19:00', '20:00');
+
+      await respond(...problem(422, 'Prenotazione non valida', 'Non è possibile prenotare nel passato.'));
+
+      // Resta solo la richiesta fatta scegliendo il giorno.
+      expect(http.match(isAvailabilityRequest)).toHaveLength(1);
     });
 
     it('lets the student try again with the same form', async () => {
@@ -715,6 +865,7 @@ describe('RoomBooking with an expired session', () => {
 
     expect(auth.isLoggedIn()).toBe(false);
     expect(TestBed.inject(Router).url).toBe('/login?reason=expired&returnUrl=%2Frooms%2Fr1%2Fbook');
+    http.match(isAvailabilityRequest);
     http.verify();
   });
 });

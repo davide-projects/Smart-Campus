@@ -1,0 +1,45 @@
+@if (timeline(); as t) {
+  <div class="head">
+    <p class="summary">{{ t.freeLabel }} <span>{{ t.totalLabel }}</span></p>
+    <!-- La legenda è solo visiva: ogni blocco dice già il proprio stato ai lettori di schermo. -->
+    <ul class="legend" aria-hidden="true">
+      <li><i class="swatch swatch-free"></i>Libera</li>
+      <li><i class="swatch swatch-occupied"></i>Occupata</li>
+    </ul>
+  </div>
+
+  <div class="timeline">
+    <ol class="bar" role="list" aria-label="Disponibilità della giornata">
+      @for (block of t.blocks; track block.start) {
+        <li
+          class="block"
+          [class.free]="block.isFree"
+          [class.occupied]="!block.isFree"
+          [class.fits-wide]="block.fitsWide"
+          [class.fits-narrow]="block.fitsNarrow"
+          [style.flex]="block.minutes + ' 1 0px'"
+          [matTooltip]="block.tooltip"
+          matTooltipPosition="above"
+          tabindex="0"
+        >
+          <span class="sr-only">{{ block.srText }}</span>
+          <span class="label" aria-hidden="true">{{ block.range }}</span>
+        </li>
+      }
+    </ol>
+
+    <div class="ticks" aria-hidden="true">
+      @for (tick of t.ticks; track tick.percent) {
+        <span
+          class="tick"
+          [class.first]="tick.edge === 'first'"
+          [class.last]="tick.edge === 'last'"
+          [class.hide-narrow]="!tick.showOnNarrow"
+          [style.left.%]="tick.percent"
+        >
+          {{ tick.label }}
+        </span>
+      }
+    </div>
+  </div>
+}

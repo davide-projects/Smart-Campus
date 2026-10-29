@@ -124,7 +124,7 @@
           </ul>
         </div>
 
-        <div class="availability-section" id="availability-section" #availabilitySection>
+        <div class="availability-section">
           <h3>Disponibilità giornaliera</h3>
 
           @if (!isLoggedIn()) {
@@ -177,32 +177,11 @@
                   </div>
                 </div>
               } @else {
-                <div class="slots-grid">
-                  @for (slot of av.slots; track slot.start) {
-                    <div
-                      class="slot-item"
-                      [class.is-free]="slot.isFree"
-                      [class.is-occupied]="!slot.isFree"
-                    >
-                      <div class="slot-time">
-                        <mat-icon fontSet="material-symbols-outlined">schedule</mat-icon>
-                        <span>{{ formatTime(slot.start) }} – {{ formatTime(slot.end) }}</span>
-                      </div>
-
-                      <div class="slot-badge">
-                        @if (slot.isFree) {
-                          <mat-icon fontSet="material-symbols-outlined">check_circle</mat-icon>
-                          <span>Libera</span>
-                        } @else {
-                          <mat-icon fontSet="material-symbols-outlined">block</mat-icon>
-                          <span>Occupata</span>
-                        }
-                      </div>
-                    </div>
-                  } @empty {
-                    <p class="empty-text">Nessuna fascia oraria disponibile per questo giorno.</p>
-                  }
-                </div>
+                @if (av.slots.length > 0) {
+                  <app-availability-timeline [slots]="av.slots" />
+                } @else {
+                  <p class="empty-text">Nessuna fascia oraria disponibile per questo giorno.</p>
+                }
               }
             }
           }
@@ -232,15 +211,6 @@
         }
 
         <div class="booking-actions">
-          <button
-            matButton="outlined"
-            type="button"
-            (click)="scrollToAvailability()"
-          >
-            <mat-icon fontSet="material-symbols-outlined">event_available</mat-icon>
-            Vedi disponibilità
-          </button>
-
           @if (r.isBookable) {
             <a matButton="filled" [routerLink]="['/rooms', r.id, 'book']">
               <mat-icon fontSet="material-symbols-outlined">bookmark_add</mat-icon>

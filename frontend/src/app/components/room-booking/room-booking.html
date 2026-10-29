@@ -94,6 +94,29 @@
           }
         </mat-form-field>
 
+        @if (hasDay()) {
+          <section class="day-availability" aria-labelledby="day-availability-title">
+            <h2 id="day-availability-title">Fasce libere e occupate del giorno</h2>
+            @if (isLoadingAvailability()) {
+              <div class="availability-loading">
+                <mat-spinner diameter="24" aria-label="Caricamento della disponibilità"></mat-spinner>
+                <span>Caricamento delle fasce orarie...</span>
+              </div>
+            } @else if (availability(); as av) {
+              @if (av.isOpen && av.slots.length > 0) {
+                <app-availability-timeline [slots]="av.slots" />
+              } @else {
+                <p class="availability-note">Lo spazio non è aperto nel giorno scelto.</p>
+              }
+            } @else if (availabilityFailed()) {
+              <p class="availability-note">
+                Non è stato possibile caricare le fasce orarie. Puoi comunque prenotare: il sistema
+                controlla che la fascia sia libera.
+              </p>
+            }
+          </section>
+        }
+
         <div class="times">
           <mat-form-field appearance="outline">
             <mat-label>Ora di inizio</mat-label>

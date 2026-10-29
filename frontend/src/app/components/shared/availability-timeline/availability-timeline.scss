@@ -1,0 +1,181 @@
+:host {
+  display: block;
+  margin-top: 1rem;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.875rem;
+}
+
+.summary {
+  margin: 0;
+  font: var(--mat-sys-title-small);
+
+  span {
+    color: var(--mat-sys-on-surface-variant);
+    font-weight: 400;
+  }
+}
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border-radius: 4px;
+  vertical-align: -3px;
+}
+
+// Libero e occupato non si distinguono solo dal colore: l'occupato ha anche le righe diagonali.
+$free-border: color-mix(in srgb, var(--mat-sys-tertiary) 30%, var(--mat-sys-tertiary-container));
+$occupied-stripe: color-mix(in srgb, var(--mat-sys-on-surface-variant) 14%, var(--mat-sys-surface-container-highest));
+$occupied-pattern: repeating-linear-gradient(
+  135deg,
+  var(--mat-sys-surface-container-highest) 0 6px,
+  #{$occupied-stripe} 6px 9px
+);
+
+.swatch-free {
+  background: var(--mat-sys-tertiary-container);
+  border: 1px solid $free-border;
+}
+
+.swatch-occupied {
+  background: $occupied-pattern;
+  border: 1px solid var(--mat-sys-outline-variant);
+}
+
+// La larghezza si misura sulla barra stessa, non sulla finestra: dentro la scheda lo spazio è minore.
+.timeline {
+  container-type: inline-size;
+}
+
+.bar {
+  display: flex;
+  gap: 2px;
+  height: 52px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  background: var(--mat-sys-surface);
+}
+
+.block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--mat-sys-label-large);
+  white-space: nowrap;
+
+  &.free {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  &.occupied {
+    background: $occupied-pattern;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--mat-sys-primary);
+    outline-offset: -3px;
+  }
+}
+
+// L'orario dentro il blocco compare solo se ci sta; sugli schermi stretti servono blocchi più larghi.
+.label {
+  display: none;
+
+  .fits-wide > & {
+    display: inline;
+  }
+
+  @container (max-width: 520px) {
+    .fits-wide > & {
+      display: none;
+    }
+
+    .fits-narrow > & {
+      display: inline;
+    }
+  }
+}
+
+.ticks {
+  position: relative;
+  height: 28px;
+  margin-top: 6px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+
+  // Piccola tacca sopra l'orario, allineata al punto della barra.
+  &::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    width: 1px;
+    height: 5px;
+    background: var(--mat-sys-outline-variant);
+  }
+
+  &.first {
+    transform: none;
+
+    &::before {
+      left: 0;
+    }
+  }
+
+  &.last {
+    transform: translateX(-100%);
+
+    &::before {
+      left: 100%;
+    }
+  }
+
+  @container (max-width: 520px) {
+    &.hide-narrow {
+      display: none;
+    }
+  }
+}
+
+// Testo solo per i lettori di schermo: fuori dalla vista, ma letto.
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
