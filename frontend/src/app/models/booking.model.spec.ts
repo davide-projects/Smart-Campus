@@ -3,6 +3,7 @@ import {
   campusTime,
   campusToday,
   defaultSearchSlot,
+  formatTimeRange,
   halfHourSlots,
   reservationTimeLabel,
   toMinutes,
@@ -104,6 +105,15 @@ describe('campus time helpers', () => {
           end: '2026-06-05T11:00:00+02:00',
         }),
       ).toBe('venerdì 5 giugno 2026, 10:00–11:00');
+    });
+  });
+
+  describe('formatTimeRange', () => {
+    it('formats the time range in campus time', () => {
+      env['TZ'] = 'UTC';
+      expect(formatTimeRange('2026-11-05T09:00:00+01:00', '2026-11-05T10:30:00+01:00')).toBe(
+        '09:00 – 10:30',
+      );
     });
   });
 

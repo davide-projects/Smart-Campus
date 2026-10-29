@@ -48,6 +48,18 @@ export interface FutureReservationsCountResponse {
   count: number;
 }
 
+// Elemento dell'elenco delle prenotazioni di uno spazio per un giorno (GET /api/bookings?roomId=...&date=...).
+export interface ReservationListItem {
+  id: string;
+  start: string;
+  end: string;
+  organizerId: string;
+  participants: number;
+  memberIds: string[];
+  status: ReservationStatus;
+  cancelledAt: string | null;
+}
+
 // Giorno e orario si mostrano sempre nell'ora del campus, qualunque sia il fuso del dispositivo.
 const CAMPUS_TIME_ZONE = 'Europe/Rome';
 
@@ -70,6 +82,13 @@ export function reservationTimeLabel(item: { start: string; end: string }): stri
   const start = new Date(item.start);
   const end = new Date(item.end);
   return `${DAY_FORMAT.format(start)}, ${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
+}
+
+// Orario della fascia in ora del campus, es. «10:00 – 11:00».
+export function formatTimeRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  return `${TIME_FORMAT.format(start)} – ${TIME_FORMAT.format(end)}`;
 }
 
 // Scostamento dall'ora UTC del campus in un istante, es. «GMT+01:00» (solo «GMT» quando è zero).
