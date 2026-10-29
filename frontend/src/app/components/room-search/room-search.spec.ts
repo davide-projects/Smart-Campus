@@ -221,7 +221,7 @@ describe('RoomSearch', () => {
     const thumb = await (await loader.getHarness(MatSliderHarness)).getEndThumb();
     expect(await thumb.getMinValue()).toBe(0);
     expect(await thumb.getMaxValue()).toBe(40);
-    expect(await thumb.getValue()).toBe(0);
+    expect(await thumb.getValue()).toBe(40);
     expect(capacityText()).toBe('Qualsiasi');
   });
 
@@ -270,7 +270,7 @@ describe('RoomSearch', () => {
     await click('Azzera filtri');
 
     expect(await (await (await loader.getHarness(MatSliderHarness)).getEndThumb()).getValue()).toBe(
-      0,
+      40,
     );
     expect(capacityText()).toBe('Qualsiasi');
     expect(search).toHaveBeenLastCalledWith({});
