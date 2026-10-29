@@ -74,7 +74,7 @@ Area: `svc:bookings`.
   - `docs/handoff-architettura.md`: F1 con la verifica dei membri, tabella degli errori 6.2 con i messaggi definitivi e i `code` dei nuovi rifiuti (tolto «*(con US-05)*», `maxParticipants` per la capienza).
 
   Verificare con `docker compose up --build`: una prenotazione con `student2` come membro dà `201` e compare in «Le mie prenotazioni» di `student2`; con `identity` fermo (`docker compose stop identity`) la stessa richiesta dà `503` e una prenotazione singola dà `201`. Riportare l'esito nella PR.
-- [ ] 2.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
+- [x] 2.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
 
 ## 3. Frontend: scelta dei membri nel modulo di prenotazione (#18)
 
