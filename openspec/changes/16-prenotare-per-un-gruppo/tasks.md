@@ -18,7 +18,7 @@ Area: `svc:identity`.
   - `docs/handoff-architettura.md` 6.3: le due route.
 
   Verificare che route e messaggi citati coincidano con il codice.
-- [ ] 1.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
+- [x] 1.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
 
 ## 2. Bookings: prenotazione con membri del gruppo (#17)
 
