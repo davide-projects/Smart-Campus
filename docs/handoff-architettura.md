@@ -234,6 +234,8 @@ Le risposte `401` e `404` non hanno `code`.
 |---|---|---|
 | POST | `/api/identity/login` | Restituisce JWT |
 | GET | `/api/identity/me` | Profilo e ruolo |
+| GET | `/api/identity/students?search=` | Ricerca degli studenti per la prenotazione di gruppo (solo `Student`, almeno 2 caratteri, al massimo 10 risultati) |
+| POST | `/internal/users/students/check` | Verifica interna per Bookings: quali id sono studenti (INV-9); non instradata dal Gateway |
 
 - Utenti **solo sintetici**, caricati da seed.
 - Registrazione self-service **fuori perimetro** *(proposta)*.

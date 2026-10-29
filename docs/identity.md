@@ -4,12 +4,14 @@ Servizio `src/Services/Identity/` (porta locale **5101**, database `SmartCampus_
 
 ## API
 
-Tutte le route passano dal Gateway (`/api/identity/**`).
+Le route pubbliche passano dal Gateway (`/api/identity/**`); quelle interne (`/internal/**`) no.
 
 | Metodo | Route | Accesso | Risposta |
 |---|---|---|---|
 | POST | `/api/identity/login` | anonimo | `200` con token e profilo · `400` campi mancanti · `401` credenziali errate |
 | GET | `/api/identity/me` | token valido | `200` con il profilo · `401` token assente, scaduto o non valido |
+| GET | `/api/identity/students?search=` | token valido con ruolo `Student` | `200` con al massimo 10 studenti (`id`, `username`, `displayName`) · `400` testo con meno di 2 caratteri o assente · `401` token assente o non valido · `403` utente `Staff` |
+| POST | `/internal/users/students/check` | token valido, qualunque ruolo; **non instradata dal Gateway** | `200` con `students` e `notStudents` · `400` corpo non valido o elenco vuoto · `401` token assente o non valido |
 
 **Login**
 
@@ -33,6 +35,37 @@ Con credenziali errate la risposta è sempre `401` con il messaggio "Nome utente
 **Maiuscole e minuscole.** Lo username **non distingue** maiuscole e minuscole: `student1`, `Student1` e `STUDENT1` accedono con lo stesso utente, perché il confronto è fatto dal database (SQL Server, collation predefinita insensibile alle maiuscole). La **password** invece le distingue. Il token e il profilo riportano sempre lo username come è salvato (`student1`), non come è stato digitato. Per lo stesso motivo non possono esistere due utenti con username che differiscono solo per le maiuscole.
 
 **Profilo**: `GET /api/identity/me` con l'intestazione `Authorization: Bearer <jwt>`. Il profilo è letto dal database, non dal token.
+
+**Ricerca degli studenti** (US-05, modulo di prenotazione di gruppo): `GET /api/identity/students?search=bia` con il token di uno studente.
+
+```json
+200 OK
+[ { "id": "a0000000-0000-0000-0000-000000000002", "username": "student2", "displayName": "Anna Bianchi" } ]
+```
+
+Limiti della ricerca:
+
+- è **riservata agli studenti**, perché solo loro creano prenotazioni di gruppo: un utente `Staff` riceve `403` con titolo «Ricerca non consentita» e messaggio «Solo gli studenti possono cercare altri studenti.». Il controllo è in Identity (claim `role`), non nel Gateway;
+- il testo deve avere **almeno 2 caratteri** dopo aver tolto gli spazi iniziali e finali; altrimenti, o senza `search`, `400` sul campo `search` con «Scrivi almeno 2 caratteri per cercare.»;
+- cerca nel nome visualizzato e nello username (`LIKE`, senza distinzione tra maiuscole e minuscole per la collation del database) e restituisce **al massimo 10 risultati**, ordinati per `displayName` e poi per `username`;
+- i risultati contengono **solo studenti** e solo `id`, `username` e `displayName`; **chi cerca è escluso** (claim `sub`). Con un `sub` che non è un GUID la risposta è `401`.
+
+**Endpoint interno: verifica degli studenti.** `POST /internal/users/students/check` serve a Bookings per controllare che i membri di una prenotazione di gruppo siano studenti registrati (INV-9). Sta fuori da `/api`, quindi il Gateway non lo instrada (`404`); in Docker Compose Identity non pubblica porte verso l'host. Richiede un JWT valido emesso da Identity, con qualunque ruolo: Bookings inoltra l'intestazione `Authorization` dell'utente, senza credenziali di servizio né segreti nuovi.
+
+```json
+POST /internal/users/students/check
+{ "userIds": ["a0000000-0000-0000-0000-000000000002", "b0000000-0000-0000-0000-000000000001"] }
+```
+
+```json
+200 OK
+{
+  "students": [ { "id": "a0000000-0000-0000-0000-000000000002", "displayName": "Anna Bianchi" } ],
+  "notStudents": [ "b0000000-0000-0000-0000-000000000001" ]
+}
+```
+
+Ogni id distinto compare una sola volta; `notStudents` contiene sia gli utenti `Staff` sia gli id inesistenti, senza distinguerli, così la risposta non rivela chi è registrato. Con corpo mancante, JSON non valido, `userIds` assente o vuoto o valori non GUID la risposta è `400` (ValidationProblem sul campo `userIds`, «Indica almeno un utente da verificare.»); senza token o con un token non valido `401`.
 
 ## Contratto del token (per il task #30)
 
@@ -100,6 +133,6 @@ Un database di sviluppo creato con una versione precedente, senza migrazioni, va
 
 - **Uscita (logout):** il token è senza stato e non c'è revoca lato server. "Uscire" significa che il frontend scarta il token; resta valido fino alla scadenza se qualcuno lo ha copiato. Per un progetto dimostrativo è un limite accettato; la durata breve lo contiene.
 - **Nessun refresh token e nessuna registrazione autonoma** (fuori perimetro, assunzione A7).
-- **Nessun limite ai tentativi di login** (rate limiting o blocco temporaneo): da valutare se il PO lo richiede.
+- **Nessun limite ai tentativi di login** (rate limiting o blocco temporaneo): da valutare se il PO lo richiede. Lo stesso vale per la ricerca degli studenti, contenuta solo dai limiti di 2 caratteri e 10 risultati.
 - **Username senza distinzione tra maiuscole e minuscole:** dipende dalla collation del database e non da codice dell'applicazione. Se si cambiasse database o collation (per esempio una collation sensibile alle maiuscole), il comportamento cambierebbe: in quel caso va aggiornato questo documento e va aggiunto un test.
 - Se un utente cambia ruolo, il token già emesso mantiene il ruolo vecchio fino alla scadenza.
