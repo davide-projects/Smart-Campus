@@ -350,8 +350,22 @@ public static class ReservationEndpoints
             ? name
             : null;
 
-    private static IResult ToProblem(ReservationRejection rejection) =>
-        Results.Problem(statusCode: rejection.StatusCode, title: rejection.Title, detail: rejection.Detail);
+    // Oltre a titolo e dettaglio, la risposta porta il codice di motivo e, se ci sono, i limiti da rispettare.
+    private static IResult ToProblem(ReservationRejection rejection)
+    {
+        var extensions = new Dictionary<string, object?> { ["code"] = rejection.Code };
+
+        if (rejection.Limits is not null)
+        {
+            extensions["limits"] = rejection.Limits;
+        }
+
+        return Results.Problem(
+            statusCode: rejection.StatusCode,
+            title: rejection.Title,
+            detail: rejection.Detail,
+            extensions: extensions);
+    }
 
     private static async Task<IResult> CountFutureAsync(
         Guid roomId,
