@@ -154,7 +154,7 @@ export class RoomSearch {
     this.searches.next({
       type,
       minCapacity: minCapacity > 0 ? minCapacity : null,
-      maxCapacity: maxCapacity > 0 && maxCapacity < max ? maxCapacity : null,
+      maxCapacity: maxCapacity > 0 ? maxCapacity : null,
       buildingId,
     });
   }
