@@ -207,6 +207,7 @@ export class RoomBooking implements OnInit {
         next: (room) => {
           this.room.set(room);
           this.isLoading.set(false);
+          this.applyQueryParams();
         },
         error: (error: unknown) => {
           this.isLoading.set(false);
@@ -217,6 +218,25 @@ export class RoomBooking implements OnInit {
           }
         },
       });
+  }
+
+  private applyQueryParams(): void {
+    const queryDate = this.route.snapshot.queryParamMap.get('date');
+    const queryStart = this.route.snapshot.queryParamMap.get('start');
+    const queryEnd = this.route.snapshot.queryParamMap.get('end');
+
+    if (queryDate) {
+      const [y, m, d] = queryDate.split('-').map(Number);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        this.form.controls.day.setValue(new Date(y, m - 1, d));
+      }
+    }
+    if (queryStart) {
+      this.form.controls.start.setValue(queryStart);
+    }
+    if (queryEnd) {
+      this.form.controls.end.setValue(queryEnd);
+    }
   }
 
   protected submit(): void {

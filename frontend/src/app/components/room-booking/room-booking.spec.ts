@@ -206,6 +206,15 @@ describe('RoomBooking', () => {
       expect(element().textContent).toContain('Spazio non trovato');
       expect(element().querySelector('form')).toBeNull();
     });
+
+    it('pre-compila giorno, ora di inizio e fine dai parametri di query', async () => {
+      await render('/rooms/r1/book?date=2026-11-05&start=10:00&end=11:30');
+
+      const day = await dayInput();
+      expect(await day.getValue()).toBe('05/11/2026');
+      expect(await (await select('Ora di inizio')).getValueText()).toBe('10:00');
+      expect(await (await select('Ora di fine')).getValueText()).toBe('11:30');
+    });
   });
 
   describe('days and times', () => {

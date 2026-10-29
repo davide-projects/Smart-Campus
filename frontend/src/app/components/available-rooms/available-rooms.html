@@ -1,0 +1,134 @@
+<section class="available-rooms">
+  <header class="page-header">
+    <h1>Cerca spazi liberi</h1>
+    <p class="subtitle">Trova rapidamente le aule e i laboratori disponibili in una specifica fascia oraria.</p>
+  </header>
+
+  <mat-card appearance="outlined" class="filters-card">
+    <mat-card-content>
+      <form [formGroup]="form" (ngSubmit)="search()" class="filters-form">
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Giorno</mat-label>
+          <input
+            matInput
+            [matDatepicker]="picker"
+            [min]="minDay"
+            [max]="maxDay"
+            formControlName="date"
+            placeholder="GG/MM/AAAA"
+            aria-label="Seleziona giorno"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Ora di inizio</mat-label>
+          <mat-select formControlName="start" aria-label="Ora di inizio">
+            @for (time of startOptions; track time) {
+              <mat-option [value]="time">{{ time }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Ora di fine</mat-label>
+          <mat-select formControlName="end" aria-label="Ora di fine">
+            @for (time of endOptions(); track time) {
+              <mat-option [value]="time">{{ time }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Tipo di spazio</mat-label>
+          <mat-select formControlName="type" aria-label="Tipo di spazio">
+            <mat-option [value]="null">Tutti i tipi</mat-option>
+            @for (type of roomTypes; track type) {
+              <mat-option [value]="type">{{ roomTypeLabel(type) }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="field">
+          <mat-label>Capienza minima</mat-label>
+          <input
+            matInput
+            type="number"
+            min="1"
+            formControlName="minCapacity"
+            placeholder="Es. 10"
+            aria-label="Capienza minima"
+          />
+        </mat-form-field>
+
+        <div class="actions">
+          <button matButton="filled" type="submit" [disabled]="loading()">
+            <mat-icon fontSet="material-symbols-outlined">search</mat-icon>
+            Cerca spazi liberi
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  @if (loading()) {
+    <div class="loading-bar">
+      <mat-progress-bar mode="indeterminate" aria-label="Caricamento in corso"></mat-progress-bar>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <p class="message error-message" role="alert">
+      {{ errorMessage() }}
+    </p>
+  } @else if (hasSearched()) {
+    @if (results().length > 0) {
+      <div class="results-header">
+        <h2>Spazi disponibili ({{ results().length }})</h2>
+      </div>
+
+      <div class="results-grid">
+        @for (room of results(); track room.roomId) {
+          <mat-card appearance="outlined" class="room-card">
+            <mat-card-header>
+              <mat-card-title>{{ room.name }}</mat-card-title>
+              <mat-card-subtitle>
+                {{ room.buildingName ? room.buildingName : 'Edificio non specificato' }}
+              </mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="room-meta">
+                <span class="type-tag">{{ room.type ? roomTypeLabel(room.type) : 'Spazio' }}</span>
+                <span class="capacity-tag">
+                  <mat-icon fontSet="material-symbols-outlined">groups</mat-icon>
+                  {{ room.capacity }} posti
+                </span>
+              </div>
+            </mat-card-content>
+            <mat-card-actions align="end">
+              <a
+                matButton="filled"
+                [routerLink]="['/rooms', room.roomId, 'book']"
+                [queryParams]="{
+                  date: selectedIsoDate(),
+                  start: form.controls.start.value,
+                  end: form.controls.end.value
+                }"
+              >
+                <mat-icon fontSet="material-symbols-outlined">bookmark_add</mat-icon>
+                Prenota
+              </a>
+            </mat-card-actions>
+          </mat-card>
+        }
+      </div>
+    } @else {
+      <div class="empty-state" role="status">
+        <mat-icon fontSet="material-symbols-outlined" class="empty-icon">event_busy</mat-icon>
+        <p class="empty-text">Nessuno spazio è libero nella fascia oraria selezionata.</p>
+        <span class="empty-hint">Prova a modificare l'orario o a cambiare i filtri di ricerca.</span>
+      </div>
+    }
+  }
+</section>

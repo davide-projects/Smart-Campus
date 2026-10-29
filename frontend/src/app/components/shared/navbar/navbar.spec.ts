@@ -68,7 +68,7 @@ describe('Navbar', () => {
     await render();
 
     // Le voci di navigazione restano quelle di prima: il logo non ne è una.
-    expect(navLinks().map((link) => link.text)).toEqual(['Cerca spazi', 'Le mie prenotazioni']);
+    expect(navLinks().map((link) => link.text)).toEqual(['Cerca spazi', 'Spazi liberi', 'Le mie prenotazioni']);
   });
 
   function navLinks(): { text: string; href: string | null }[] {
@@ -100,6 +100,21 @@ describe('Navbar', () => {
     expect(navLinks()).not.toContainEqual(MY_BOOKINGS);
   });
 
+  const AVAILABLE_ROOMS = { text: 'Spazi liberi', href: '/available-rooms' };
+
+  it('shows the link to available rooms to a student', async () => {
+    user.set(STUDENT);
+    await render();
+
+    expect(navLinks()).toContainEqual(AVAILABLE_ROOMS);
+  });
+
+  it('hides the link to available rooms from a guest', async () => {
+    await render();
+
+    expect(navLinks()).not.toContainEqual(AVAILABLE_ROOMS);
+  });
+
   const NEW_ROOM = { text: 'Nuovo spazio', href: '/staff/rooms/new' };
 
   it('shows the link to create a room to the staff only', async () => {
@@ -126,7 +141,7 @@ describe('Navbar', () => {
     await menu.open();
 
     const items = await Promise.all((await menu.getItems()).map((item) => item.getText()));
-    expect(items).toEqual(['Cerca spazi', 'Le mie prenotazioni']);
+    expect(items).toEqual(['Cerca spazi', 'Spazi liberi', 'Le mie prenotazioni']);
   });
 
   it('has the menu button for mobile', async () => {

@@ -1,13 +1,14 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
-import { DailyAvailability } from '../models/availability.model';
+import { DailyAvailability, AvailabilitySearchFilter, AvailableRoomResponse } from '../models/availability.model';
 import {
   CreateReservationRequest,
   FutureReservationsCountResponse,
   MyReservationsResponse,
   ReservationResponse,
 } from '../models/booking.model';
+
 
 // Accesso al servizio Bookings attraverso il gateway.
 @Injectable({ providedIn: 'root' })
@@ -42,5 +43,22 @@ export class BookingsService {
     return this.http
       .get<FutureReservationsCountResponse>(`/api/bookings/rooms/${roomId}/future-reservations-count`)
       .pipe(map((response) => response.count));
+  }
+
+  // Cerca gli spazi liberi in una data e fascia oraria, con filtri opzionali per tipo e capienza.
+  searchAvailableRooms(filter: AvailabilitySearchFilter): Observable<AvailableRoomResponse[]> {
+    let params = new HttpParams()
+      .set('date', filter.date)
+      .set('start', filter.start)
+      .set('end', filter.end);
+
+    if (filter.type) {
+      params = params.set('type', filter.type);
+    }
+    if (filter.minCapacity != null && filter.minCapacity > 0) {
+      params = params.set('minCapacity', filter.minCapacity.toString());
+    }
+
+    return this.http.get<AvailableRoomResponse[]>('/api/bookings/availability/search', { params });
   }
 }

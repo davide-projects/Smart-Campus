@@ -53,7 +53,10 @@ describe('app routes', () => {
         },
         {
           provide: BookingsService,
-          useValue: { getMine: () => of({ upcoming: [], past: [], cancelled: [] }) },
+          useValue: {
+            getMine: () => of({ upcoming: [], past: [], cancelled: [] }),
+            searchAvailableRooms: () => of([]),
+          },
         },
         // La pagina di prenotazione resta in caricamento: qui conta solo la navigazione.
         { provide: RoomsService, useValue: { getRoomById: () => NEVER } },
@@ -126,5 +129,20 @@ describe('app routes', () => {
 
     expect(router.url).toBe('/rooms/r1/book');
     expect(TestBed.inject(Title).getTitle()).toBe('Prenota spazio · SmartCampus');
+  });
+
+  it('sends a guest from the available rooms page to the login, remembering the page', async () => {
+    await router.navigateByUrl('/available-rooms');
+
+    expect(router.url).toBe('/login?returnUrl=%2Favailable-rooms');
+  });
+
+  it('opens the available rooms page with its title for a logged in user', async () => {
+    isLoggedIn.set(true);
+
+    await router.navigateByUrl('/available-rooms');
+
+    expect(router.url).toBe('/available-rooms');
+    expect(TestBed.inject(Title).getTitle()).toBe('Cerca spazi liberi · SmartCampus');
   });
 });
