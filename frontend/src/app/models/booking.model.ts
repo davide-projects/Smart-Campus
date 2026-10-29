@@ -19,13 +19,54 @@ export interface MyReservationsResponse {
   cancelled: MyReservationItem[];
 }
 
-// Richiesta di POST /api/bookings: prenotazione singola a nome dell'utente del token.
+// Richiesta di POST /api/bookings a nome dell'utente del token.
 // start ed end sono date-ora ISO 8601 con lo scostamento del campus (es. 2026-11-05T10:00:00+01:00).
+// memberIds sono gli id degli studenti del gruppo, organizzatore escluso: [] per una prenotazione
+// singola.
 export interface CreateReservationRequest {
   roomId: string;
   start: string;
   end: string;
   purpose: string | null;
+  memberIds: string[];
+}
+
+// Numero massimo di membri di una prenotazione di gruppo, come in Bookings (organizzatore escluso).
+export const MAX_MEMBERS = 10;
+
+// Limiti che Bookings allega a un rifiuto (proprietà "limits" del ProblemDetails).
+export type RejectionLimits = Record<string, unknown>;
+
+// Messaggi dei rifiuti delle prenotazioni di gruppo, scelti dal codice di motivo ("code") del
+// ProblemDetails di Bookings e non dal testo. null se mancano i limiti che servono al messaggio.
+const GROUP_REJECTION_MESSAGES: Record<string, (limits: RejectionLimits) => string | null> = {
+  'members-occupied': () => 'Uno o più membri hanno già una prenotazione in questa fascia.',
+  'member-booking-in-progress': () =>
+    "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.",
+  'capacity-exceeded': (limits) =>
+    typeof limits['maxParticipants'] === 'number'
+      ? `Lo spazio ospita al massimo ${limits['maxParticipants']} persone.`
+      : null,
+  'too-many-members': (limits) => {
+    const maxMembers =
+      typeof limits['maxMembers'] === 'number' ? limits['maxMembers'] : MAX_MEMBERS;
+    return `Puoi aggiungere al massimo ${maxMembers} membri.`;
+  },
+  'organizer-as-member': () => "Non puoi aggiungerti come membro: sei già l'organizzatore.",
+  'duplicate-members': () => 'Ogni studente può essere aggiunto una sola volta.',
+  'members-not-students': () => 'Puoi aggiungere come membri solo studenti registrati.',
+  'members-check-unavailable': () =>
+    'Non è possibile verificare i membri in questo momento. Riprova tra poco.',
+};
+
+// Messaggio per l'utente di un rifiuto di prenotazione di gruppo; null per un codice non previsto.
+export function groupRejectionMessage(code: unknown, limits: unknown): string | null {
+  if (typeof code !== 'string' || !Object.hasOwn(GROUP_REJECTION_MESSAGES, code)) {
+    return null;
+  }
+  const safeLimits =
+    typeof limits === 'object' && limits !== null ? (limits as RejectionLimits) : {};
+  return GROUP_REJECTION_MESSAGES[code](safeLimits);
 }
 
 // Stato di una prenotazione come lo invia Bookings (es. "Confirmed").

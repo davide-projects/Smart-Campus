@@ -12,12 +12,19 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, catchError, debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 // Componenti di Angular Material
+import {
+  MatAutocompleteModule,
+  MatAutocompleteSelectedEvent,
+  MatAutocompleteTrigger,
+} from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatChipsModule } from '@angular/material/chips';
 import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
 import { MatDatepicker, MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -28,6 +35,7 @@ import { MatSelectModule } from '@angular/material/select';
 
 // Servizi e modelli
 import {
+  MAX_MEMBERS,
   ReservationResponse,
   addDays,
   campusDateTime,
@@ -35,11 +43,15 @@ import {
   campusToday,
   halfHourSlots,
   pad,
+  groupRejectionMessage,
   reservationTimeLabel,
 } from '../../models/booking.model';
 import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
+import { StudentSummary } from '../../models/user.model';
+import { AuthService } from '../../services/auth.service';
 import { BookingsService } from '../../services/bookings.service';
 import { RoomsService } from '../../services/rooms.service';
+import { StudentsService } from '../../services/students.service';
 
 // Giorni prenotabili oltre oggi (assunzione A2).
 const MAX_DAYS_AHEAD = 14;
@@ -53,6 +65,10 @@ export const ROOM_CONFLICT_DETAIL = 'Lo spazio è già prenotato in questa fasci
 
 export const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
 
+// Attesa dopo l'ultimo tasto prima di cercare gli studenti, e lunghezza minima del testo.
+const MEMBER_SEARCH_DEBOUNCE_MS = 300;
+const MIN_SEARCH_LENGTH = 2;
+
 interface BookingForm {
   day: FormControl<Date | null>;
   start: FormControl<string | null>;
@@ -63,14 +79,23 @@ interface BookingForm {
 interface Confirmation {
   roomName: string;
   time: string;
+  participants: number;
 }
+
+// Esito dell'ultima ricerca degli studenti, per il testo cercato (già senza spazi ai bordi).
+type MemberSearchResult =
+  | { text: string; status: 'done'; students: StudentSummary[] }
+  | { text: string; status: 'error' }
+  | { text: string; status: 'idle' };
 
 @Component({
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    MatAutocompleteModule,
     MatButtonModule,
     MatCardModule,
+    MatChipsModule,
     MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
@@ -88,10 +113,16 @@ export class RoomBooking implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly roomsService = inject(RoomsService);
   private readonly bookingsService = inject(BookingsService);
+  private readonly studentsService = inject(StudentsService);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
 
   protected readonly maxPurposeLength = MAX_PURPOSE_LENGTH;
+  protected readonly maxMembers = MAX_MEMBERS;
+
+  // Lo Staff non crea prenotazioni di gruppo: il campo «Membri del gruppo» non compare.
+  protected readonly isStaff = this.auth.isStaff;
 
   protected readonly roomId = signal<string | null>(null);
   protected readonly room = signal<RoomDetail | null>(null);
@@ -119,6 +150,39 @@ export class RoomBooking implements OnInit {
       validators: Validators.maxLength(MAX_PURPOSE_LENGTH),
     }),
   });
+
+  // Membri scelti: si scelgono tra le proposte, non si scrivono, quindi stanno fuori dal FormGroup.
+  protected readonly members = signal<StudentSummary[]>([]);
+  protected readonly participants = computed(() => 1 + this.members().length);
+  protected readonly overCapacity = computed(() => {
+    const room = this.room();
+    return !!room && this.participants() > room.capacity;
+  });
+  protected readonly membersFull = computed(() => this.members().length >= MAX_MEMBERS);
+
+  // Testo scritto nel campo di ricerca e risultato dell'ultima ricerca inviata.
+  private readonly memberSearchText = signal('');
+  private readonly memberSearchResult = signal<MemberSearchResult>({ text: '', status: 'idle' });
+  private readonly memberSearchTerms = new Subject<string>();
+
+  // Il risultato vale solo se riguarda il testo che c'è ora nel campo.
+  private readonly currentSearchResult = computed(() => {
+    const result = this.memberSearchResult();
+    const text = this.memberSearchText().trim();
+    return text.length >= MIN_SEARCH_LENGTH && result.text === text ? result : null;
+  });
+  // Proposte senza gli studenti già scelti; null finché non c'è una risposta per il testo attuale.
+  protected readonly memberSuggestions = computed(() => {
+    const result = this.currentSearchResult();
+    if (result?.status !== 'done') {
+      return null;
+    }
+    const chosen = new Set(this.members().map((member) => member.id));
+    return result.students.filter((student) => !chosen.has(student.id));
+  });
+  protected readonly memberSearchFailed = computed(
+    () => this.currentSearchResult()?.status === 'error',
+  );
 
   private readonly selectedDay = signal<Date | null>(null);
   private readonly selectedStart = signal<string | null>(null);
@@ -163,8 +227,35 @@ export class RoomBooking implements OnInit {
 
   private readonly confirmationHeading = viewChild<ElementRef<HTMLElement>>('confirmationHeading');
   private readonly dayInput = viewChild<ElementRef<HTMLInputElement>>('dayInput');
+  private readonly memberInput = viewChild<ElementRef<HTMLInputElement>>('memberInput');
 
   constructor() {
+    // Ricerca degli studenti: da 2 caratteri, dopo una pausa nella scrittura, e solo l'ultima
+    // richiesta conta. Un errore non interrompe le ricerche successive; il 401 chiude la sessione
+    // nell'interceptor, quindi non mostra il messaggio.
+    this.memberSearchTerms
+      .pipe(
+        map((text) => text.trim()),
+        debounceTime(MEMBER_SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((text) =>
+          text.length < MIN_SEARCH_LENGTH
+            ? of<MemberSearchResult>({ text, status: 'idle' })
+            : this.studentsService.search(text).pipe(
+                map((students): MemberSearchResult => ({ text, status: 'done', students })),
+                catchError((error: unknown) =>
+                  of<MemberSearchResult>(
+                    error instanceof HttpErrorResponse && error.status === 401
+                      ? { text, status: 'idle' }
+                      : { text, status: 'error' },
+                  ),
+                ),
+              ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.memberSearchResult.set(result));
+
     // Al cambio di giorno si azzerano gli orari che non sono più dentro l'apertura.
     this.form.controls.day.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -251,6 +342,10 @@ export class RoomBooking implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
+    // L'avviso di capienza spiega già perché il servizio rifiuterebbe la richiesta.
+    if (this.overCapacity()) {
+      return;
+    }
 
     const { day, start, end, purpose } = this.form.getRawValue();
     const trimmedPurpose = purpose.trim();
@@ -263,6 +358,7 @@ export class RoomBooking implements OnInit {
         start: campusDateTime(day!, start!),
         end: campusDateTime(day!, end!),
         purpose: trimmedPurpose === '' ? null : trimmedPurpose,
+        memberIds: this.members().map((member) => member.id),
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -285,9 +381,46 @@ export class RoomBooking implements OnInit {
     picker.open();
   }
 
-  // Dopo la conferma: modulo vuoto per lo stesso spazio, senza messaggi di rifiuto.
+  protected onMemberInput(text: string): void {
+    this.memberSearchText.set(text);
+    this.memberSearchTerms.next(text);
+  }
+
+  // Scelta di una proposta: diventa un chip, il testo si svuota e le proposte si chiudono.
+  protected addMember(event: MatAutocompleteSelectedEvent, trigger: MatAutocompleteTrigger): void {
+    const student = event.option.value as StudentSummary;
+    if (!this.membersFull() && !this.members().some((member) => member.id === student.id)) {
+      this.members.update((members) => [...members, student]);
+    }
+    this.clearMemberSearch();
+    trigger.closePanel();
+  }
+
+  protected removeMember(student: StudentSummary): void {
+    this.members.update((members) => members.filter((member) => member.id !== student.id));
+  }
+
+  // Invio senza una proposta evidenziata non aggiunge nulla e non invia il modulo: un membro si
+  // aggiunge solo scegliendolo. Con una proposta evidenziata la sceglie l'autocomplete.
+  protected onMemberEnter(event: Event, trigger: MatAutocompleteTrigger): void {
+    if (!trigger.panelOpen || !trigger.activeOption) {
+      event.preventDefault();
+    }
+  }
+
+  private clearMemberSearch(): void {
+    const input = this.memberInput()?.nativeElement;
+    if (input) {
+      input.value = '';
+    }
+    this.onMemberInput('');
+  }
+
+  // Dopo la conferma: modulo vuoto per lo stesso spazio, senza messaggi di rifiuto né membri.
   protected bookAnother(): void {
     this.form.reset();
+    this.members.set([]);
+    this.memberSearchText.set('');
     this.errorMessage.set(null);
     this.confirmation.set(null);
     this.focusAfterRender(() => this.dayInput()?.nativeElement);
@@ -300,19 +433,25 @@ export class RoomBooking implements OnInit {
 }
 
 function toConfirmation(reservation: ReservationResponse): Confirmation {
-  return { roomName: reservation.roomName, time: reservationTimeLabel(reservation) };
+  return {
+    roomName: reservation.roomName,
+    time: reservationTimeLabel(reservation),
+    participants: reservation.participants,
+  };
 }
 
-// 409 e 422 portano il motivo nel detail; il 401 lo porta quando presente, ma la sessione viene
-// comunque chiusa dall'interceptor. Ogni altro errore riceve il messaggio generico.
+// 409, 422 e 503 portano il motivo: per i rifiuti dei gruppi il messaggio si sceglie dal codice
+// ("code"), per gli altri si usa il detail. Il 401 porta il detail quando presente, ma la sessione
+// viene comunque chiusa dall'interceptor. Ogni altro errore riceve il messaggio generico.
 function rejectionMessage(error: unknown): string | null {
   if (!(error instanceof HttpErrorResponse)) {
     return GENERIC_ERROR;
   }
   const detail: unknown = error.error?.detail;
   const hasDetail = typeof detail === 'string' && detail.trim() !== '';
-  if (error.status === 409 || error.status === 422) {
-    return hasDetail ? detail : GENERIC_ERROR;
+  if (error.status === 409 || error.status === 422 || error.status === 503) {
+    const byCode = groupRejectionMessage(error.error?.code, error.error?.limits);
+    return byCode ?? (hasDetail ? detail : GENERIC_ERROR);
   }
   if (error.status === 401) {
     return hasDetail ? detail : null;

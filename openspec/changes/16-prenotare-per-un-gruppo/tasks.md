@@ -80,8 +80,8 @@ Area: `svc:bookings`.
 
 Area: `frontend`. Parte dopo il merge di #123 e #17.
 
-- [ ] 3.1 Aggiungere `StudentSummary` (`id`, `username`, `displayName`) in `models/user.model.ts` e `services/students.service.ts` con `search(text)` su `GET /api/identity/students?search=`. Aggiungere `memberIds: string[]` a `CreateReservationRequest`. Test Vitest con `HttpTestingController`: URL, parametro `search` codificato, metodo `GET`; corpo della `POST` con `memberIds`. Aggiornare i test esistenti di `bookings.service.spec.ts` e `room-booking.spec.ts` sul corpo della richiesta (`memberIds: []`).
-- [ ] 3.2 Nel modulo di `components/room-booking/` aggiungere il campo «Membri del gruppo» con `MatAutocomplete` e `MatChipGrid`:
+- [x] 3.1 Aggiungere `StudentSummary` (`id`, `username`, `displayName`) in `models/user.model.ts` e `services/students.service.ts` con `search(text)` su `GET /api/identity/students?search=`. Aggiungere `memberIds: string[]` a `CreateReservationRequest`. Test Vitest con `HttpTestingController`: URL, parametro `search` codificato, metodo `GET`; corpo della `POST` con `memberIds`. Aggiornare i test esistenti di `bookings.service.spec.ts` e `room-booking.spec.ts` sul corpo della richiesta (`memberIds: []`).
+- [x] 3.2 Nel modulo di `components/room-booking/` aggiungere il campo «Membri del gruppo» con `MatAutocomplete` e `MatChipGrid`:
   - ricerca con debounce di 300 ms da 2 caratteri dopo `trim`, con `switchMap`;
   - opzioni con nome visualizzato e username, senza i membri già scelti;
   - scelta → chip, input svuotato e pannello chiuso;
@@ -90,9 +90,9 @@ Area: `frontend`. Parte dopo il merge di #123 e #17.
   - «Nessuno studente trovato.» senza risultati e «Non è stato possibile cercare gli studenti. Riprova più tardi.» con `role="alert"` su errore diverso da `401`.
 
   Test con harness di Angular Material (`MatAutocompleteHarness`, `MatChipGridHarness`) e timer controllati: nessuna richiesta con 1 carattere, una richiesta con «bia», scelta e rimozione, membro già scelto non riproposto, Invio sul testo libero senza chip e senza `POST`, i due messaggi, `401` che chiude la sessione.
-- [ ] 3.3 Con `auth.isStaff()` non mostrare il campo «Membri del gruppo» (partecipanti fissi a 1, `memberIds` = `[]`). Con 10 membri disabilitare l'input e mostrare «Puoi aggiungere al massimo 10 membri.», che sparisce togliendo un chip. Test: Staff senza campo e con `memberIds` = `[]` nella `POST`; decimo membro che disabilita la ricerca e mostra il messaggio; rimozione che la riattiva.
-- [ ] 3.4 Mostrare «Partecipanti: N» (1 + membri) in un elemento `aria-live="polite"`. Con N oltre `room().capacity` mostrare «Lo spazio ospita al massimo N persone.» con `role="alert"`, e `submit()` non invia la richiesta. Test: 1 all'apertura, 3 con due membri, avviso e nessuna `POST` con capienza 4 e 4 membri, invio con 3 membri, avviso che sparisce rimuovendo un membro.
-- [ ] 3.5 Invio e risposta:
+- [x] 3.3 Con `auth.isStaff()` non mostrare il campo «Membri del gruppo» (partecipanti fissi a 1, `memberIds` = `[]`). Con 10 membri disabilitare l'input e mostrare «Puoi aggiungere al massimo 10 membri.», che sparisce togliendo un chip. Test: Staff senza campo e con `memberIds` = `[]` nella `POST`; decimo membro che disabilita la ricerca e mostra il messaggio; rimozione che la riattiva.
+- [x] 3.4 Mostrare «Partecipanti: N» (1 + membri) in un elemento `aria-live="polite"`. Con N oltre `room().capacity` mostrare «Lo spazio ospita al massimo N persone.» con `role="alert"`, e `submit()` non invia la richiesta. Test: 1 all'apertura, 3 con due membri, avviso e nessuna `POST` con capienza 4 e 4 membri, invio con 3 membri, avviso che sparisce rimuovendo un membro.
+- [x] 3.5 Invio e risposta:
   - `memberIds` nella `POST`;
   - `rejectionMessage()` mostra il `detail` anche per `503`, e senza `detail` il messaggio generico;
   - i chip restano dopo un rifiuto;

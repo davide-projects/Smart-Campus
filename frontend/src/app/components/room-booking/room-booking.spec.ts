@@ -4,7 +4,9 @@ import { HarnessLoader, TestKey } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { MatAutocompleteHarness } from '@angular/material/autocomplete/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
+import { MatChipGridHarness } from '@angular/material/chips/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import {
   MatDatepickerInputHarness,
@@ -18,6 +20,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { Observable, of, throwError } from 'rxjs';
 import { ReservationResponse } from '../../models/booking.model';
 import { RoomDetail } from '../../models/room.model';
+import { StudentSummary } from '../../models/user.model';
 import { authInterceptor } from '../../services/auth.interceptor';
 import { AuthService } from '../../services/auth.service';
 import { RoomsService } from '../../services/rooms.service';
@@ -52,6 +55,18 @@ const ROOM: RoomDetail = {
 // 09:00 di giovedì 5 novembre 2026 a Roma.
 const NOW = new Date('2026-11-05T08:00:00Z');
 
+const ANNA: StudentSummary = { id: 's2', username: 'student2', displayName: 'Anna Bianchi' };
+const LUCA: StudentSummary = { id: 's3', username: 'student3', displayName: 'Luca Verdi' };
+
+// Studenti sintetici numerati, per riempire il gruppo.
+function students(count: number): StudentSummary[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `m${i + 1}`,
+    username: `studente${i + 1}`,
+    displayName: `Studente Prova ${i + 1}`,
+  }));
+}
+
 const ROOM_CONFLICT = 'Lo spazio è già prenotato in questa fascia.';
 const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
 
@@ -68,12 +83,23 @@ function created(overrides: Partial<ReservationResponse> = {}): ReservationRespo
   };
 }
 
-function problem(status: number, title: string, detail: string): [object, object] {
+function problem(
+  status: number,
+  title: string,
+  detail: string,
+  extensions: object = {},
+): [object, object] {
   return [
-    { status, title, detail },
+    { status, title, detail, ...extensions },
     { status, statusText: title },
   ];
 }
+
+// Le date sono controllate; setInterval anche, perché lo usa il debounce di RxJS.
+const FAKE_TIMERS: Parameters<typeof vi.useFakeTimers>[0] = {
+  toFake: ['Date', 'setInterval', 'clearInterval'],
+};
+const DEBOUNCE_MS = 300;
 
 // Variabile d'ambiente del fuso del processo di test, per simulare un dispositivo in un altro fuso.
 const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } })
@@ -171,8 +197,72 @@ describe('RoomBooking', () => {
     await stable();
   }
 
+  // Ricerca degli studenti nel campo «Membri del gruppo», con l'attesa del debounce.
+  async function memberSearch(): Promise<MatAutocompleteHarness> {
+    return loader.getHarness(MatAutocompleteHarness);
+  }
+
+  // Scrive nel campo al posto del testo precedente e attende la pausa del debounce.
+  async function typeMember(text: string): Promise<void> {
+    const search = await memberSearch();
+    await search.clear();
+    await search.enterText(text);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    await stable();
+  }
+
+  async function respondSearch(text: string, found: StudentSummary[]): Promise<void> {
+    const request = http.expectOne((req) => req.url === '/api/identity/students');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('search')).toBe(text);
+    request.flush(found);
+    await settle();
+  }
+
+  // L'autocomplete aggiorna il pannello con un ritardo di RxJS (setInterval, controllato).
+  async function settle(): Promise<void> {
+    await stable();
+    vi.advanceTimersByTime(0);
+    await stable();
+  }
+
+  async function addMember(student: StudentSummary, text = student.displayName): Promise<void> {
+    await typeMember(text);
+    await respondSearch(text, [student]);
+    await (await memberSearch()).selectOption({ text: new RegExp(student.displayName) });
+    // Lo studente fa una pausa prima di scrivere ancora: passa anche il campo svuotato.
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    await stable();
+  }
+
+  async function optionTextsOfSearch(): Promise<string[]> {
+    const options = await (await memberSearch()).getOptions();
+    return Promise.all(options.map((option) => option.getText()));
+  }
+
+  async function chipNames(): Promise<string[]> {
+    const rows = await (await loader.getHarness(MatChipGridHarness)).getRows();
+    return Promise.all(rows.map((row) => row.getText()));
+  }
+
+  async function removeChip(name: string): Promise<void> {
+    const remove = element().querySelector<HTMLButtonElement>(
+      `button[aria-label="Rimuovi ${name}"]`,
+    )!;
+    remove.click();
+    await stable();
+  }
+
+  function participantsText(): string {
+    return element().querySelector('.participants')!.textContent!.trim();
+  }
+
+  function capacityWarning(): string | null {
+    return element().querySelector('.capacity-warning')?.textContent!.trim() ?? null;
+  }
+
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.useFakeTimers(FAKE_TIMERS);
     vi.setSystemTime(NOW);
     getRoomById = vi.fn(() => of(ROOM));
   });
@@ -475,6 +565,7 @@ describe('RoomBooking', () => {
         start: '2026-11-05T10:00:00+01:00',
         end: '2026-11-05T11:00:00+01:00',
         purpose: 'Ripasso di analisi',
+        memberIds: [],
       });
       request.flush(created(), { status: 201, statusText: 'Created' });
     });
@@ -654,6 +745,388 @@ describe('RoomBooking', () => {
       expect(alertText()).toBe(GENERIC_ERROR);
     });
   });
+
+  describe('group members', () => {
+    it('sends no search with a single character', async () => {
+      await render();
+
+      await typeMember('b');
+
+      http.expectNone((req) => req.url === '/api/identity/students');
+      expect(await (await memberSearch()).isOpen()).toBe(false);
+    });
+
+    it('searches once after the pause and offers name and username', async () => {
+      await render();
+
+      await (await memberSearch()).enterText('bia');
+      // Prima della pausa non parte nulla.
+      http.expectNone((req) => req.url === '/api/identity/students');
+      vi.advanceTimersByTime(DEBOUNCE_MS);
+      await stable();
+      await respondSearch('bia', [ANNA]);
+
+      const texts = await optionTextsOfSearch();
+      expect(texts).toHaveLength(1);
+      expect(texts[0]).toContain('Anna Bianchi');
+      expect(texts[0]).toContain('student2');
+    });
+
+    it('adds the chosen student as a chip, empties the field and closes the panel', async () => {
+      await render();
+
+      await addMember(ANNA, 'bia');
+
+      expect(await chipNames()).toEqual(['Anna Bianchi']);
+      const search = await memberSearch();
+      expect(await search.getValue()).toBe('');
+      expect(await search.isOpen()).toBe(false);
+    });
+
+    it('removes a member with «Rimuovi <nome>»', async () => {
+      await render();
+      await addMember(ANNA, 'bia');
+      await addMember(LUCA, 'ver');
+
+      await removeChip('Anna Bianchi');
+
+      expect(await chipNames()).toEqual(['Luca Verdi']);
+      expect(participantsText()).toBe('Partecipanti: 2');
+    });
+
+    it('removes a member with the chip remove harness', async () => {
+      await render();
+      await addMember(ANNA, 'bia');
+
+      const [row] = await (await loader.getHarness(MatChipGridHarness)).getRows();
+      await row.remove();
+      await stable();
+
+      expect(await chipNames()).toEqual([]);
+      expect(participantsText()).toBe('Partecipanti: 1');
+    });
+
+    it('does not offer again a student who is already a member', async () => {
+      await render();
+      await addMember(ANNA, 'bia');
+
+      await typeMember('bia');
+      await respondSearch('bia', [ANNA]);
+
+      expect(await optionTextsOfSearch()).toEqual(['Nessuno studente trovato.']);
+    });
+
+    it('shows «Nessuno studente trovato.» when the search finds nobody', async () => {
+      await render();
+
+      await typeMember('Conti');
+      await respondSearch('Conti', []);
+
+      const options = await (await memberSearch()).getOptions();
+      expect(options).toHaveLength(1);
+      expect(await options[0].getText()).toBe('Nessuno studente trovato.');
+      expect(await options[0].isDisabled()).toBe(true);
+      await options[0].click();
+      await stable();
+      expect(await chipNames()).toEqual([]);
+    });
+
+    it('adds nothing and sends no booking with Enter on free text', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseTime('Ora di inizio', '10:00');
+      await chooseTime('Ora di fine', '11:00');
+      await (await memberSearch()).enterText('Elena Conti');
+      const input = element().querySelector<HTMLInputElement>('.members-field input')!;
+      // Evento costruito a mano per leggere defaultPrevented: nel browser è ciò che impedisce a
+      // Invio di inviare il modulo (jsdom non simula l'invio implicito).
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
+      input.dispatchEvent(enter);
+      await stable();
+
+      expect(enter.defaultPrevented).toBe(true);
+      expect(await chipNames()).toEqual([]);
+      http.expectNone('/api/bookings');
+      // La ricerca del testo scritto può partire, ma non aggiunge membri.
+      vi.advanceTimersByTime(DEBOUNCE_MS);
+      await stable();
+      await respondSearch('Elena Conti', []);
+      expect(await chipNames()).toEqual([]);
+    });
+
+    it('shows the search error with role alert and keeps chips and form values', async () => {
+      await render();
+      await chooseDay(5);
+      await chooseTime('Ora di inizio', '10:00');
+      await addMember(ANNA, 'bia');
+
+      await typeMember('ver');
+      http
+        .expectOne((req) => req.url === '/api/identity/students')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      await stable();
+
+      const error = element().querySelector('.member-search-error')!;
+      expect(error.getAttribute('role')).toBe('alert');
+      expect(error.textContent!.trim()).toBe(
+        'Non è stato possibile cercare gli studenti. Riprova più tardi.',
+      );
+      expect(await chipNames()).toEqual(['Anna Bianchi']);
+      expect(await (await select('Ora di inizio')).getValueText()).toBe('10:00');
+
+      // La ricerca successiva funziona ancora.
+      await typeMember('verd');
+      await respondSearch('verd', [LUCA]);
+      expect(element().querySelector('.member-search-error')).toBeNull();
+      expect((await optionTextsOfSearch())[0]).toContain('Luca Verdi');
+    });
+
+    it('disables the search with 10 members and enables it again after a removal', async () => {
+      await render();
+      // Uno spazio abbastanza grande per 11 partecipanti.
+      for (const student of students(10)) {
+        await addMember(student, student.username);
+      }
+
+      const search = await memberSearch();
+      expect(await search.isDisabled()).toBe(true);
+      expect(element().querySelector('.members-field')!.textContent).toContain(
+        'Puoi aggiungere al massimo 10 membri.',
+      );
+      expect(participantsText()).toBe('Partecipanti: 11');
+
+      await removeChip('Studente Prova 3');
+
+      expect(await search.isDisabled()).toBe(false);
+      expect(element().querySelector('.members-field')!.textContent).not.toContain(
+        'Puoi aggiungere al massimo 10 membri.',
+      );
+    });
+
+    it('sends the ids of the members with the booking', async () => {
+      await render();
+      await addMember(ANNA, 'bia');
+      await addMember(LUCA, 'ver');
+
+      await fillAndSubmit();
+
+      const request = http.expectOne('/api/bookings');
+      expect(request.request.body.memberIds).toEqual(['s2', 's3']);
+      request.flush(created({ participants: 3 }), { status: 201, statusText: 'Created' });
+    });
+  });
+
+  describe('participants and capacity', () => {
+    const SMALL_ROOM: RoomDetail = { ...ROOM, name: 'Sala studio B2', capacity: 4 };
+
+    it('shows «Partecipanti: 1» on opening, in a polite live region', async () => {
+      await render();
+
+      const participants = element().querySelector('.participants')!;
+      expect(participants.getAttribute('aria-live')).toBe('polite');
+      expect(participantsText()).toBe('Partecipanti: 1');
+    });
+
+    it('shows «Partecipanti: 3» with two members', async () => {
+      await render();
+      await addMember(ANNA, 'bia');
+      await addMember(LUCA, 'ver');
+
+      expect(participantsText()).toBe('Partecipanti: 3');
+      expect(capacityWarning()).toBeNull();
+    });
+
+    it('warns and sends no request when the participants exceed the capacity', async () => {
+      getRoomById.mockReturnValue(of(SMALL_ROOM));
+      await render();
+      for (const student of students(4)) {
+        await addMember(student, student.username);
+      }
+
+      expect(participantsText()).toBe('Partecipanti: 5');
+      expect(capacityWarning()).toBe('Lo spazio ospita al massimo 4 persone.');
+      expect(element().querySelector('.capacity-warning')!.getAttribute('role')).toBe('alert');
+
+      await fillAndSubmit();
+      http.expectNone('/api/bookings');
+    });
+
+    it('sends the request when the participants equal the capacity', async () => {
+      getRoomById.mockReturnValue(of(SMALL_ROOM));
+      await render();
+      for (const student of students(3)) {
+        await addMember(student, student.username);
+      }
+
+      expect(participantsText()).toBe('Partecipanti: 4');
+      expect(capacityWarning()).toBeNull();
+      await fillAndSubmit();
+      await respond(created({ participants: 4 }), { status: 201, statusText: 'Created' });
+    });
+
+    it('removes the warning when a member is removed', async () => {
+      getRoomById.mockReturnValue(of(SMALL_ROOM));
+      await render();
+      for (const student of students(4)) {
+        await addMember(student, student.username);
+      }
+      expect(capacityWarning()).not.toBeNull();
+
+      await removeChip('Studente Prova 1');
+
+      expect(capacityWarning()).toBeNull();
+      expect(participantsText()).toBe('Partecipanti: 4');
+    });
+  });
+
+  describe('group rejections and confirmation', () => {
+    async function bookWithAnna(): Promise<void> {
+      await render();
+      await addMember(ANNA, 'bia');
+      await fillAndSubmit();
+    }
+
+    it.each([
+      [
+        409,
+        'members-occupied',
+        {},
+        'Uno o più membri hanno già una prenotazione in questa fascia.',
+      ],
+      [
+        409,
+        'member-booking-in-progress',
+        {},
+        "Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.",
+      ],
+      [
+        422,
+        'capacity-exceeded',
+        { limits: { maxParticipants: 4 } },
+        'Lo spazio ospita al massimo 4 persone.',
+      ],
+      [
+        422,
+        'too-many-members',
+        { limits: { maxMembers: 10 } },
+        'Puoi aggiungere al massimo 10 membri.',
+      ],
+      [422, 'members-not-students', {}, 'Puoi aggiungere come membri solo studenti registrati.'],
+      [
+        422,
+        'organizer-as-member',
+        {},
+        "Non puoi aggiungerti come membro: sei già l'organizzatore.",
+      ],
+      [422, 'duplicate-members', {}, 'Ogni studente può essere aggiunto una sola volta.'],
+      [
+        503,
+        'members-check-unavailable',
+        {},
+        'Non è possibile verificare i membri in questo momento. Riprova tra poco.',
+      ],
+    ])('shows the message of %i «%s» and keeps the chips', async (status, code, extra, message) => {
+      await bookWithAnna();
+
+      // Il detail volutamente diverso mostra che il messaggio si sceglie dal codice.
+      await respond(...problem(status, 'Rifiuto', 'Testo del servizio', { code, ...extra }));
+
+      expect(alertText()).toBe(message);
+      expect(await chipNames()).toEqual(['Anna Bianchi']);
+      expect(await (await confirmButton()).isDisabled()).toBe(false);
+    });
+
+    it('falls back to the detail when the capacity has no limits', async () => {
+      await bookWithAnna();
+
+      await respond(
+        ...problem(422, 'Capienza superata', 'Lo spazio ospita al massimo 4 persone.', {
+          code: 'capacity-exceeded',
+        }),
+      );
+
+      expect(alertText()).toBe('Lo spazio ospita al massimo 4 persone.');
+    });
+
+    it('shows the 503 detail without a known code', async () => {
+      await bookWithAnna();
+
+      await respond(
+        ...problem(
+          503,
+          'Servizio non disponibile',
+          'Non è possibile verificare i membri in questo momento. Riprova tra poco.',
+        ),
+      );
+
+      expect(alertText()).toBe(
+        'Non è possibile verificare i membri in questo momento. Riprova tra poco.',
+      );
+    });
+
+    it('shows the generic message for a 503 without detail', async () => {
+      await bookWithAnna();
+
+      await respond(null, { status: 503, statusText: 'Service Unavailable' });
+
+      expect(alertText()).toBe(GENERIC_ERROR);
+      expect(await chipNames()).toEqual(['Anna Bianchi']);
+    });
+
+    it('lets the student try again after a 503 with the same members', async () => {
+      await bookWithAnna();
+      await respond(
+        ...problem(503, 'Servizio non disponibile', 'x', { code: 'members-check-unavailable' }),
+      );
+
+      await (await confirmButton()).click();
+      await stable();
+
+      const request = http.expectOne('/api/bookings');
+      expect(request.request.body.memberIds).toEqual(['s2']);
+      request.flush(created({ participants: 2 }), { status: 201, statusText: 'Created' });
+      await stable();
+      expect(element().querySelector('.confirmation')).not.toBeNull();
+    });
+
+    it('shows «Partecipanti: 3» in the confirmation of a group booking', async () => {
+      await render();
+      await addMember(ANNA, 'bia');
+      await addMember(LUCA, 'ver');
+      await fillAndSubmit();
+
+      await respond(created({ participants: 3 }), { status: 201, statusText: 'Created' });
+
+      expect(element().querySelector('.confirmation-participants')!.textContent!.trim()).toBe(
+        'Partecipanti: 3',
+      );
+    });
+
+    it('does not show the participants in the confirmation of a single booking', async () => {
+      await render();
+      await fillAndSubmit();
+
+      await respond(created({ participants: 1 }), { status: 201, statusText: 'Created' });
+
+      expect(element().querySelector('.confirmation')).not.toBeNull();
+      expect(element().querySelector('.confirmation-participants')).toBeNull();
+    });
+
+    it("empties the members with «Prenota un'altra fascia»", async () => {
+      await bookWithAnna();
+      await respond(created({ participants: 2 }), { status: 201, statusText: 'Created' });
+
+      await (
+        await loader.getHarness(MatButtonHarness.with({ text: /Prenota un'altra fascia/ }))
+      ).click();
+      await stable();
+
+      expect(await chipNames()).toEqual([]);
+      expect(participantsText()).toBe('Partecipanti: 1');
+      expect(element().querySelector('[role="alert"]')).toBeNull();
+    });
+  });
 });
 
 describe('RoomBooking with an expired session', () => {
@@ -716,5 +1189,116 @@ describe('RoomBooking with an expired session', () => {
     expect(auth.isLoggedIn()).toBe(false);
     expect(TestBed.inject(Router).url).toBe('/login?reason=expired&returnUrl=%2Frooms%2Fr1%2Fbook');
     http.verify();
+  });
+});
+
+describe('RoomBooking with a session', () => {
+  @Component({ template: '' })
+  class LoginPage {}
+
+  // Sessioni sintetiche salvate come le salva AuthService, valide rispetto alla data del test.
+  function session(role: 'Student' | 'Staff') {
+    return {
+      accessToken: 'token-di-prova',
+      expiresAt: new Date(NOW.getTime() + 60 * 60_000).toISOString(),
+      user:
+        role === 'Staff'
+          ? { id: 'u9', username: 'staff1', displayName: 'Elena Conti', role }
+          : { id: 'u1', username: 'student1', displayName: 'Mario Rossi', role },
+    };
+  }
+
+  let harness: RouterTestingHarness;
+  let loader: HarnessLoader;
+  let http: HttpTestingController;
+
+  async function render(role: 'Student' | 'Staff'): Promise<void> {
+    sessionStorage.setItem('smartcampus.session', JSON.stringify(session(role)));
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'login', component: LoginPage },
+          { path: 'rooms/:id/book', component: RoomBooking },
+        ]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: RoomsService, useValue: { getRoomById: () => of(ROOM) } },
+        { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    harness = await RouterTestingHarness.create('/rooms/r1/book');
+    loader = TestbedHarnessEnvironment.loader(harness.fixture);
+    await harness.fixture.whenStable();
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    http?.verify();
+    sessionStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it('hides the members field from Staff and sends memberIds = []', async () => {
+    await render('Staff');
+    const page = harness.routeNativeElement!;
+
+    expect(page.textContent).not.toContain('Membri del gruppo');
+    expect(await loader.getAllHarnesses(MatAutocompleteHarness)).toEqual([]);
+    expect(page.querySelector('.participants')!.textContent!.trim()).toBe('Partecipanti: 1');
+
+    await (await loader.getHarness(MatDatepickerToggleHarness)).openCalendar();
+    const input = await loader.getHarness(MatDatepickerInputHarness);
+    await (await input.getCalendar()).selectCell({ text: '5' });
+    for (const [label, time] of [
+      ['Ora di inizio', '10:00'],
+      ['Ora di fine', '11:00'],
+    ]) {
+      const field = await loader.getHarness(MatFormFieldHarness.with({ floatingLabelText: label }));
+      const control = (await field.getControl(MatSelectHarness))!;
+      await control.open();
+      await control.clickOptions({ text: time });
+    }
+    await (await loader.getHarness(MatButtonHarness.with({ text: /Conferma/ }))).click();
+
+    const request = http.expectOne('/api/bookings');
+    expect(request.request.body.memberIds).toEqual([]);
+    request.flush(
+      {
+        id: 'p1',
+        roomId: 'r1',
+        roomName: 'Aula A1',
+        start: '2026-11-05T10:00:00+01:00',
+        end: '2026-11-05T11:00:00+01:00',
+        participants: 1,
+        status: 'Confirmed',
+      },
+      { status: 201, statusText: 'Created' },
+    );
+  });
+
+  it('ends the session and goes back to the login when the search answers 401', async () => {
+    await render('Student');
+    const auth = TestBed.inject(AuthService);
+
+    const search = await loader.getHarness(MatAutocompleteHarness);
+    await search.enterText('bia');
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    await harness.fixture.whenStable();
+
+    const request = http.expectOne((req) => req.url === '/api/identity/students');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer token-di-prova');
+    request.flush(
+      { status: 401, title: 'Accesso richiesto' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await harness.fixture.whenStable();
+
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(TestBed.inject(Router).url).toBe('/login?reason=expired&returnUrl=%2Frooms%2Fr1%2Fbook');
   });
 });
