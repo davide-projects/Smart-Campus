@@ -25,6 +25,7 @@
     <div class="capacity">
       <span class="capacity-label" id="capacity-label">Capienza (range)</span>
       <div class="capacity-control">
+      @if (maxCapacity() > 0) {
         <mat-slider min="0" [max]="maxCapacity()" step="1" [displayWith]="capacityLabel">
           <input
             matSliderStartThumb
@@ -39,8 +40,9 @@
             (change)="capacityChanged()"
           />
         </mat-slider>
-        <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
-      </div>
+      }
+      <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
+    </div>
     </div>
 
     <div class="actions">
