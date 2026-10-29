@@ -18,4 +18,5 @@ public class Reservation
     public DateTimeOffset? CancelledAt { get; set; }
     public byte[] RowVersion { get; set; } = []; // Versione della riga gestita da SQL Server: impedisce di sovrascrivere modifiche altrui.
     public ICollection<ReservationMember> Members { get; set; } = [];
+    public ICollection<AttendanceRecord> AttendanceRecords { get; set; } = []; // Al massimo uno (indice unico su ReservationId).
 }

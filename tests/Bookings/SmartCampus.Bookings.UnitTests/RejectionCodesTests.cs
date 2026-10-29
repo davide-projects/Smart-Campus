@@ -17,6 +17,7 @@ public sealed class RejectionCodesTests
 
     private static readonly Guid Organizer = Guid.NewGuid();
     private static readonly Guid Stranger = Guid.NewGuid();
+    private static readonly Guid StaffUser = Guid.NewGuid();
 
     // --- Regole sulla richiesta ---
 
@@ -156,7 +157,7 @@ public sealed class RejectionCodesTests
     [Fact]
     public void CancellationByAStranger_HasTheForbiddenCode()
     {
-        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), Stranger, isStaff: false, Now);
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), Stranger, isStaff: false, hasCheckIn: false, Now);
 
         AssertRejection(decision.Rejection, 403, RejectionCodes.CancellationForbidden);
     }
@@ -164,9 +165,72 @@ public sealed class RejectionCodesTests
     [Fact]
     public void CancellationOfAStartedReservation_HasTheTooLateCode()
     {
-        var decision = ReservationRules.ValidateCancellation(Booking(Now), Organizer, isStaff: false, Now);
+        var decision = ReservationRules.ValidateCancellation(Booking(Now), Organizer, isStaff: false, hasCheckIn: false, Now);
 
         AssertRejection(decision.Rejection, 422, RejectionCodes.CancellationTooLate);
+    }
+
+    [Fact]
+    public void CancellationOfAUsedReservation_HasTheAlreadyUsedCode()
+    {
+        var decision = ReservationRules.ValidateCancellation(Booking(Now.AddDays(1)), Organizer, isStaff: false, hasCheckIn: true, Now);
+
+        AssertRejection(decision.Rejection, 422, RejectionCodes.CancellationAlreadyUsed);
+        Assert.Null(decision.Rejection.Limits);
+    }
+
+    // --- Check-in ---
+
+    [Fact]
+    public void CheckInByAStranger_HasTheForbiddenCode()
+    {
+        var rejection = ReservationRules.ValidateCheckIn(Booking(Now), Stranger, isMember: false, isStaff: false, existingRecord: null, Now);
+
+        AssertRejection(rejection, 403, RejectionCodes.CheckInForbidden);
+    }
+
+    [Fact]
+    public void CheckInOfACancelledReservation_HasTheCancelledCode()
+    {
+        var booking = Booking(Now);
+        booking.Status = ReservationStatus.Cancelled;
+
+        var rejection = ReservationRules.ValidateCheckIn(booking, Organizer, isMember: false, isStaff: false, existingRecord: null, Now);
+
+        AssertRejection(rejection, 422, RejectionCodes.CheckInCancelled);
+    }
+
+    [Fact]
+    public void CheckInOfANoShowReservation_HasTheNoShowCode()
+    {
+        var rejection = ReservationRules.ValidateCheckIn(Booking(Now), StaffUser, isMember: false, isStaff: true, AttendanceType.NoShow, Now);
+
+        AssertRejection(rejection, 422, RejectionCodes.CheckInNoShow);
+    }
+
+    [Fact]
+    public void SecondCheckIn_HasTheAlreadyRecordedCode()
+    {
+        var rejection = ReservationRules.ValidateCheckIn(Booking(Now), Organizer, isMember: false, isStaff: false, AttendanceType.CheckIn, Now);
+
+        AssertRejection(rejection, 422, RejectionCodes.CheckInAlreadyRecorded);
+    }
+
+    [Fact]
+    public void CheckInOutsideTheWindow_HasTheOutsideWindowCode()
+    {
+        var rejection = ReservationRules.ValidateCheckIn(Booking(Now.AddDays(1)), Organizer, isMember: false, isStaff: false, existingRecord: null, Now);
+
+        AssertRejection(rejection, 422, RejectionCodes.CheckInOutsideWindow);
+        Assert.Null(rejection.Limits);
+    }
+
+    [Theory]
+    [InlineData(AttendanceType.CheckIn, RejectionCodes.CheckInAlreadyRecorded)]
+    [InlineData(AttendanceType.NoShow, RejectionCodes.CheckInNoShow)]
+    public void ExistingAttendance_HasTheCodeOfTheRecordFound(AttendanceType recorded, string code)
+    {
+        AssertRejection(ReservationRules.ExistingAttendance(recorded), 422, code);
     }
 
     // --- Verifiche e dati di prova ---

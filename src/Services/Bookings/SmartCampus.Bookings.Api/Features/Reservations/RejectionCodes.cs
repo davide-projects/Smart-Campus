@@ -25,5 +25,13 @@ public static class RejectionCodes
 
     // Cancellazione.
     public const string CancellationForbidden = "cancellation-forbidden";
+    public const string CancellationAlreadyUsed = "cancellation-already-used";
     public const string CancellationTooLate = "cancellation-too-late";
+
+    // Check-in.
+    public const string CheckInForbidden = "check-in-forbidden";
+    public const string CheckInCancelled = "check-in-cancelled";
+    public const string CheckInNoShow = "check-in-no-show";
+    public const string CheckInAlreadyRecorded = "check-in-already-recorded";
+    public const string CheckInOutsideWindow = "check-in-outside-window";
 }

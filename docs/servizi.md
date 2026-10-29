@@ -61,7 +61,7 @@ Un'analogia: è come la segreteria di un campus divisa in sportelli. Ogni sporte
 **Cosa fa:** è il **cuore del prodotto**.
 - Registra le prenotazioni (`Reservation`): chi usa quale spazio e quando, **da solo o in gruppo**. In una prenotazione di gruppo chi prenota (organizzatore, `OrganizerId`) aggiunge altri studenti come membri (`ReservationMember`).
 - Calcola le fasce libere e garantisce le regole più importanti: **due prenotazioni confermate dello stesso spazio non si sovrappongono mai**, nemmeno se due persone premono "Prenota" nello stesso istante, e **nessuno può essere in due prenotazioni nello stesso orario**.
-- Registra ciò che è **successo davvero**: il check-in (fatto dall'organizzatore o da un membro) e le mancate presentazioni (`AttendanceRecord`).
+- Registra ciò che è **successo davvero**: il check-in (fatto dall'organizzatore, da un membro o dallo Staff, uno solo per prenotazione e valido per tutto il gruppo) e le mancate presentazioni (`AttendanceRecord`).
 - Produce i riepiloghi per il personale distinguendo sempre tre casi: *usato*, *non usato*, *nessuna informazione*. Quest'ultimo caso **non** viene mai trattato come "spazio vuoto".
 
 **Archivio:** prenotazioni, membri, check-in e mancate presentazioni, più una copia ridotta degli spazi prenotabili (`BookableRoom`: nome, nome dell'edificio, capienza, orari) ricevuta da Rooms. Così una prenotazione, e l'elenco «le mie prenotazioni» con spazio ed edificio, non dipendono dal fatto che Rooms risponda in quel momento. Con ogni prenotazione si salva anche il nome dell'organizzatore al momento della creazione.

@@ -10,6 +10,7 @@ public class BookingDbContext(DbContextOptions<BookingDbContext> options)
     public DbSet<BookableRoomOpeningHours> BookableRoomOpeningHours => Set<BookableRoomOpeningHours>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReservationMember> ReservationMembers => Set<ReservationMember>();
+    public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
