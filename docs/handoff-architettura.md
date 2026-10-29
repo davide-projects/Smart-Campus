@@ -188,17 +188,34 @@ Le **epiche** sono aree di valore; le storie dentro un'epica possono toccare pi�
 - *(Opzione con riserva)* storico dei check-in su MongoDB: non implementato; MongoDB è già usato da Rooms per il catalogo e le assegnazioni delle attrezzature (vedi [architettura](architettura.md#rooms)).
 
 **Codici di errore da rendere comprensibili in UI**
-| Caso | HTTP | Messaggio utente proposto |
-|---|---|---|
-| Conflitto sullo spazio | 409 | "Lo spazio è già prenotato in questa fascia. Ecco le fasce libere…" |
-| Conflitto sulla persona | 409 | "Hai già una prenotazione in questa fascia" / "Uno o più membri hanno già una prenotazione in questa fascia" |
-| Altra prenotazione della stessa persona in elaborazione (lock oltre 10 secondi) | 409 | "Hai un'altra prenotazione in corso, riprova tra qualche secondo." |
-| Fuori orario | 422 | "Lo spazio è aperto dalle X alle Y" |
-| Capienza superata | 422 | "Lo spazio ospita al massimo N persone" |
-| Spazio non prenotabile/disattivato | 422 | "Questo spazio non è prenotabile" |
-| Cancellazione di prenotazione altrui (anche da un membro non organizzatore) | 403 | "Non puoi cancellare questa prenotazione." |
-| Cancellazione di prenotazione già iniziata o passata | 422 | "Non è possibile cancellare una prenotazione già iniziata o passata." |
-| Prenotazione da cancellare inesistente | 404 | "La prenotazione richiesta non esiste." |
+
+Ogni rifiuto di una prenotazione o di una cancellazione è un `ProblemDetails` con `status`, `title` e `detail`, più:
+- `code`: il codice di motivo, stabile, con cui la UI sceglie il messaggio (il testo di `detail` serve come ripiego);
+- `limits`: i limiti da rispettare, quando ce ne sono (per esempio `{ "opensAt": "08:00", "closesAt": "20:00" }`);
+- `freeSlots`: solo per `room-occupied`, gli intervalli liberi dello stesso spazio nello stesso giorno, in ordine di orario e senza quelli già iniziati (`[{ "start": …, "end": … }]`). Un elenco vuoto vuol dire che quel giorno non ce ne sono: va detto esplicitamente.
+
+Le risposte `401` e `404` non hanno `code`.
+
+| Caso | HTTP | `code` | `limits` / `freeSlots` | Messaggio utente proposto |
+|---|---|---|---|---|
+| Conflitto sullo spazio | 409 | `room-occupied` | `freeSlots` | "Lo spazio è già prenotato in questa fascia. Ecco le fasce libere…" (se `freeSlots` è vuoto: nessuna fascia libera quel giorno) |
+| Conflitto sulla persona | 409 | `person-occupied` | — | "Hai già una prenotazione in questa fascia" |
+| Conflitto sui membri del gruppo *(con US-05)* | 409 | `members-occupied` | — | "Uno o più membri hanno già una prenotazione in questa fascia" |
+| Altra prenotazione della stessa persona in elaborazione (lock oltre 10 secondi) | 409 | `booking-in-progress` | — | "Hai un'altra prenotazione in corso, riprova tra qualche secondo." |
+| Fuori orario | 422 | `outside-opening-hours` | `opensAt`, `closesAt` (`HH:mm`) | "Lo spazio è aperto dalle X alle Y" |
+| Spazio chiuso in quel giorno | 422 | `room-closed` | — | "Lo spazio è chiuso in questo giorno." |
+| Capienza superata *(con US-05)* | 422 | `capacity-exceeded` | capienza massima | "Lo spazio ospita al massimo N persone" |
+| Spazio non prenotabile/disattivato | 422 | `room-not-bookable` | — | "Questo spazio non è prenotabile" |
+| Durata eccessiva | 422 | `duration-exceeded` | `maxDurationMinutes` (240) | "Una prenotazione può durare al massimo 4 ore." |
+| Troppo in anticipo | 422 | `too-far-ahead` | `maxAdvanceDays` (14) | "Si può prenotare al massimo 14 giorni prima." |
+| Orario non alla mezz'ora | 422 | `slot-boundary` | `slotMinutes` (30) | "Le prenotazioni iniziano e finiscono all'ora esatta o alla mezz'ora." |
+| Fine non successiva all'inizio | 422 | `invalid-time-range` | — | "L'orario di fine deve essere successivo a quello di inizio." |
+| Orario nel passato | 422 | `in-the-past` | — | "Non è possibile prenotare nel passato." |
+| Inizio e fine in giorni diversi | 422 | `different-days` | — | "La prenotazione deve iniziare e finire nello stesso giorno." |
+| Motivo troppo lungo | 422 | `purpose-too-long` | `maxLength` (200) | "Il motivo può contenere al massimo 200 caratteri." |
+| Cancellazione di prenotazione altrui (anche da un membro non organizzatore) | 403 | `cancellation-forbidden` | — | "Non puoi cancellare questa prenotazione." |
+| Cancellazione di prenotazione già iniziata o passata | 422 | `cancellation-too-late` | — | "Non è possibile cancellare una prenotazione già iniziata o passata." |
+| Prenotazione da cancellare inesistente | 404 | — | — | "La prenotazione richiesta non esiste." |
 
 ### 6.3 Identity
 
