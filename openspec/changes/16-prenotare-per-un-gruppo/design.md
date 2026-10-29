@@ -97,6 +97,22 @@ Nuovo ordine di `CreateReservationAsync`:
 
 **Retry di EF Core.** La chiamata a Identity è fuori da `strategy.ExecuteAsync`: un nuovo tentativo della transazione per un errore transitorio di SQL non richiama Identity.
 
+**Codici di motivo (decisione dell'utente).** Con #20 ogni rifiuto di `POST /api/bookings` porta `code` (costanti in `RejectionCodes`, tabella in `docs/handoff-architettura.md` 6.2). I nuovi rifiuti seguono la stessa regola, un codice per caso così la UI non deve leggere il testo:
+
+| Rifiuto | HTTP | `code` | `limits` |
+|---|---|---|---|
+| `Staff` con membri | 403 | `group-booking-forbidden` | — |
+| Più di 10 membri | 422 | `too-many-members` | `maxMembers` (10) |
+| Organizzatore tra i membri | 422 | `organizer-as-member` | — |
+| Membro ripetuto | 422 | `duplicate-members` | — |
+| Membri non studenti o inesistenti | 422 | `members-not-students` | — |
+| Identity non disponibile | 503 | `members-check-unavailable` | — |
+| Lock di un membro oltre 10 s | 409 | `member-booking-in-progress` | — |
+| Capienza superata | 422 | `capacity-exceeded` | `maxParticipants` (capienza dello spazio) |
+| Membro già impegnato | 409 | `members-occupied` | — |
+
+`members-occupied` e `capacity-exceeded` sono i nomi già riservati dall'handoff; la chiave `maxParticipants` segue `maxLength`, `maxDurationMinutes` e `maxAdvanceDays`. Il timeout del lock di un membro ha un codice diverso da `booking-in-progress` perché il messaggio è diverso.
+
 **Conseguenza dell'ordine.** Una richiesta con un membro non studente e uno spazio inesistente riceve `422` (membri) e non `404`, perché i membri si controllano prima di aprire la transazione. È voluto: i controlli che non richiedono lock vengono prima.
 
 ### 5. Contratto della `POST` (decisione dell'utente)

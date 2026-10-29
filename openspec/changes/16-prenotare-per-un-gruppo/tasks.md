@@ -24,7 +24,7 @@ Area: `svc:identity`.
 
 Area: `svc:bookings`.
 
-- [ ] 2.1 Aggiungere `MemberIds` (`IReadOnlyList<Guid>?`) a `CreateReservationRequest` e `ReservationRules.ValidateMembers(memberIds, organizerId)` (più di `MaxMembers` = 10 id, poi organizzatore tra i membri, poi membri ripetuti → `422` «Membri non validi» con i tre messaggi della spec), chiamata dopo `ValidateRequest`. Aggiungere i rifiuti `StaffGroupForbidden()` (`403` «Prenotazione di gruppo non consentita» / «Il personale non può creare prenotazioni di gruppo.»), `CapacityExceeded(capacity)` («Capienza superata» / «Lo spazio ospita al massimo N persone.»), `MemberConflict()` («Membro già impegnato» / «Uno o più membri hanno già una prenotazione in questa fascia.»), `MemberLockTimeout()`, `NotStudents()` e `MembersCheckUnavailable()` (`503`). Unit test in `ReservationRulesTests`: `null` e vuoto validi, 10 membri validi, 11 rifiutati (anche con duplicati tra gli 11), organizzatore incluso, duplicato, capienza uguale (valida) e superata di uno.
+- [ ] 2.1 Aggiungere `MemberIds` (`IReadOnlyList<Guid>?`) a `CreateReservationRequest` e `ReservationRules.ValidateMembers(memberIds, organizerId)` (più di `MaxMembers` = 10 id, poi organizzatore tra i membri, poi membri ripetuti → `422` «Membri non validi» con i tre messaggi della spec), chiamata dopo `ValidateRequest`. Aggiungere i rifiuti `StaffGroupForbidden()` (`403` «Prenotazione di gruppo non consentita» / «Il personale non può creare prenotazioni di gruppo.»), `CapacityExceeded(capacity)` («Capienza superata» / «Lo spazio ospita al massimo N persone.»), `MemberConflict()` («Membro già impegnato» / «Uno o più membri hanno già una prenotazione in questa fascia.»), `MemberLockTimeout()`, `NotStudents()` e `MembersCheckUnavailable()` (`503`). Ogni rifiuto ha il `code` della tabella «Codici di motivo» del design: aggiungere a `RejectionCodes` `group-booking-forbidden`, `too-many-members`, `organizer-as-member`, `duplicate-members`, `members-not-students`, `members-check-unavailable`, `member-booking-in-progress`, `capacity-exceeded`, `members-occupied` (togliendo il commento che li annuncia), con `limits` `maxMembers` per i troppi membri e `maxParticipants` per la capienza. Unit test in `ReservationRulesTests`: `null` e vuoto validi, 10 membri validi, 11 rifiutati (anche con duplicati tra gli 11), organizzatore incluso, duplicato, capienza uguale (valida) e superata di uno; per ogni rifiuto `Code` e `Limits` attesi (anche in `RejectionCodesTests`).
 - [ ] 2.2 Creare `IdentityClient` (HttpClient tipizzato) registrato con `AddHttpClient` in `Program.cs`:
   - `BaseAddress` da `Services:Identity:BaseAddress`, che all'avvio deve essere un URI assoluto, altrimenti il servizio si ferma con un messaggio che nomina la chiave;
   - `Timeout` 3 s, nessun retry e nessun pacchetto nuovo;
@@ -57,7 +57,7 @@ Area: `svc:bookings`.
   - Identity che non risponde entro 3 s, risponde `500`, risponde JSON non valido o è irraggiungibile → `503` con il messaggio della spec;
   - prenotazione singola con lo stub che fallirebbe → `201`.
 
-  In ogni rifiuto, verificare nel database che non esistano né `Reservation` né `ReservationMembers` nuovi. `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` verde.
+  In ogni rifiuto, verificare `code` (e `limits` per troppi membri e capienza) nel `ProblemDetails`, e nel database che non esistano né `Reservation` né `ReservationMembers` nuovi. Togliere da `RejectionResponseTests` il commento che rimanda a US-05. `dotnet test tests/Bookings/SmartCampus.Bookings.IntegrationTests` verde.
 - [ ] 2.5 Test di permessi, visibilità e concorrenza:
   - prenotazione di gruppo creata con la `POST`, poi `GET /api/bookings/mine` di ogni membro (`upcoming`, `isGroup` = `true`, `isOrganizer` = `false`, `organizerName`) e dell'organizzatore (una sola volta);
   - `DELETE` del membro → `403` con la prenotazione invariata;
@@ -71,7 +71,7 @@ Area: `svc:bookings`.
   - `docs/endpoints.md`: riga della `POST` con `memberIds` (al massimo 10), `participants`, il `403` per lo `Staff` con membri, i nuovi `422`, `409` e `503`;
   - `docs/servizi.md`: chiamata HTTP Bookings → Identity in «Come si parlano i servizi», lock sui membri in «Come Bookings evita le sovrapposizioni»;
   - `docs/architettura.md`: Bookings, verifica dei membri e chiave `Services:Identity:BaseAddress`;
-  - `docs/handoff-architettura.md`: F1 con la verifica dei membri, tabella degli errori 6.2 con i messaggi definitivi.
+  - `docs/handoff-architettura.md`: F1 con la verifica dei membri, tabella degli errori 6.2 con i messaggi definitivi e i `code` dei nuovi rifiuti (tolto «*(con US-05)*», `maxParticipants` per la capienza).
 
   Verificare con `docker compose up --build`: una prenotazione con `student2` come membro dà `201` e compare in «Le mie prenotazioni» di `student2`; con `identity` fermo (`docker compose stop identity`) la stessa richiesta dà `503` e una prenotazione singola dà `201`. Riportare l'esito nella PR.
 - [ ] 2.7 Eseguire `dotnet test SmartCampus.slnx` e riportare comando ed esito nella PR.
