@@ -28,6 +28,7 @@ import { MatSelectModule } from '@angular/material/select';
 
 // Servizi e modelli
 import {
+  FreeRange,
   ReservationResponse,
   addDays,
   campusDateTime,
@@ -35,6 +36,7 @@ import {
   campusToday,
   pad,
   reservationTimeLabel,
+  timeRangeLabel,
 } from '../../models/booking.model';
 import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
 import { ApiProblem, problemOf } from '../../services/api-problem';
@@ -44,6 +46,9 @@ import { RoomsService } from '../../services/rooms.service';
 
 // Giorni prenotabili oltre oggi (assunzione A2).
 const MAX_DAYS_AHEAD = 14;
+
+// Durata massima di una prenotazione in minuti, come in Bookings.
+const MAX_DURATION_MINUTES = 240;
 
 // Lunghezza massima del motivo, come in Bookings.
 export const MAX_PURPOSE_LENGTH = 200;
@@ -105,6 +110,8 @@ export class RoomBooking implements OnInit {
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   private readonly rejectionCode = signal<string | null>(null);
+  // Fasce libere proposte dopo un conflitto sullo spazio; null senza conflitto, vuoto se non ce ne sono.
+  protected readonly freeSlots = signal<FreeRange[] | null>(null);
   protected readonly confirmation = signal<Confirmation | null>(null);
   protected readonly showAvailabilityLink = computed(
     () =>
@@ -168,6 +175,8 @@ export class RoomBooking implements OnInit {
 
   private readonly confirmationHeading = viewChild<ElementRef<HTMLElement>>('confirmationHeading');
   private readonly dayInput = viewChild<ElementRef<HTMLInputElement>>('dayInput');
+  // Il pulsante è un componente di Material: si legge il suo elemento HTML per portarci il focus.
+  private readonly confirmButton = viewChild('confirmButton', { read: ElementRef });
 
   constructor() {
     // Al cambio di giorno si azzerano gli orari che non sono più dentro l'apertura.
@@ -175,6 +184,8 @@ export class RoomBooking implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((day) => {
         this.selectedDay.set(day);
+        // Le fasce libere proposte erano del giorno di prima.
+        this.freeSlots.set(null);
         const { start, end } = this.form.controls;
         if (end.value !== null && !this.endOptions().includes(end.value)) {
           end.reset(null);
@@ -237,8 +248,7 @@ export class RoomBooking implements OnInit {
     const { day, start, end, purpose } = this.form.getRawValue();
     const trimmedPurpose = purpose.trim();
     this.submitting.set(true);
-    this.errorMessage.set(null);
-    this.rejectionCode.set(null);
+    this.clearRejection();
 
     this.bookingsService
       .create({
@@ -259,6 +269,7 @@ export class RoomBooking implements OnInit {
           const problem = problemOf(error);
           this.errorMessage.set(rejectionMessage(problem));
           this.rejectionCode.set(problem.code);
+          this.freeSlots.set(problem.code === ROOM_OCCUPIED_CODE ? problem.freeSlots : null);
         },
       });
   }
@@ -270,13 +281,53 @@ export class RoomBooking implements OnInit {
     picker.open();
   }
 
+  // Etichetta di una fascia libera, es. «08:00–10:00», nell'ora del campus.
+  protected freeSlotLabel(slot: FreeRange): string {
+    return timeRangeLabel(slot);
+  }
+
+  // Sceglie una fascia libera proposta dopo un conflitto: l'inizio è quello della fascia e la fine
+  // mantiene la durata che lo studente aveva chiesto, se ci sta (altrimenti la fascia intera), al
+  // massimo 4 ore. Rifiuto e proposte spariscono, perché riguardavano gli orari di prima, e il
+  // focus passa al pulsante di conferma.
+  protected chooseFreeSlot(slot: FreeRange): void {
+    const { start, end } = this.form.controls;
+    const slotStart = campusTime(new Date(slot.start));
+    if (!this.startOptions().includes(slotStart)) {
+      return;
+    }
+
+    const slotMinutes = (new Date(slot.end).getTime() - new Date(slot.start).getTime()) / 60_000;
+    const requestedMinutes =
+      start.value !== null && end.value !== null
+        ? toMinutes(end.value) - toMinutes(start.value)
+        : MAX_DURATION_MINUTES;
+    const minutes = Math.min(
+      requestedMinutes > 0 ? requestedMinutes : MAX_DURATION_MINUTES,
+      slotMinutes,
+      MAX_DURATION_MINUTES,
+    );
+    const endMinutes = toMinutes(slotStart) + minutes;
+
+    start.setValue(slotStart);
+    end.setValue(`${pad(Math.floor(endMinutes / 60))}:${pad(endMinutes % 60)}`);
+    this.clearRejection();
+    this.focusAfterRender(() => this.confirmButton()?.nativeElement);
+  }
+
   // Dopo la conferma: modulo vuoto per lo stesso spazio, senza messaggi di rifiuto.
   protected bookAnother(): void {
     this.form.reset();
-    this.errorMessage.set(null);
-    this.rejectionCode.set(null);
+    this.clearRejection();
     this.confirmation.set(null);
     this.focusAfterRender(() => this.dayInput()?.nativeElement);
+  }
+
+  // Toglie il rifiuto mostrato: messaggio, codice e fasce libere proposte.
+  private clearRejection(): void {
+    this.errorMessage.set(null);
+    this.rejectionCode.set(null);
+    this.freeSlots.set(null);
   }
 
   // Il contenuto che aveva il focus sparisce: lo si porta sul nuovo contenuto.

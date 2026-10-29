@@ -664,6 +664,135 @@ describe('RoomBooking', () => {
       expect(await availabilityLink()).toBeNull();
     });
 
+    describe('free slots', () => {
+      // Lunedì 9 novembre 2026, 08:00-20:00: un giorno futuro, così nessuna fascia è già iniziata.
+      const FREE_SLOTS = [
+        { start: '2026-11-09T08:00:00+01:00', end: '2026-11-09T10:00:00+01:00' },
+        { start: '2026-11-09T11:00:00+01:00', end: '2026-11-09T20:00:00+01:00' },
+      ];
+
+      async function conflict(freeSlots?: object[]): Promise<void> {
+        await respond(
+          ...problem(409, 'Spazio già prenotato', ROOM_CONFLICT, {
+            code: 'room-occupied',
+            ...(freeSlots === undefined ? {} : { freeSlots }),
+          }),
+        );
+      }
+
+      async function slotButtons(): Promise<MatButtonHarness[]> {
+        return loader.getAllHarnesses(MatButtonHarness.with({ text: /\d{2}:\d{2}–\d{2}:\d{2}/ }));
+      }
+
+      it('offers the free slots of the day after a room conflict', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+
+        await conflict(FREE_SLOTS);
+
+        const texts = await Promise.all((await slotButtons()).map((button) => button.getText()));
+        expect(texts).toHaveLength(2);
+        expect(texts[0]).toContain('08:00–10:00');
+        expect(texts[1]).toContain('11:00–20:00');
+      });
+
+      it.each<[number, string, string]>([
+        [0, '08:00', '09:00'],
+        [1, '11:00', '12:00'],
+      ])('chooses slot %i and keeps the requested hour', async (index, start, end) => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+        await conflict(FREE_SLOTS);
+
+        await (await slotButtons())[index].click();
+        await stable();
+
+        expect(await (await select('Ora di inizio')).getValueText()).toBe(start);
+        expect(await (await select('Ora di fine')).getValueText()).toBe(end);
+      });
+
+      it('takes the whole slot when it is shorter than the requested duration', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '12:00');
+        await conflict([{ start: '2026-11-09T08:00:00+01:00', end: '2026-11-09T09:00:00+01:00' }]);
+
+        await (await slotButtons())[0].click();
+        await stable();
+
+        expect(await (await select('Ora di inizio')).getValueText()).toBe('08:00');
+        expect(await (await select('Ora di fine')).getValueText()).toBe('09:00');
+      });
+
+      it('clears the rejection, focuses the confirmation and sends the new times', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+        await conflict(FREE_SLOTS);
+
+        await (await slotButtons())[0].click();
+        await stable();
+
+        expect(alertText()).toBeNull();
+        expect(await slotButtons()).toHaveLength(0);
+        expect(await (await confirmButton()).isFocused()).toBe(true);
+
+        await (await confirmButton()).click();
+        await stable();
+        const request = http.expectOne('/api/bookings');
+        expect(request.request.body).toEqual({
+          roomId: 'r1',
+          start: '2026-11-09T08:00:00+01:00',
+          end: '2026-11-09T09:00:00+01:00',
+          purpose: null,
+        });
+        request.flush(created(), { status: 201, statusText: 'Created' });
+      });
+
+      it('says explicitly that there are no free slots when the list is empty', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+
+        await conflict([]);
+
+        expect(alertText()).toBe(ROOM_CONFLICT);
+        expect(element().querySelector('.free-slots')?.textContent).toContain(
+          'Non ci sono fasce libere in questo giorno',
+        );
+        expect(await slotButtons()).toHaveLength(0);
+      });
+
+      it('proposes nothing when the service sends no free slots', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+
+        await conflict();
+
+        expect(element().querySelector('.free-slots')).toBeNull();
+      });
+
+      it('proposes nothing for a rejection that is not a room conflict', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+
+        await respond(
+          ...problem(409, 'Hai già una prenotazione', 'Testo del servizio.', {
+            code: 'person-occupied',
+          }),
+        );
+
+        expect(element().querySelector('.free-slots')).toBeNull();
+      });
+
+      it('removes the proposals when the day changes', async () => {
+        await render();
+        await fillAndSubmit(9, '10:00', '11:00');
+        await conflict(FREE_SLOTS);
+
+        await chooseDay(10);
+
+        expect(element().querySelector('.free-slots')).toBeNull();
+      });
+    });
+
     it('lets the student try again with the same form', async () => {
       await render();
       await fillAndSubmit();

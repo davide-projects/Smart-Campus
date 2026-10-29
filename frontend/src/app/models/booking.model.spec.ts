@@ -1,4 +1,10 @@
-import { campusDateTime, campusTime, campusToday, reservationTimeLabel } from './booking.model';
+import {
+  campusDateTime,
+  campusTime,
+  campusToday,
+  reservationTimeLabel,
+  timeRangeLabel,
+} from './booking.model';
 
 // Variabile d'ambiente del fuso del processo di test, per simulare un dispositivo in un altro fuso.
 const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } })
@@ -13,6 +19,21 @@ describe('campus time helpers', () => {
     } else {
       env['TZ'] = originalTimeZone;
     }
+  });
+
+  describe('timeRangeLabel', () => {
+    it('writes the two times of a range in campus time', () => {
+      const range = { start: '2026-11-05T08:00:00+01:00', end: '2026-11-05T10:30:00+01:00' };
+
+      expect(timeRangeLabel(range)).toBe('08:00–10:30');
+    });
+
+    it('does not depend on the time zone of the device', () => {
+      env['TZ'] = 'America/New_York';
+      const range = { start: '2026-06-05T09:00:00+02:00', end: '2026-06-05T11:00:00+02:00' };
+
+      expect(timeRangeLabel(range)).toBe('09:00–11:00');
+    });
   });
 
   describe('campusDateTime', () => {

@@ -79,6 +79,13 @@ export function reservationTimeLabel(item: { start: string; end: string }): stri
   return `${DAY_FORMAT.format(start)}, ${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
 }
 
+// Es. «08:00–10:00»: inizio e fine nell'ora del campus.
+export function timeRangeLabel(range: { start: string; end: string }): string {
+  const start = new Date(range.start);
+  const end = new Date(range.end);
+  return `${TIME_FORMAT.format(start)}–${TIME_FORMAT.format(end)}`;
+}
+
 // Scostamento dall'ora UTC del campus in un istante, es. «GMT+01:00» (solo «GMT» quando è zero).
 const OFFSET_FORMAT = new Intl.DateTimeFormat('en-US', {
   timeZone: CAMPUS_TIME_ZONE,
