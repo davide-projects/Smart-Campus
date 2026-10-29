@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { DailyAvailability, AvailabilitySearchFilter, AvailableRoomResponse } from '../models/availability.model';
 import {
+  CheckInResponse,
   CreateReservationRequest,
   FutureReservationsCountResponse,
   MyReservationsResponse,
@@ -31,6 +32,14 @@ export class BookingsService {
   // Cancella una prenotazione: la riga resta, con stato «cancellata». Risposta 204 senza corpo.
   cancel(id: string): Observable<void> {
     return this.http.delete<void>(`/api/bookings/${encodeURIComponent(id)}`);
+  }
+
+  // Registra il check-in di una prenotazione, valido per tutto il gruppo. Richiesta senza corpo.
+  checkIn(id: string): Observable<CheckInResponse> {
+    return this.http.post<CheckInResponse>(
+      `/api/bookings/${encodeURIComponent(id)}/check-in`,
+      null,
+    );
   }
 
   // Crea una prenotazione singola confermata a nome dell'utente autenticato.

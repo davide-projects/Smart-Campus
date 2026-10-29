@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { DailyAvailability, AvailableRoomResponse } from '../models/availability.model';
 import {
+  CheckInResponse,
   CreateReservationRequest,
   MyReservationsResponse,
   ReservationListItem,
@@ -23,6 +24,7 @@ const RESPONSE: MyReservationsResponse = {
       isGroup: false,
       organizerName: 'Mario Rossi',
       isOrganizer: true,
+      checkedInAt: null,
     },
   ],
   past: [],
@@ -109,6 +111,24 @@ describe('BookingsService', () => {
     request.flush(null, { status: 204, statusText: 'No Content' });
 
     await result;
+  });
+
+  it('checks in a reservation with POST /api/bookings/{id}/check-in and an empty body', async () => {
+    const checkedIn: CheckInResponse = { checkedInAt: '2026-11-05T08:55:00+00:00' };
+    const result = new Promise((resolve) => service.checkIn('p1').subscribe(resolve));
+
+    const request = http.expectOne('/api/bookings/p1/check-in');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush(checkedIn);
+
+    expect(await result).toEqual(checkedIn);
+  });
+
+  it('encodes the id in the check-in URL', () => {
+    service.checkIn('a/b').subscribe();
+
+    http.expectOne('/api/bookings/a%2Fb/check-in').flush({ checkedInAt: '2026-11-05T08:55:00Z' });
   });
 
   it('creates a reservation with POST /api/bookings and returns the confirmation', async () => {
