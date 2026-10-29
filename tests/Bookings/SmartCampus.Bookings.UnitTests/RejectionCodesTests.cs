@@ -152,6 +152,102 @@ public sealed class RejectionCodesTests
         AssertRejection(ReservationRules.UserLockTimeout(), 409, RejectionCodes.BookingInProgress);
     }
 
+    // --- Prenotazione di gruppo (US-05) ---
+
+    [Fact]
+    public void StaffWithMembers_HasTheGroupBookingForbiddenCode()
+    {
+        var rejection = ReservationRules.StaffGroupForbidden();
+
+        AssertRejection(rejection, 403, RejectionCodes.GroupBookingForbidden);
+        Assert.Equal("Prenotazione di gruppo non consentita", rejection.Title);
+        Assert.Equal("Il personale non può creare prenotazioni di gruppo.", rejection.Detail);
+        Assert.Null(rejection.Limits);
+    }
+
+    [Fact]
+    public void TooManyMembers_HasTheCodeAndTheMaximumNumberOfMembers()
+    {
+        var members = Enumerable.Range(0, 11).Select(_ => Guid.NewGuid()).ToList();
+
+        var rejection = ReservationRules.ValidateMembers(members, Organizer);
+
+        AssertRejection(rejection, 422, RejectionCodes.TooManyMembers);
+        AssertLimit(rejection, "maxMembers", 10);
+    }
+
+    [Fact]
+    public void OrganizerAsMember_HasTheOrganizerAsMemberCode()
+    {
+        var rejection = ReservationRules.ValidateMembers([Organizer], Organizer);
+
+        AssertRejection(rejection, 422, RejectionCodes.OrganizerAsMember);
+        Assert.Null(rejection.Limits);
+    }
+
+    [Fact]
+    public void DuplicateMembers_HasTheDuplicateMembersCode()
+    {
+        var rejection = ReservationRules.ValidateMembers([Stranger, Stranger], Organizer);
+
+        AssertRejection(rejection, 422, RejectionCodes.DuplicateMembers);
+        Assert.Null(rejection.Limits);
+    }
+
+    [Fact]
+    public void NotStudents_HasTheMembersNotStudentsCode()
+    {
+        var rejection = ReservationRules.NotStudents();
+
+        AssertRejection(rejection, 422, RejectionCodes.MembersNotStudents);
+        Assert.Equal("Membri non validi", rejection.Title);
+        Assert.Equal("Puoi aggiungere come membri solo studenti registrati.", rejection.Detail);
+        Assert.Null(rejection.Limits);
+    }
+
+    [Fact]
+    public void MembersCheckUnavailable_HasTheCodeAnd503()
+    {
+        var rejection = ReservationRules.MembersCheckUnavailable();
+
+        AssertRejection(rejection, 503, RejectionCodes.MembersCheckUnavailable);
+        Assert.Equal("Servizio non disponibile", rejection.Title);
+        Assert.Equal("Non è possibile verificare i membri in questo momento. Riprova tra poco.", rejection.Detail);
+    }
+
+    [Fact]
+    public void MemberLockTimeout_HasTheMemberBookingInProgressCode()
+    {
+        var rejection = ReservationRules.MemberLockTimeout();
+
+        AssertRejection(rejection, 409, RejectionCodes.MemberBookingInProgress);
+        Assert.Equal("Prenotazione in corso", rejection.Title);
+        Assert.Equal("Un membro del gruppo ha un'altra prenotazione in corso, riprova tra qualche secondo.", rejection.Detail);
+    }
+
+    [Fact]
+    public void CapacityExceeded_HasTheCodeAndTheCapacityAsMaximumParticipants()
+    {
+        var room = Room();
+        room.Capacity = 4;
+
+        var rejection = ReservationRules.ValidateCapacity(5, room);
+
+        AssertRejection(rejection, 422, RejectionCodes.CapacityExceeded);
+        AssertLimit(rejection, "maxParticipants", 4);
+    }
+
+    [Fact]
+    public void MemberConflict_HasTheMembersOccupiedCode()
+    {
+        var rejection = ReservationRules.MemberConflict();
+
+        AssertRejection(rejection, 409, RejectionCodes.MembersOccupied);
+        Assert.Equal("Membro già impegnato", rejection.Title);
+        Assert.Equal("Uno o più membri hanno già una prenotazione in questa fascia.", rejection.Detail);
+        Assert.Null(rejection.Limits);
+    }
+
     // --- Cancellazione ---
 
     [Fact]

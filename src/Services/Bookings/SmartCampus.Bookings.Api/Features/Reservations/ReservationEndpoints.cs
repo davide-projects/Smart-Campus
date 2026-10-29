@@ -33,9 +33,11 @@ public static class ReservationEndpoints
             .WithTags("Reservations")
             .Produces<ReservationResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
-            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         // GET /api/bookings/mine
         api.MapGet("/mine", GetMineAsync)
@@ -75,10 +77,13 @@ public static class ReservationEndpoints
         return api;
     }
 
+    // Ordine dei controlli: design della change 16-prenotare-per-un-gruppo, decisione 4.
     private static async Task<IResult> CreateReservationAsync(
         CreateReservationRequest request,
         ClaimsPrincipal user,
+        HttpRequest httpRequest,
         BookingDbContext db,
+        IdentityClient identityClient,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -95,13 +100,50 @@ public static class ReservationEndpoints
                 detail: "Effettua l'accesso per prenotare.");
         }
 
-        // 2. Regole sulla sola richiesta: se è sbagliata non serve prendere nessun lock.
+        var memberIds = request.MemberIds ?? [];
+
+        // 2. Solo gli studenti creano prenotazioni di gruppo: è un permesso, quindi uno Staff con membri
+        // riceve sempre 403, qualunque siano gli altri dati. Senza membri la sua prenotazione resta com'è.
+        if (memberIds.Count > 0 && user.IsInRole(StaffRole))
+        {
+            return ToProblem(ReservationRules.StaffGroupForbidden());
+        }
+
+        // 3. Regole sulla sola richiesta e sui membri: se è sbagliata non serve chiamare Identity né prendere lock.
         var now = timeProvider.GetUtcNow();
 
         if (ReservationRules.ValidateRequest(request, now) is { } invalidRequest)
         {
             return ToProblem(invalidRequest);
         }
+
+        if (ReservationRules.ValidateMembers(memberIds, organizerId) is { } invalidMembers)
+        {
+            return ToProblem(invalidMembers);
+        }
+
+        // 4. INV-9: i membri sono studenti registrati, secondo Identity. La chiamata avviene prima della transazione
+        // e fuori dalla strategia di retry: una risposta lenta non tiene bloccati spazio e persone, e un nuovo
+        // tentativo della transazione non richiama Identity.
+        if (memberIds.Count > 0)
+        {
+            var outcome = await identityClient.CheckStudentsAsync(
+                memberIds,
+                httpRequest.Headers.Authorization.ToString(),
+                cancellationToken);
+
+            switch (outcome)
+            {
+                case StudentsCheckOutcome.Unavailable:
+                    return ToProblem(ReservationRules.MembersCheckUnavailable());
+                case StudentsCheckOutcome.NotAllStudents:
+                    return ToProblem(ReservationRules.NotStudents());
+            }
+        }
+
+        // Organizzatore e membri in ordine crescente di id: due richieste che coinvolgono le stesse persone
+        // prendono i lock nello stesso ordine e la seconda aspetta la prima invece di bloccarsi a vicenda.
+        var people = memberIds.Append(organizerId).Order().ToList();
 
         // Con EnableRetryOnFailure una transazione manuale va eseguita dentro la strategia di retry:
         // se la connessione cade a metà, si ripete l'intera transazione da capo.
@@ -114,7 +156,7 @@ public static class ReservationEndpoints
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-            // 3. Lock sulla riga dello spazio (INV-1): chi prenota lo stesso spazio aspetta qui il proprio turno.
+            // 5. Lock sulla riga dello spazio (INV-1): chi prenota lo stesso spazio aspetta qui il proprio turno.
             var room = await db.BookableRooms
                 .FromSql($"SELECT * FROM BookableRooms WITH (UPDLOCK, ROWLOCK) WHERE RoomId = {request.RoomId}")
                 .SingleOrDefaultAsync(cancellationToken);
@@ -129,32 +171,33 @@ public static class ReservationEndpoints
 
             await db.Entry(room).Collection(bookableRoom => bookableRoom.OpeningHours).LoadAsync(cancellationToken);
 
-            // 4. Lock sulla persona (INV-8): due prenotazioni della stessa persona, anche su spazi diversi,
-            // passano una alla volta. Il lock si libera da solo alla fine della transazione.
-            var userLock = $"user:{organizerId}";
-            try
+            // 6. Lock sulle persone (INV-8): due prenotazioni che coinvolgono la stessa persona, anche su spazi
+            // diversi, passano una alla volta. I lock si liberano da soli alla fine della transazione.
+            foreach (var personId in people)
             {
-                await db.Database.ExecuteSqlAsync(
-                    $"""
-                    DECLARE @result int;
-                    EXEC @result = sp_getapplock @Resource = {userLock}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
-                    IF @result < 0 THROW 50001, 'Impossibile ottenere il lock sull''utente.', 1;
-                    """,
-                    cancellationToken);
-            }
-            catch (SqlException exception) when (exception.Number == 50001)
-            {
-                // Dopo 10 secondi di attesa un'altra prenotazione della stessa persona è ancora in corso.
-                return ToProblem(ReservationRules.UserLockTimeout());
+                if (!await TryLockUserAsync(db, personId, cancellationToken))
+                {
+                    // Dopo 10 secondi di attesa un'altra prenotazione della stessa persona è ancora in corso.
+                    return ToProblem(personId == organizerId
+                        ? ReservationRules.UserLockTimeout()
+                        : ReservationRules.MemberLockTimeout());
+                }
             }
 
-            // 5. Regole sullo spazio: attivo, prenotabile, dentro l'orario (INV-3, INV-4).
+            // 7. Regole sullo spazio: attivo, prenotabile, dentro l'orario (INV-3, INV-4), poi capienza (INV-5).
             if (ReservationRules.ValidateAgainstRoom(request, room, CampusTimeZone) is { } invalidForRoom)
             {
                 return ToProblem(invalidForRoom);
             }
 
-            // 6. INV-1: nessuna prenotazione confermata sovrapposta sullo stesso spazio.
+            var participants = 1 + memberIds.Count;
+
+            if (ReservationRules.ValidateCapacity(participants, room) is { } overCapacity)
+            {
+                return ToProblem(overCapacity);
+            }
+
+            // 8. INV-1: nessuna prenotazione confermata sovrapposta sullo stesso spazio.
             var roomTaken = await db.Reservations.AnyAsync(
                 reservation =>
                     reservation.RoomId == request.RoomId &&
@@ -170,7 +213,7 @@ public static class ReservationEndpoints
                 return ToProblem(ReservationRules.RoomConflict(freeSlots));
             }
 
-            // 7. INV-8: l'organizzatore non è già impegnato altrove, né come organizzatore né come membro.
+            // 9. INV-8: l'organizzatore non è già impegnato altrove, né come organizzatore né come membro...
             var organizerBusy = await db.Reservations.AnyAsync(
                 reservation =>
                     reservation.Status == ReservationStatus.Confirmed &&
@@ -185,19 +228,41 @@ public static class ReservationEndpoints
                 return ToProblem(ReservationRules.OrganizerConflict());
             }
 
-            // 8. Inserimento e commit: da qui la fascia risulta occupata per tutti.
+            // ...e nemmeno i membri.
+            if (memberIds.Count > 0)
+            {
+                var membersBusy = await db.Reservations.AnyAsync(
+                    reservation =>
+                        reservation.Status == ReservationStatus.Confirmed &&
+                        reservation.Start < request.End &&
+                        reservation.End > request.Start &&
+                        (memberIds.Contains(reservation.OrganizerId) ||
+                         reservation.Members.Any(member => memberIds.Contains(member.UserId))),
+                    cancellationToken);
+
+                if (membersBusy)
+                {
+                    return ToProblem(ReservationRules.MemberConflict());
+                }
+            }
+
+            // 10. Prenotazione e membri con un solo SaveChanges, poi commit: da qui la fascia risulta occupata per tutti.
+            var reservationId = Guid.NewGuid();
             var reservation = new Reservation
             {
-                Id = Guid.NewGuid(),
+                Id = reservationId,
                 RoomId = room.RoomId,
                 OrganizerId = organizerId,
                 OrganizerName = organizerName,
                 Start = request.Start,
                 End = request.End,
-                Participants = 1,
+                Participants = participants,
                 Purpose = request.Purpose,
                 Status = ReservationStatus.Confirmed,
-                CreatedAt = now
+                CreatedAt = now,
+                Members = memberIds
+                    .Select(memberId => new ReservationMember { ReservationId = reservationId, UserId = memberId })
+                    .ToList()
             };
 
             db.Reservations.Add(reservation);
@@ -215,6 +280,28 @@ public static class ReservationEndpoints
 
             return Results.Created($"/api/bookings/{reservation.Id}", response);
         });
+    }
+
+    // Lock esclusivo sulla persona (risorsa "user:{id}"), legato alla transazione aperta.
+    // False se dopo 10 secondi un'altra transazione lo tiene ancora.
+    private static async Task<bool> TryLockUserAsync(BookingDbContext db, Guid userId, CancellationToken cancellationToken)
+    {
+        var userLock = $"user:{userId}";
+        try
+        {
+            await db.Database.ExecuteSqlAsync(
+                $"""
+                DECLARE @result int;
+                EXEC @result = sp_getapplock @Resource = {userLock}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
+                IF @result < 0 THROW 50001, 'Impossibile ottenere il lock sull''utente.', 1;
+                """,
+                cancellationToken);
+            return true;
+        }
+        catch (SqlException exception) when (exception.Number == 50001)
+        {
+            return false;
+        }
     }
 
     // Le prenotazioni in cui l'utente è organizzatore o membro, divise in future, passate e cancellate.

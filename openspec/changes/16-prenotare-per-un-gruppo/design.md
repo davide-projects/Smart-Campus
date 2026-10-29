@@ -67,9 +67,9 @@ Bookings chiede a Identity, al momento della prenotazione, quali `memberIds` son
 - `BaseAddress` letto da `Services:Identity:BaseAddress`:
   - `appsettings.json`: `http://localhost:5101`, la porta di `launchSettings` di Identity;
   - `docker-compose.yml`: `Services__Identity__BaseAddress: http://identity:8080`;
-  - all'avvio un valore mancante o non assoluto ferma il servizio con un messaggio che nomina la chiave, come per `Jwt:SigningKey`.
+  - all'avvio un valore mancante, non assoluto o con uno schema diverso da `http` e `https` ferma il servizio con un messaggio che nomina la chiave, come per `Jwt:SigningKey` (decisione dell'utente). Lo schema va controllato perché su macOS e Linux un percorso come `/internal` è letto come URI assoluto `file://`.
 - `Timeout` = 3 secondi. Nessun retry, nessun pacchetto nuovo: `IHttpClientFactory` è già nel framework.
-- Metodo del tipo `CheckStudentsAsync(IReadOnlyCollection<Guid> userIds, string authorizationHeader, CancellationToken)`. Restituisce un risultato con tre esiti: tutti studenti, almeno un non studente, Identity non disponibile. Il client gestisce `HttpRequestException`, il timeout (`TaskCanceledException` non causata dal `CancellationToken` della richiesta), le risposte non `200` e il JSON non leggibile, e li riduce tutti a «non disponibile». Il chiamante non vede eccezioni.
+- Metodo del tipo `CheckStudentsAsync(IReadOnlyCollection<Guid> userIds, string authorizationHeader, CancellationToken)`. Restituisce un risultato con tre esiti: tutti studenti, almeno un non studente, Identity non disponibile. Il client gestisce `HttpRequestException`, il timeout (`TaskCanceledException` non causata dal `CancellationToken` della richiesta), le risposte non `200` e il JSON non leggibile, e li riduce tutti a «non disponibile». Una risposta `200` senza `students` o senza `notStudents` conta come JSON non leggibile. Il chiamante non vede eccezioni.
 - **Log:** un `LogWarning` con il solo motivo tecnico (timeout, codice di stato, tipo di eccezione). Niente id utente, nomi o token: l'intestazione `Authorization` non va mai nei log. I log HTTP predefiniti di `IHttpClientFactory` riportano URL e stato, non le intestazioni, quindi vanno bene.
 
 ### 4. Momento della chiamata e ordine dei controlli (decisione dell'utente)
@@ -81,7 +81,7 @@ Nuovo ordine di `CreateReservationAsync`:
 3. `ValidateRequest` (invariato) e poi le regole pure sui membri, in quest'ordine: più di 10 id → `422` «Puoi aggiungere al massimo 10 membri.» (decisione dell'utente), organizzatore tra i membri, membri ripetuti → `422` «Membri non validi». Il tetto si conta sugli id ricevuti, prima di togliere i duplicati, e limita sia la chiamata a Identity sia i lock `sp_getapplock` per richiesta. Una nuova funzione pura in `ReservationRules` (es. `ValidateMembers(memberIds, organizerId)`, con la costante `MaxMembers = 10`), con unit test.
 4. Solo se ci sono membri: chiamata a Identity, **prima** di aprire la transazione e prima di qualunque lock, così una risposta lenta (fino a 3 s) non tiene bloccati lo spazio o le persone.
    - Identity non disponibile → `503` «Servizio non disponibile» / «Non è possibile verificare i membri in questo momento. Riprova tra poco.». Qui rientrano timeout, errori di rete, `5xx`, JSON non leggibile e anche le altre risposte non `200` (`401`, `400`): in tutti i casi Bookings non sa se i membri sono studenti, e il problema non dipende dall'utente.
-   - Almeno un id in `notStudents` → `422` «Membri non validi» / «Puoi aggiungere come membri solo studenti registrati.».
+   - Almeno un id in `notStudents` → `422` «Membri non validi» / «Puoi aggiungere come membri solo studenti registrati.». Lo stesso vale per un id che Identity non riporta né in `students` né in `notStudents` (decisione dell'utente): un membro è accettato solo se Identity lo conferma come studente. Con il contratto della decisione 2 il caso non capita.
 5. Transazione: lock sullo spazio → `404`.
 6. Lock `user:{id}` su organizzatore **e** membri, presi uno alla volta in ordine crescente di id (`Guid.CompareTo` su tutto l'insieme, organizzatore compreso). Timeout sul lock:
    - dell'organizzatore → `409` «Hai un'altra prenotazione in corso, riprova tra qualche secondo.» (invariato);
@@ -96,6 +96,22 @@ Nuovo ordine di `CreateReservationAsync`:
 **Perché Identity prima della transazione.** Con la chiamata dentro la transazione ogni prenotazione di gruppo terrebbe il lock sulla riga dello spazio fino a 3 secondi, bloccando chiunque prenoti lo stesso spazio. Il prezzo è che il ruolo è letto un istante prima del commit: se un utente cambiasse ruolo in quell'istante, la prenotazione userebbe il ruolo precedente. Il rischio è accettato: oggi i ruoli non cambiano a runtime.
 
 **Retry di EF Core.** La chiamata a Identity è fuori da `strategy.ExecuteAsync`: un nuovo tentativo della transazione per un errore transitorio di SQL non richiama Identity.
+
+**Codici di motivo (decisione dell'utente).** Con #20 ogni rifiuto di `POST /api/bookings` porta `code` (costanti in `RejectionCodes`, tabella in `docs/handoff-architettura.md` 6.2). I nuovi rifiuti seguono la stessa regola, un codice per caso così la UI non deve leggere il testo:
+
+| Rifiuto | HTTP | `code` | `limits` |
+|---|---|---|---|
+| `Staff` con membri | 403 | `group-booking-forbidden` | — |
+| Più di 10 membri | 422 | `too-many-members` | `maxMembers` (10) |
+| Organizzatore tra i membri | 422 | `organizer-as-member` | — |
+| Membro ripetuto | 422 | `duplicate-members` | — |
+| Membri non studenti o inesistenti | 422 | `members-not-students` | — |
+| Identity non disponibile | 503 | `members-check-unavailable` | — |
+| Lock di un membro oltre 10 s | 409 | `member-booking-in-progress` | — |
+| Capienza superata | 422 | `capacity-exceeded` | `maxParticipants` (capienza dello spazio) |
+| Membro già impegnato | 409 | `members-occupied` | — |
+
+`members-occupied` e `capacity-exceeded` sono i nomi già riservati dall'handoff; la chiave `maxParticipants` segue `maxLength`, `maxDurationMinutes` e `maxAdvanceDays`. Il timeout del lock di un membro ha un codice diverso da `booking-in-progress` perché il messaggio è diverso.
 
 **Conseguenza dell'ordine.** Una richiesta con un membro non studente e uno spazio inesistente riceve `422` (membri) e non `404`, perché i membri si controllano prima di aprire la transazione. È voluto: i controlli che non richiedono lock vengono prima.
 
