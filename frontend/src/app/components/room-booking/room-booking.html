@@ -148,8 +148,29 @@
           </div>
         }
 
+        @if (freeSlots(); as slots) {
+          <section class="free-slots" aria-labelledby="free-slots-title">
+            @if (slots.length > 0) {
+              <h2 id="free-slots-title">Fasce libere di questo giorno</h2>
+              <ul class="free-slot-list">
+                @for (slot of slots; track slot.start) {
+                  <li>
+                    <button matButton="outlined" type="button" (click)="chooseFreeSlot(slot)">
+                      <mat-icon fontSet="material-symbols-outlined">schedule</mat-icon>
+                      {{ freeSlotLabel(slot) }}
+                    </button>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <h2 id="free-slots-title">Nessuna fascia libera</h2>
+              <p>Non ci sono fasce libere in questo giorno: scegli un altro giorno.</p>
+            }
+          </section>
+        }
+
         <div class="actions">
-          <button matButton="filled" type="submit" [disabled]="submitting()">
+          <button #confirmButton matButton="filled" type="submit" [disabled]="submitting()">
             <mat-icon fontSet="material-symbols-outlined">bookmark_add</mat-icon>
             Conferma prenotazione
           </button>
