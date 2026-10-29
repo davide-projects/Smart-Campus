@@ -1,32 +1,42 @@
+// La pagina occupa tutta l'altezza rimasta tra navbar e footer, così lo sfondo non lascia strisce vuote.
 :host {
-  display: block;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 // Contenuto al centro, con spazio sopra e sotto; su mobile resta in colonna con i margini della pagina.
-// Lo sfondo è un'illustrazione decorativa del campus (frontend/public/campus-hero.svg), caricata dal CSS
-// e non inclusa nel bundle. È ancorata in basso: gli edifici stanno ai lati e al centro resta cielo chiaro,
-// così il testo si legge su tutta la larghezza senza bisogno di un velo.
+// Lo sfondo è un'illustrazione decorativa del campus (frontend/public/campus-hero.svg, 16:9), caricata dal CSS
+// e non inclusa nel bundle. Gli edifici stanno ai lati e al centro resta cielo chiaro, così il testo
+// si legge su tutta la larghezza senza bisogno di un velo.
 .home {
   display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  min-height: 60vh;
+  // Con «cover» un'area più larga del 16:9 taglia l'immagine. Con un'altezza minima di 40vw il taglio non supera
+  // il 29% dell'altezza, che si divide tra sopra (80%) e sotto (20%): la punta della torre dell'orologio,
+  // al 29% dall'alto, resta sempre visibile. Su schermi molto larghi la pagina scorre un po' invece di tagliarla.
+  min-height: max(60vh, 40vw);
+  // L'altezza minima comprende il padding: senza, la pagina scorrerebbe anche quando non serve.
+  box-sizing: border-box;
   // Il padding inferiore più ampio alza il testo, lontano dal piazzale in fondo all'immagine.
   padding: 32px 16px 96px;
   text-align: center;
-  background: var(--mat-sys-surface) url('/campus-hero.svg') center bottom / cover no-repeat;
+  background: var(--mat-sys-surface) url('/campus-hero.svg') center 80% / cover no-repeat;
 }
 
 h1 {
   margin: 0;
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-display-large);
-  // Si restringe su schermi piccoli, così «SmartCampus» non esce dalla pagina.
+  // Stesso carattere del logo nella navbar (definito in styles.scss).
+  font-family: var(--app-brand-font);
+  // Si restringe su schermi piccoli, così «SmartCampus» non esce dalla pagina (Poppins è più largo di Roboto).
   font-size: clamp(2.5rem, 12vw, 3.5rem);
-  // Roboto è caricato nei pesi 300-500: il medio è il più marcato disponibile.
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .tagline {

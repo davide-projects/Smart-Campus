@@ -5,6 +5,10 @@
   min-height: 100%;
 }
 
+// Anche il contenuto è una colonna flessibile: una pagina può occupare tutta l'altezza rimasta
+// tra navbar e footer (la pagina iniziale lo usa per lo sfondo).
 main {
+  display: flex;
   flex: 1;
+  flex-direction: column;
 }
