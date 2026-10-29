@@ -13,6 +13,13 @@ public enum StudentsCheckOutcome
     Unavailable
 }
 
+// Esito della verifica e, con AllStudents, il displayName ricevuto per ogni id (null se Identity non lo ha dato).
+public sealed record StudentsCheckResult(StudentsCheckOutcome Outcome, IReadOnlyDictionary<Guid, string?> DisplayNames)
+{
+    public static readonly StudentsCheckResult NotAllStudents = new(StudentsCheckOutcome.NotAllStudents, new Dictionary<Guid, string?>());
+    public static readonly StudentsCheckResult Unavailable = new(StudentsCheckOutcome.Unavailable, new Dictionary<Guid, string?>());
+}
+
 // Configurazione della chiamata a Identity: sezione "Services:Identity".
 public sealed class IdentityServiceOptions
 {
@@ -52,7 +59,7 @@ public sealed class IdentityClient(HttpClient httpClient, ILogger<IdentityClient
 
     private sealed record CheckResponse(IReadOnlyList<CheckedStudent>? Students, IReadOnlyList<Guid>? NotStudents);
 
-    public async Task<StudentsCheckOutcome> CheckStudentsAsync(
+    public async Task<StudentsCheckResult> CheckStudentsAsync(
         IReadOnlyCollection<Guid> userIds,
         string authorizationHeader,
         CancellationToken cancellationToken)
@@ -82,11 +89,13 @@ public sealed class IdentityClient(HttpClient httpClient, ILogger<IdentityClient
             }
 
             // Un membro è accettato solo se Identity lo conferma come studente.
-            var students = body.Students.Select(student => student.Id).ToHashSet();
+            var students = body.Students
+                .GroupBy(student => student.Id)
+                .ToDictionary(group => group.Key, group => group.First().DisplayName);
 
-            return body.NotStudents.Count == 0 && userIds.All(students.Contains)
-                ? StudentsCheckOutcome.AllStudents
-                : StudentsCheckOutcome.NotAllStudents;
+            return body.NotStudents.Count == 0 && userIds.All(students.ContainsKey)
+                ? new StudentsCheckResult(StudentsCheckOutcome.AllStudents, students)
+                : StudentsCheckResult.NotAllStudents;
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -109,9 +118,9 @@ public sealed class IdentityClient(HttpClient httpClient, ILogger<IdentityClient
     }
 
     // Solo il motivo tecnico: niente id, nomi o token.
-    private StudentsCheckOutcome Unavailable(string reason)
+    private StudentsCheckResult Unavailable(string reason)
     {
         logger.LogWarning("Verifica dei membri presso Identity non disponibile: {Reason}.", reason);
-        return StudentsCheckOutcome.Unavailable;
+        return StudentsCheckResult.Unavailable;
     }
 }

@@ -115,6 +115,55 @@ public sealed class GroupReservationTests
         Assert.Empty(_fixture.Identity.Requests);
     }
 
+    // --- Nome dei membri (decisione 8) ---
+
+    [Fact]
+    public async Task GroupReservation_SavesTheDisplayNameOfEachMemberFromIdentity()
+    {
+        var roomId = await SeedRoomAsync();
+        Guid anna = Guid.NewGuid(), luca = Guid.NewGuid();
+        _fixture.Identity.SetDisplayName(anna, "Anna Bianchi");
+        _fixture.Identity.SetDisplayName(luca, "Luca Verdi");
+
+        var response = await Post(Guid.NewGuid(), Request(roomId, "10:00", "11:00", anna, luca));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var names = await MemberNamesAsync(roomId);
+        Assert.Equal("Anna Bianchi", names[anna]);
+        Assert.Equal("Luca Verdi", names[luca]);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(129)]
+    public async Task UnusableDisplayNameFromIdentity_Returns201AndSavesNull(object? displayName)
+    {
+        var roomId = await SeedRoomAsync();
+        var anna = Guid.NewGuid();
+        _fixture.Identity.SetDisplayName(anna, displayName is int length ? new string('a', length) : (string?)displayName);
+
+        var response = await Post(Guid.NewGuid(), Request(roomId, "10:00", "11:00", anna));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Null((await MemberNamesAsync(roomId))[anna]);
+    }
+
+    [Fact]
+    public async Task DisplayNameOf128Characters_IsSaved()
+    {
+        var roomId = await SeedRoomAsync();
+        var anna = Guid.NewGuid();
+        var name = new string('a', 128);
+        _fixture.Identity.SetDisplayName(anna, name);
+
+        var response = await Post(Guid.NewGuid(), Request(roomId, "10:00", "11:00", anna));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(name, (await MemberNamesAsync(roomId))[anna]);
+    }
+
     // --- Capienza (INV-5) ---
 
     [Fact]
@@ -366,6 +415,15 @@ public sealed class GroupReservationTests
         var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
         Assert.Equal(0, await db.Reservations.CountAsync(reservation => reservation.RoomId == roomId));
         Assert.Equal(0, await db.Set<ReservationMember>().CountAsync(member => member.Reservation.RoomId == roomId));
+    }
+
+    private async Task<Dictionary<Guid, string?>> MemberNamesAsync(Guid roomId)
+    {
+        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        return await db.Set<ReservationMember>()
+            .Where(member => member.Reservation.RoomId == roomId)
+            .ToDictionaryAsync(member => member.UserId, member => member.DisplayName);
     }
 
     private async Task<HttpResponseMessage> Post(Guid userId, CreateReservationRequest request)

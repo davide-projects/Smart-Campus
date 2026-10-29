@@ -339,6 +339,123 @@ public sealed class MyReservationsTests : IDisposable
         Assert.Null(item.CheckedInAt);
     }
 
+    // --- Membri del gruppo (change 16-prenotare-per-un-gruppo, decisione 8) ---
+
+    [Fact]
+    public async Task Mine_GroupMembers_AreSortedByNameWithoutTheOrganizer_SameForOrganizerAndMember()
+    {
+        var room = await SeedRoomAsync();
+        var mario = Guid.NewGuid();
+        Guid luca = Guid.NewGuid(), anna = Guid.NewGuid(), unknown = Guid.NewGuid(), bruno = Guid.NewGuid();
+        await SeedAsync(NewReservation(room, mario, Now.AddDays(1), organizerName: "Mario Rossi", memberNames: new()
+        {
+            [luca] = "Luca Verdi",
+            [unknown] = null,
+            [anna] = "anna Bianchi",
+            [bruno] = "Bruno Neri"
+        }));
+        MyReservationMember[] expected =
+        [
+            new(anna, "anna Bianchi"),
+            new(bruno, "Bruno Neri"),
+            new(luca, "Luca Verdi"),
+            new(unknown, null)
+        ];
+
+        var asOrganizer = Assert.Single((await GetMineAsync(mario)).Upcoming);
+        var asMember = Assert.Single((await GetMineAsync(anna)).Upcoming);
+
+        Assert.Equal(expected, asOrganizer.Members);
+        Assert.Equal(expected, asMember.Members);
+        Assert.DoesNotContain(asOrganizer.Members, member => member.Id == mario);
+    }
+
+    [Fact]
+    public async Task Mine_MembersWithoutName_AreSortedById()
+    {
+        var room = await SeedRoomAsync();
+        var mario = Guid.NewGuid();
+        Guid first = Guid.NewGuid(), second = Guid.NewGuid();
+        await SeedAsync(NewReservation(room, mario, Now.AddDays(1), memberNames: new() { [first] = null, [second] = null }));
+
+        var item = Assert.Single((await GetMineAsync(mario)).Upcoming);
+
+        Assert.Equal(new[] { first, second }.Order(), item.Members.Select(member => member.Id));
+        Assert.All(item.Members, member => Assert.Null(member.DisplayName));
+    }
+
+    [Fact]
+    public async Task Mine_SingleReservation_HasAnEmptyMembersArray()
+    {
+        var room = await SeedRoomAsync();
+        var user = Guid.NewGuid();
+        await SeedAsync(NewReservation(room, user, Now.AddDays(1)));
+
+        var response = await ClientFor(user).GetAsync("/api/bookings/mine");
+
+        // JSON grezzo: members deve esserci ed essere un array vuoto, non null.
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var members = body.RootElement.GetProperty("upcoming").EnumerateArray().Single().GetProperty("members");
+        Assert.Equal(JsonValueKind.Array, members.ValueKind);
+        Assert.Equal(0, members.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Mine_MemberJson_HasIdAndDisplayName()
+    {
+        var room = await SeedRoomAsync();
+        var mario = Guid.NewGuid();
+        var anna = Guid.NewGuid();
+        await SeedAsync(NewReservation(room, mario, Now.AddDays(1), memberNames: new() { [anna] = "Anna Bianchi" }));
+
+        var response = await ClientFor(anna).GetAsync("/api/bookings/mine");
+
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var member = body.RootElement.GetProperty("upcoming").EnumerateArray().Single().GetProperty("members").EnumerateArray().Single();
+        Assert.Equal(new[] { "displayName", "id" }, member.EnumerateObject().Select(property => property.Name).Order());
+        Assert.Equal(anna, member.GetProperty("id").GetGuid());
+        Assert.Equal("Anna Bianchi", member.GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task Mine_CancelledGroup_KeepsItsMembers()
+    {
+        var room = await SeedRoomAsync();
+        var mario = Guid.NewGuid();
+        Guid anna = Guid.NewGuid(), luca = Guid.NewGuid();
+        await SeedAsync(NewReservation(room, mario, Now.AddDays(1), ReservationStatus.Cancelled,
+            memberNames: new() { [anna] = "Anna Bianchi", [luca] = "Luca Verdi" }));
+
+        var item = Assert.Single((await GetMineAsync(anna)).Cancelled);
+
+        Assert.Equal(["Anna Bianchi", "Luca Verdi"], item.Members.Select(member => member.DisplayName));
+    }
+
+    [Fact]
+    public async Task Mine_AfterCreatingWithMembers_ShowsTheNamesFromIdentity()
+    {
+        // Come sopra: la POST usa l'ora reale.
+        _fixture.Clock.Reset();
+        _fixture.Identity.Reset();
+        var rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
+        var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, rome).Date).AddDays(2);
+        var local = day.ToDateTime(new TimeOnly(10, 0));
+        var start = new DateTimeOffset(local, rome.GetUtcOffset(local));
+        var room = await SeedRoomAsync(openAllDay: true);
+        var mario = Guid.NewGuid();
+        Guid anna = Guid.NewGuid(), luca = Guid.NewGuid();
+        _fixture.Identity.SetDisplayName(anna, "Anna Bianchi");
+        _fixture.Identity.SetDisplayName(luca, "Luca Verdi");
+        var request = new CreateReservationRequest(room.RoomId, start, start.AddHours(1), null, [luca, anna]);
+
+        var created = await ClientFor(mario, "Mario Rossi").PostAsJsonAsync("/api/bookings", request);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var item = Assert.Single((await GetMineAsync(luca)).Upcoming);
+        Assert.Equal([new(anna, "Anna Bianchi"), new(luca, "Luca Verdi")], item.Members);
+        Assert.Equal("Mario Rossi", item.OrganizerName);
+    }
+
     // --- Supporto ---
 
     // Record di presenza inserito direttamente: nessuna API crea ancora i NoShow (US-15).
@@ -430,7 +547,8 @@ public sealed class MyReservationsTests : IDisposable
         DateTimeOffset start,
         ReservationStatus status = ReservationStatus.Confirmed,
         string? organizerName = "Studente di prova",
-        Guid[]? members = null)
+        Guid[]? members = null,
+        Dictionary<Guid, string?>? memberNames = null)
     {
         var reservation = new Reservation
         {
@@ -440,7 +558,7 @@ public sealed class MyReservationsTests : IDisposable
             OrganizerName = organizerName,
             Start = start,
             End = start.AddHours(1),
-            Participants = 1 + (members?.Length ?? 0),
+            Participants = 1 + (members?.Length ?? 0) + (memberNames?.Count ?? 0),
             Status = status,
             CreatedAt = Now.AddDays(-30),
             CancelledAt = status == ReservationStatus.Cancelled ? Now.AddDays(-1) : null
@@ -449,6 +567,11 @@ public sealed class MyReservationsTests : IDisposable
         foreach (var member in members ?? [])
         {
             reservation.Members.Add(new ReservationMember { ReservationId = reservation.Id, UserId = member });
+        }
+
+        foreach (var (member, name) in memberNames ?? [])
+        {
+            reservation.Members.Add(new ReservationMember { ReservationId = reservation.Id, UserId = member, DisplayName = name });
         }
 
         return reservation;

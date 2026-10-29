@@ -30,7 +30,7 @@ Su indicazione del docente, la gestione delle presenze (check-in, mancate presen
 - **Responsabilità:** prenotare senza conflitti (singolarmente o in gruppo), cancellare, calcolare la disponibilità, registrare check-in e mancate presentazioni, produrre i report di utilizzo.
 - **Dati:**
   - `Reservation` (`OrganizerId`, `OrganizerName`, `RoomId`, `Start`, `End`, `Participants`, `Status`, `RowVersion`): `OrganizerName` è il nome visualizzato letto dal claim `name` del token alla creazione;
-  - `ReservationMember` (`ReservationId`, `UserId`): gli altri studenti di una prenotazione di gruppo;
+  - `ReservationMember` (`ReservationId`, `UserId`, `DisplayName`): gli altri studenti di una prenotazione di gruppo; `DisplayName` è il nome visualizzato restituito dalla verifica di Identity alla creazione (`null` se non noto);
   - `BookableRoom` (`RoomId`, `Name`, `BuildingName`, `Capacity`, `IsBookable`, `IsActive`, orari di apertura): copia locale aggiornata dagli eventi del servizio Rooms; `BuildingName` si aggiorna solo con eventi che lo contengono;
   - `AttendanceRecord` (`Type`: `CheckIn` / `NoShow`).
 - **Invarianti:**
