@@ -15,8 +15,7 @@ function textOfDetail(detail: string | null): string | null {
   return detail !== null && detail.trim() !== '' ? detail : null;
 }
 
-// I motivi di gruppo (US-05) li produce Bookings, ma il modulo di prenotazione non invia ancora i
-// membri, quindi oggi non compaiono da questa pagina. Le parole sono quelle del servizio.
+// Le parole sono quelle del servizio, anche per i motivi delle prenotazioni di gruppo (US-05).
 function textOfCode(code: string | null, limits: Record<string, unknown> | null): string | null {
   switch (code) {
     case 'room-occupied':
@@ -37,6 +36,8 @@ function textOfCode(code: string | null, limits: Record<string, unknown> | null)
       return 'Ogni studente può essere aggiunto una sola volta.';
     case 'members-not-students':
       return 'Puoi aggiungere come membri solo studenti registrati.';
+    case 'members-check-unavailable':
+      return 'Non è possibile verificare i membri in questo momento. Riprova tra poco.';
     case 'room-not-bookable':
       return 'Questo spazio non è prenotabile.';
     case 'invalid-time-range':

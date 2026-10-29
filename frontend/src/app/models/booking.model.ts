@@ -1,5 +1,6 @@
 // Una prenotazione dell'utente, come organizzatore o come membro (GET /api/bookings/mine).
 // buildingName e organizerName sono null quando Bookings non li conosce (dati precedenti a US-07).
+// members sono i membri del gruppo, organizzatore escluso, già in ordine di nome: [] se singola.
 export interface MyReservationItem {
   id: string;
   roomId: string;
@@ -12,6 +13,13 @@ export interface MyReservationItem {
   isOrganizer: boolean;
   // Istante del check-in (ISO 8601, UTC); null se la prenotazione non è ancora stata usata.
   checkedInAt: string | null;
+  members: ReservationMemberSummary[];
+}
+
+// Membro di una prenotazione di gruppo: displayName è null quando Bookings non conosce il nome.
+export interface ReservationMemberSummary {
+  id: string;
+  displayName: string | null;
 }
 
 // Risposta di GET /api/bookings/mine: le tre sezioni della pagina «Le mie prenotazioni».
@@ -21,14 +29,20 @@ export interface MyReservationsResponse {
   cancelled: MyReservationItem[];
 }
 
-// Richiesta di POST /api/bookings: prenotazione singola a nome dell'utente del token.
+// Richiesta di POST /api/bookings a nome dell'utente del token.
 // start ed end sono date-ora ISO 8601 con lo scostamento del campus (es. 2026-11-05T10:00:00+01:00).
+// memberIds sono gli id degli studenti del gruppo, organizzatore escluso: [] per una prenotazione
+// singola.
 export interface CreateReservationRequest {
   roomId: string;
   start: string;
   end: string;
   purpose: string | null;
+  memberIds: string[];
 }
+
+// Numero massimo di membri di una prenotazione di gruppo, come in Bookings (organizzatore escluso).
+export const MAX_MEMBERS = 10;
 
 // Stato di una prenotazione come lo invia Bookings (es. "Confirmed").
 export type ReservationStatus = 'Confirmed' | 'Cancelled';
@@ -204,6 +218,15 @@ export function organizerLabel(
   return item.organizerName === null
     ? 'Organizzatore non disponibile'
     : `Organizzatore: ${item.organizerName}`;
+}
+
+// Membri di una prenotazione di gruppo nell'ordine ricevuto: null sulle prenotazioni singole.
+export function membersLabel(item: Pick<MyReservationItem, 'isGroup' | 'members'>): string | null {
+  if (!item.isGroup || item.members.length === 0) {
+    return null;
+  }
+  const names = item.members.map((member) => member.displayName ?? 'Nome non disponibile');
+  return `Membri: ${names.join(', ')}`;
 }
 
 // Converte un oggetto Date nel formato "YYYY-MM-DD" richiesto come parametro query dall'API

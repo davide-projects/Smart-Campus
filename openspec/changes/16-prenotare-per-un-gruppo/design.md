@@ -6,7 +6,7 @@ Motivazione e ambito: vedi `proposal.md`. Requisiti: `specs/identity`, `specs/bo
 
 Stato attuale rilevante:
 
-- **Bookings, modello.** `Reservation` ha già `Participants` e la collezione `Members`. `ReservationMember` (`ReservationId`, `UserId`) è nella tabella `ReservationMembers` da `InitialCreate` (`20261027095732`): chiave composta `ReservationId` + `UserId`, FK con cascade e indice `IX_ReservationMembers_UserId`. Nessuna migrazione serve.
+- **Bookings, modello.** `Reservation` ha già `Participants` e la collezione `Members`. `ReservationMember` (`ReservationId`, `UserId`) è nella tabella `ReservationMembers` da `InitialCreate` (`20261027095732`): chiave composta `ReservationId` + `UserId`, FK con cascade e indice `IX_ReservationMembers_UserId`. Per l'elenco dei membri in «Le mie prenotazioni» serve una colonna nuova (decisione 8).
 - **Bookings, `POST /api/bookings` (`ReservationEndpoints.CreateReservationAsync`).** L'ordine attuale è:
   1. `sub` e `name` → `401`;
   2. `ReservationRules.ValidateRequest` (regole pure);
@@ -23,7 +23,7 @@ Stato attuale rilevante:
 - **Bookings, route.** `/api/bookings/{id:guid}` è mappata solo per `DELETE`. Un `PUT` o `PATCH` sullo stesso percorso riceve `405` dal routing di ASP.NET Core; il Gateway inoltra tutti i metodi (route `bookings`, policy `Default`).
 - **Identity.** `Program.cs` mappa tutto sotto `/api/identity`. `AddSmartCampusJwt` registra già `AddSmartCampusJwtBearer`, ma oggi solo `/me` usa `RequireAuthorization()`. `User` ha `Id`, `Username` (max 64, unico), `DisplayName` (max 128) e `Role` salvato come testo. La collation predefinita di SQL Server non distingue maiuscole e minuscole.
 - **Gateway.** Le route sono `identity-login` e `identity` (`/api/identity/{**catch-all}`, policy `Default`), più quelle di rooms e bookings. Non c'è un fallback: un percorso senza route riceve `404` senza essere inoltrato.
-- **Frontend.** `components/room-booking/` ha un modulo reattivo (`day`, `start`, `end`, `purpose`) e conosce `room().capacity` da `RoomsService.getRoomById`. `rejectionMessage()` mostra il `detail` solo per `409` e `422`. `BookingsService.create()` invia `CreateReservationRequest` senza membri. `authInterceptor` chiude la sessione su ogni `401` di `/api/`.
+- **Frontend.** `components/room-booking/` ha un modulo reattivo (`day`, `start`, `end`, `purpose`) e conosce `room().capacity` da `RoomsService.getRoomById`. `rejectionMessage(problemOf(error))` sceglie il messaggio dal `code` per `409` e `422` con `rejectionText` di `services/rejection-message.ts` (#21), che conosce già i codici di gruppo tranne `members-check-unavailable`, e ripiega sul `detail`. `BookingsService.create()` invia `CreateReservationRequest` senza membri. `components/my-bookings/` mostra per le voci di gruppo «Prenotazione di gruppo» e l'organizzatore (`organizerLabel`), non i membri. `authInterceptor` chiude la sessione su ogni `401` di `/api/`.
 - **Comunicazione tra servizi.** Finora solo eventi MassTransit (Rooms → Bookings). Nessun servizio chiama un altro servizio in HTTP.
 
 ## Goals / Non-Goals
@@ -59,7 +59,7 @@ Bookings chiede a Identity, al momento della prenotazione, quali `memberIds` son
 - **Risposta `200`:** `{ "students": [{ "id", "displayName" }], "notStudents": [guid, ...] }`. Ogni id distinto compare una sola volta: in `students` se esiste con `Role = Student`, altrimenti in `notStudents` (`Staff` o inesistente). Identity non distingue «inesistente» da «Staff», così Bookings non può usarlo per scoprire chi è registrato. Una sola query `WHERE Id IN (...)`.
 - **Autenticazione:** Bookings inoltra l'intestazione `Authorization` della richiesta dell'utente. Nessun segreto nuovo né credenziali di servizio: Identity valida il token con la stessa chiave che usa per emetterlo. Il token è già stato validato da Bookings, quindi un `401` di Identity è un caso anomalo (vedi decisione 4).
 - **Non esposto dal Gateway:** nessuna route corrisponde a `/internal/**`, quindi il Gateway risponde `404`. Il Gateway non cambia configurazione. Un test di integrazione del Gateway, con il servizio a valle finto già usato dai test, verifica il `404` e che la richiesta non arrivi a valle. In Docker Compose Identity non pubblica porte verso l'host: solo i container della rete interna (Bookings) lo raggiungono.
-- `displayName` in `students` non serve oggi a Bookings, ma fa parte del contratto deciso. Bookings non lo salva.
+- Bookings salva `displayName` di `students` in `ReservationMember` per l'elenco dei membri (decisione 8).
 
 ### 3. Client in Bookings: `IdentityClient` tipizzato (decisione dell'utente)
 
@@ -69,7 +69,7 @@ Bookings chiede a Identity, al momento della prenotazione, quali `memberIds` son
   - `docker-compose.yml`: `Services__Identity__BaseAddress: http://identity:8080`;
   - all'avvio un valore mancante, non assoluto o con uno schema diverso da `http` e `https` ferma il servizio con un messaggio che nomina la chiave, come per `Jwt:SigningKey` (decisione dell'utente). Lo schema va controllato perché su macOS e Linux un percorso come `/internal` è letto come URI assoluto `file://`.
 - `Timeout` = 3 secondi. Nessun retry, nessun pacchetto nuovo: `IHttpClientFactory` è già nel framework.
-- Metodo del tipo `CheckStudentsAsync(IReadOnlyCollection<Guid> userIds, string authorizationHeader, CancellationToken)`. Restituisce un risultato con tre esiti: tutti studenti, almeno un non studente, Identity non disponibile. Il client gestisce `HttpRequestException`, il timeout (`TaskCanceledException` non causata dal `CancellationToken` della richiesta), le risposte non `200` e il JSON non leggibile, e li riduce tutti a «non disponibile». Una risposta `200` senza `students` o senza `notStudents` conta come JSON non leggibile. Il chiamante non vede eccezioni.
+- Metodo del tipo `CheckStudentsAsync(IReadOnlyCollection<Guid> userIds, string authorizationHeader, CancellationToken)`. Restituisce un risultato con tre esiti: tutti studenti, almeno un non studente, Identity non disponibile. Con «tutti studenti» il risultato porta anche il `displayName` ricevuto per ogni id (decisione 8). Il client gestisce `HttpRequestException`, il timeout (`TaskCanceledException` non causata dal `CancellationToken` della richiesta), le risposte non `200` e il JSON non leggibile, e li riduce tutti a «non disponibile». Una risposta `200` senza `students` o senza `notStudents` conta come JSON non leggibile. Il chiamante non vede eccezioni.
 - **Log:** un `LogWarning` con il solo motivo tecnico (timeout, codice di stato, tipo di eccezione). Niente id utente, nomi o token: l'intestazione `Authorization` non va mai nei log. I log HTTP predefiniti di `IHttpClientFactory` riportano URL e stato, non le intestazioni, quindi vanno bene.
 
 ### 4. Momento della chiamata e ordine dei controlli (decisione dell'utente)
@@ -89,7 +89,7 @@ Nuovo ordine di `CreateReservationAsync`:
 7. `ValidateAgainstRoom` (`422`, invariato), poi capienza: `1 + membri > room.Capacity` → `422` «Capienza superata» / «Lo spazio ospita al massimo {Capacity} persone.». La capienza va controllata dopo il lock sulla riga dello spazio, come le altre regole sullo spazio. Il testo è quello proposto in `docs/handoff-architettura.md` (6.2), con il punto finale.
 8. Conflitto sullo spazio (`409`, invariato).
 9. Conflitto dell'organizzatore (`409` «Hai già una prenotazione in questa fascia oraria.», invariato), poi conflitto dei membri: una query `Confirmed`, sovrapposta, con `OrganizerId IN (membri)` oppure `Members.Any(UserId IN membri)` → `409` «Membro già impegnato» / «Uno o più membri hanno già una prenotazione in questa fascia.» (testo dell'handoff 6.2).
-10. Insert di `Reservation` con `Participants = 1 + membri` e di un `ReservationMember` per ogni membro con un solo `SaveChangesAsync`, poi commit.
+10. Insert di `Reservation` con `Participants = 1 + membri` e di un `ReservationMember` per ogni membro, con il suo `DisplayName` (decisione 8), con un solo `SaveChangesAsync`, poi commit.
 
 **Perché i lock in ordine di id.** Due richieste che coinvolgono le stesse persone (per esempio Mario con Anna come membro e, in parallelo, Anna con Mario) prendono i lock nello stesso ordine: la seconda aspetta la prima invece di bloccarsi a vicenda. Il lock sullo spazio viene sempre prima di quelli sulle persone, quindi l'ordine globale resta «spazio, poi persone per id crescente» e non introduce cicli. I lock sono legati alla transazione (`@LockOwner = 'Transaction'`) e si liberano al commit o al rollback.
 
@@ -163,10 +163,23 @@ Nuovo ordine di `CreateReservationAsync`:
   - Errore diverso da `401` → «Non è stato possibile cercare gli studenti. Riprova più tardi.» sotto il campo, con `role="alert"`; la sequenza di ricerca non si interrompe (`catchError` dentro lo `switchMap`).
   - Nessun risultato → opzione disabilitata «Nessuno studente trovato.».
   - `401` → lo gestisce `authInterceptor`.
-- **Messaggi della `POST`.** `rejectionMessage()` aggiunge `503` ai codici che mostrano il `detail`. Senza `detail` (per esempio il `503` del Gateway quando Bookings è spento) resta il messaggio generico.
+- **Messaggi della `POST` (decisione dell'utente).** I rifiuti di gruppo usano la logica della #21: `rejectionMessage(problemOf(error))` passa a `rejectionText` di `services/rejection-message.ts`, che sceglie il testo dal `code` con i testi di `docs/handoff-architettura.md` 6.2 e i numeri dai `limits` (`maxParticipants` per `capacity-exceeded`, `maxMembers` per `too-many-members`). Questa change aggiunge a `rejectionText` il codice `members-check-unavailable` e fa accettare a `rejectionMessage` anche il `503`. Con un codice non previsto o senza i `limits` necessari si mostra il `detail`; senza `detail` (per esempio il `503` del Gateway quando Bookings è spento) resta il messaggio generico. `group-booking-forbidden` (`403`) riceve il messaggio generico: lo `Staff` non vede il campo dei membri.
+- *Scartata:* una funzione propria per i rifiuti di gruppo (`groupRejectionMessage` in `models/booking.model.ts`). Duplicherebbe i testi e la scelta dal `code` che la #21 ha già portato su `main`.
 - **Conferma.** «Partecipanti: N» solo se `participants > 1`. «Prenota un'altra fascia» svuota anche `members`.
 - *Scartata:* membri come `FormArray` nel `FormGroup`. Complica il reset e la validazione senza vantaggi: i membri non si scrivono, si scelgono.
 - *Scartata:* invio consentito con la capienza superata, lasciando al servizio il `422`. Una richiesta che sicuramente fallisce non aggiunge informazioni; l'avviso spiega già il motivo.
+
+### 8. Elenco dei membri in «Le mie prenotazioni» (decisione del team, dettagli dell'utente)
+
+- **Salvataggio.** `ReservationMember` acquisisce `DisplayName` (`string?`, `HasMaxLength(128)`, come `OrganizerName` e `DisplayName` di Identity). `CreateReservationAsync` lo valorizza con il `displayName` della risposta di Identity, letto prima della transazione insieme alla verifica di INV-9: nessuna chiamata in più. È il nome del momento della creazione e non si aggiorna, come `organizerName`. Un `displayName` mancante, vuoto (dopo `Trim`) o oltre 128 caratteri si salva `null` senza rifiutare la prenotazione (decisione dell'utente): il membro è comunque uno studente confermato, il nome serve solo a mostrarlo.
+- **Migrazione `AddMemberDisplayName`.** `AddColumn` nullable su `ReservationMembers`; le righe esistenti restano `null` (Bookings non ha i nomi per recuperarli). Il `Down` toglie la colonna.
+- **API.** `MyReservationItem` acquisisce `Members` (`IReadOnlyList<MyReservationMember>`, record `MyReservationMember(Guid Id, string? DisplayName)`), proiettato nella stessa query di `/mine`. Sempre presente: `[]` per una prenotazione singola (decisione dell'utente).
+  - Tutti i membri, organizzatore escluso (ha già `organizerName`); chi guarda, se è membro, compare con il proprio nome. L'elenco è lo stesso per organizzatore e membri (decisione dell'utente).
+  - Ordine applicato in memoria: `displayName` senza distinzione di maiuscole (`StringComparer.OrdinalIgnoreCase`), i `null` in fondo, a parità per `id` (decisione dell'utente).
+  - Vale per le tre liste, cancellate comprese. La lista Staff `GET /api/bookings` non cambia.
+- **Frontend.** `MyReservationItem.members: ReservationMemberSummary[]` (`id`, `displayName`). Funzione pura `membersLabel(item)` in `models/booking.model.ts`, accanto a `organizerLabel`: «Membri: A, B» nell'ordine ricevuto, «Nome non disponibile» per un `displayName` `null`, `null` se la voce non è di gruppo o non ha membri (decisioni dell'utente). In `my-bookings` la riga è un `<p class="members">` sotto l'organizzatore e va a capo a 375px.
+- *Scartata:* leggere i nomi da Identity in `/mine`. Metterebbe una dipendenza sincrona anche sulla lettura delle proprie prenotazioni.
+- *Scartata:* nelle spec, MODIFIED di «Contenuto di ogni voce». La change `45-check-in` modifica lo stesso requisito e chi archivia per secondo sovrascriverebbe l'altra: l'elenco dei membri è un requisito ADDED.
 
 ## Risks / Trade-offs
 
@@ -177,11 +190,14 @@ Nuovo ordine di `CreateReservationAsync`:
 - [La ricerca permette di scoprire nomi e username degli studenti] → solo per studenti autenticati, al massimo 10 risultati per richiesta, da 2 caratteri. I dati sono sintetici. Nessun limite di frequenza (come per il login, vedi `docs/identity.md`, «Limiti noti»).
 - [Messaggi generici: lo studente non sa quale membro è impegnato o non è studente] → scelta voluta per non rivelare dati di altri. Lo studente toglie i membri uno alla volta, oppure lo chiede al gruppo.
 - [Frontend e Bookings possono vedere capienze diverse per qualche istante] → il `422` del servizio resta mostrato.
-- [Confronto sul testo del `detail` nel frontend (`ROOM_CONFLICT_DETAIL`)] → invariato; i nuovi messaggi non aggiungono confronti sul testo.
+- [Confronto sul testo del `detail` nel frontend (`ROOM_CONFLICT_DETAIL`)] → invariato; i nuovi messaggi si scelgono dal `code` e non aggiungono confronti sul testo.
+- [Nomi dei membri fermi alla creazione] → come `organizerName`: un cambio di nome in Identity non si vede nelle prenotazioni già create. Accettato.
+- [Membri salvati prima della migrazione senza nome] → `displayName` `null` e «Nome non disponibile» nel frontend.
+- [Testi dei rifiuti duplicati in `services/rejection-message.ts` e in `ReservationRules`] → coincidono con la tabella 6.2 dell'handoff; un cambio di testo va fatto nei due punti. Il `detail` resta il ripiego per i codici non previsti.
 
 ## Migration Plan
 
-- **Database:** nessuna migrazione, né in Bookings né in Identity.
+- **Database:** migrazione `AddMemberDisplayName` in Bookings (colonna nullable `DisplayName` in `ReservationMembers`, decisione 8); nessuna in Identity.
 - **Configurazione:**
   - `Services:Identity:BaseAddress` in `src/Services/Bookings/SmartCampus.Bookings.Api/appsettings.json` (`http://localhost:5101`);
   - in `docker-compose.yml` `Services__Identity__BaseAddress: http://identity:8080` e `identity` tra le dipendenze di `bookings`;
@@ -191,7 +207,8 @@ Nuovo ordine di `CreateReservationAsync`:
 - **Rollback:** togliere `memberIds` dalla `POST` riporta il comportamento attuale. L'endpoint interno può restare senza effetti.
 - **Documentazione:**
   - #123: `docs/endpoints.md` (`GET /api/identity/students` nella tabella di Identity e una sezione per gli endpoint interni, non instradati dal Gateway), `docs/identity.md` (API, endpoint interno, limiti della ricerca), `docs/gateway.md` (`/internal/**` non instradato e passo di prova manuale; «Limiti noti»: Identity valida il token anche per le nuove route), `docs/handoff-architettura.md` 6.3 (nuove route);
-  - #17: `docs/endpoints.md` (riga della `POST` con `memberIds`, `422`, `409` e `503`), `docs/servizi.md` (nuova riga in «Come si parlano i servizi» per la chiamata HTTP Bookings → Identity; lock sui membri in «Come Bookings evita le sovrapposizioni»), `docs/architettura.md` (Bookings: chiamata a Identity e configurazione), `docs/handoff-architettura.md` (flusso F1 con la verifica dei membri, tabella degli errori 6.2 con i nuovi messaggi).
+  - #17: `docs/endpoints.md` (riga della `POST` con `memberIds`, `422`, `409` e `503`), `docs/servizi.md` (nuova riga in «Come si parlano i servizi» per la chiamata HTTP Bookings → Identity; lock sui membri in «Come Bookings evita le sovrapposizioni»), `docs/architettura.md` (Bookings: chiamata a Identity e configurazione), `docs/handoff-architettura.md` (flusso F1 con la verifica dei membri, tabella degli errori 6.2 con i nuovi messaggi);
+  - #18: `docs/endpoints.md` (`members` nella risposta di `GET /api/bookings/mine`), `docs/architettura.md` e `docs/handoff-architettura.md` (`DisplayName` di `ReservationMember`).
 - **Archivio:** dopo il merge di #123, #17 e #18, con `/opsx:archive` dal branch del task «Archivio OpenSpec» (#122). L'archivio crea `openspec/specs/identity/spec.md` con il `Purpose` della delta.
 
 ## Open Questions

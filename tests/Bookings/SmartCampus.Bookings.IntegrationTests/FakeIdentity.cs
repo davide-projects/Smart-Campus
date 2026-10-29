@@ -23,7 +23,10 @@ public sealed class FakeIdentity
 
     public sealed record ReceivedRequest(HttpMethod Method, string Path, string? Authorization, IReadOnlyList<Guid> UserIds);
 
+    public const string DefaultDisplayName = "Studente di prova";
+
     private readonly ConcurrentDictionary<Guid, byte> _notStudents = new();
+    private readonly ConcurrentDictionary<Guid, string?> _displayNames = new();
     private readonly ConcurrentQueue<ReceivedRequest> _requests = new();
 
     public Behavior Mode { get; set; } = Behavior.Students;
@@ -32,10 +35,14 @@ public sealed class FakeIdentity
 
     public void MarkNotStudent(Guid userId) => _notStudents[userId] = 0;
 
+    // Nome restituito per lo studente; con null la risposta non contiene displayName per lui.
+    public void SetDisplayName(Guid userId, string? displayName) => _displayNames[userId] = displayName;
+
     public void Reset()
     {
         Mode = Behavior.Students;
         _notStudents.Clear();
+        _displayNames.Clear();
         _requests.Clear();
     }
 
@@ -73,7 +80,9 @@ public sealed class FakeIdentity
         {
             students = distinct
                 .Where(id => !_notStudents.ContainsKey(id))
-                .Select(id => new { id, displayName = "Studente di prova" }),
+                .Select(id => _displayNames.TryGetValue(id, out var name)
+                    ? name is null ? (object)new { id } : new { id, displayName = name }
+                    : new { id, displayName = DefaultDisplayName }),
             notStudents = distinct.Where(_notStudents.ContainsKey)
         };
 

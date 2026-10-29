@@ -20,6 +20,11 @@ const CASES: Case[] = [
   ['duplicate-members', null, 'Ogni studente può essere aggiunto una sola volta.'],
   ['members-not-students', null, 'Puoi aggiungere come membri solo studenti registrati.'],
   [
+    'members-check-unavailable',
+    null,
+    'Non è possibile verificare i membri in questo momento. Riprova tra poco.',
+  ],
+  [
     'booking-in-progress',
     null,
     "Hai un'altra prenotazione in corso, riprova tra qualche secondo.",

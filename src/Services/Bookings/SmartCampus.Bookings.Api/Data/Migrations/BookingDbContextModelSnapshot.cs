@@ -173,6 +173,10 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.HasKey("ReservationId", "UserId");
 
                     b.HasIndex("UserId");

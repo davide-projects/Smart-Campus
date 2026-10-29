@@ -164,6 +164,40 @@ Con richieste contemporanee che coinvolgono la stessa persona (come organizzator
 - **WHEN** in parallelo Mario Rossi prenota con Anna Bianchi come membro e Anna Bianchi prenota un altro spazio con Mario Rossi come membro, nella stessa fascia
 - **THEN** una risposta è `201`, l'altra è `409`, nessuna è `500` e nessuna attende oltre i 10 secondi del lock
 
+### Requirement: Nome dei membri salvato alla creazione
+`POST /api/bookings` MUST salvare con ogni membro il `displayName` restituito per lui dalla verifica interna di Identity; il nome resta quello del momento della creazione. Un nome mancante, vuoto o più lungo di 128 caratteri MUST essere salvato come `null`, senza rifiutare la prenotazione. Richiesta e risposta `201` non cambiano.
+
+#### Scenario: Nomi dei membri salvati
+- **WHEN** Mario Rossi crea una prenotazione con Anna Bianchi e Luca Verdi e Identity li conferma come studenti con i loro `displayName`
+- **THEN** la risposta è `201` come prima e la prenotazione compare in `GET /api/bookings/mine` con `members` che contiene «Anna Bianchi» e «Luca Verdi»
+
+#### Scenario: Nome non ricevuto da Identity
+- **WHEN** Identity conferma Anna Bianchi come studentessa senza `displayName`
+- **THEN** la risposta è `201` e in `GET /api/bookings/mine` il membro con l'id di Anna Bianchi ha `displayName` = `null`
+
+### Requirement: Membri nelle voci delle mie prenotazioni
+Ogni voce di `GET /api/bookings/mine` MUST contenere `members`: per una prenotazione di gruppo tutti i membri (`id`, `displayName`), organizzatore escluso, in ordine alfabetico di `displayName` (i `null` in fondo, a parità per `id`); `[]` senza membri. L'elenco MUST essere lo stesso per l'organizzatore e per ogni membro. `displayName` SHALL valere `null` quando Bookings non conosce il nome.
+
+#### Scenario: Elenco visto dall'organizzatore
+- **WHEN** Mario Rossi ha prenotato con Luca Verdi e Anna Bianchi e chiama `GET /api/bookings/mine`
+- **THEN** la voce contiene `members` = Anna Bianchi e poi Luca Verdi (ordine alfabetico senza distinzione di maiuscole), ognuno con `id` e `displayName`, e non contiene Mario Rossi
+
+#### Scenario: Elenco visto da un membro
+- **WHEN** Anna Bianchi, membro della stessa prenotazione, chiama `GET /api/bookings/mine`
+- **THEN** la voce contiene lo stesso `members`, con Anna Bianchi e Luca Verdi
+
+#### Scenario: Prenotazione singola
+- **WHEN** l'utente vede una prenotazione senza membri
+- **THEN** la voce contiene `members` = `[]`
+
+#### Scenario: Membro senza nome salvato
+- **WHEN** un membro è stato salvato prima che Bookings salvasse i nomi dei membri
+- **THEN** in `members` quel membro ha il suo `id` e `displayName` = `null`, dopo i membri con il nome
+
+#### Scenario: Prenotazione di gruppo cancellata
+- **WHEN** l'organizzatore ha cancellato una prenotazione con due membri e un membro chiama `GET /api/bookings/mine`
+- **THEN** la voce in `cancelled` contiene ancora i due membri in `members`
+
 ## MODIFIED Requirements
 
 ### Requirement: Creazione di una prenotazione singola

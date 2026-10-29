@@ -50,6 +50,9 @@
         <mat-card-content>
           <p class="confirmation-room">{{ c.roomName }}</p>
           <p class="confirmation-time">{{ c.time }}</p>
+          @if (c.participants > 1) {
+            <p class="confirmation-participants">Partecipanti: {{ c.participants }}</p>
+          }
         </mat-card-content>
         <mat-card-actions class="actions">
           <a matButton="outlined" [routerLink]="['/rooms', roomId()]">
@@ -135,6 +138,66 @@
             <mat-error>Il motivo può avere al massimo {{ maxPurposeLength }} caratteri.</mat-error>
           }
         </mat-form-field>
+
+        @if (!isStaff()) {
+          <mat-form-field appearance="outline" class="members-field">
+            <mat-label>Membri del gruppo</mat-label>
+            <mat-chip-grid #chipGrid aria-label="Membri del gruppo">
+              @for (member of members(); track member.id) {
+                <mat-chip-row (removed)="removeMember(member)">
+                  {{ member.displayName }}
+                  <button
+                    matChipRemove
+                    type="button"
+                    [attr.aria-label]="'Rimuovi ' + member.displayName"
+                  >
+                    <mat-icon fontSet="material-symbols-outlined">cancel</mat-icon>
+                  </button>
+                </mat-chip-row>
+              }
+            </mat-chip-grid>
+            <input
+              #memberInput
+              #memberTrigger="matAutocompleteTrigger"
+              [matChipInputFor]="chipGrid"
+              [matAutocomplete]="memberOptions"
+              [matAutocompleteDisabled]="membersFull()"
+              [disabled]="membersFull()"
+              (input)="onMemberInput(memberInput.value)"
+              (keydown.enter)="onMemberEnter($event, memberTrigger)"
+            />
+            <mat-autocomplete
+              #memberOptions="matAutocomplete"
+              (optionSelected)="addMember($event, memberTrigger)"
+            >
+              @if (memberSuggestions(); as suggestions) {
+                @for (student of suggestions; track student.id) {
+                  <mat-option [value]="student">
+                    <span class="student-name">{{ student.displayName }}</span>
+                    <span class="student-username">{{ student.username }}</span>
+                  </mat-option>
+                } @empty {
+                  <mat-option disabled>Nessuno studente trovato.</mat-option>
+                }
+              }
+            </mat-autocomplete>
+            @if (membersFull()) {
+              <mat-hint>Puoi aggiungere al massimo {{ maxMembers }} membri.</mat-hint>
+            }
+          </mat-form-field>
+          @if (memberSearchFailed()) {
+            <p class="member-search-error" role="alert">
+              Non è stato possibile cercare gli studenti. Riprova più tardi.
+            </p>
+          }
+        }
+
+        <p class="participants" aria-live="polite">Partecipanti: {{ participants() }}</p>
+        @if (overCapacity()) {
+          <p class="capacity-warning" role="alert">
+            Lo spazio ospita al massimo {{ r.capacity }} persone.
+          </p>
+        }
 
         @if (errorMessage(); as message) {
           <div class="rejection" role="alert">

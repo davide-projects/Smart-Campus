@@ -30,6 +30,9 @@
                       @if (item.organizer) {
                         <p class="group">Prenotazione di gruppo</p>
                         <p class="organizer">{{ item.organizer }}</p>
+                        @if (item.members) {
+                          <p class="members">{{ item.members }}</p>
+                        }
                       }
                       @if (item.used) {
                         <p class="used" tabindex="-1" [id]="item.usedId">Usata</p>
