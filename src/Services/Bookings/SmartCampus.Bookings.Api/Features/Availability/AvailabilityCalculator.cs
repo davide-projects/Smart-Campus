@@ -49,6 +49,36 @@ public static class AvailabilityCalculator
         return new DailyAvailability(roomId, date, IsOpen: true, slots);
     }
 
+    // Unisce le fasce libere consecutive in intervalli: dieci fasce libere di fila diventano un solo intervallo.
+    // Con notBefore si saltano le fasce già iniziate, perché non sono più prenotabili.
+    // Giorno chiuso o tutto occupato: elenco vuoto, mai null.
+    public static IReadOnlyList<FreeRange> FreeRanges(DailyAvailability availability, DateTimeOffset? notBefore = null)
+    {
+        var ranges = new List<FreeRange>();
+        FreeRange? current = null;
+
+        foreach (var slot in availability.Slots)
+        {
+            if (!slot.IsFree || slot.Start < notBefore)
+            {
+                current = null;
+                continue;
+            }
+
+            if (current is not null && current.End == slot.Start)
+            {
+                ranges[^1] = current = current with { End = slot.End };
+            }
+            else
+            {
+                current = new FreeRange(slot.Start, slot.End);
+                ranges.Add(current);
+            }
+        }
+
+        return ranges;
+    }
+
     // Combina data e ora locali del campus in un istante preciso, con lo scarto UTC giusto per quel giorno
     // (+01:00 d'inverno, +02:00 con l'ora legale).
     private static DateTimeOffset ToCampusTime(DateOnly date, TimeOnly time, TimeZoneInfo campusTimeZone)

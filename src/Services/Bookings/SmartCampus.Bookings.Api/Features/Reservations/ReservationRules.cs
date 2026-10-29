@@ -1,5 +1,6 @@
 using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
+using SmartCampus.Bookings.Api.Features.Availability;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -23,37 +24,53 @@ public static class ReservationRules
         // INV-2
         if (request.End <= request.Start)
         {
-            return Unprocessable("Orario non valido", "L'orario di fine deve essere successivo a quello di inizio.");
+            return Unprocessable(RejectionCodes.InvalidTimeRange, "Orario non valido", "L'orario di fine deve essere successivo a quello di inizio.");
         }
 
         // INV-6
         if (request.Start < now)
         {
-            return Unprocessable("Orario nel passato", "Non è possibile prenotare nel passato.");
+            return Unprocessable(RejectionCodes.InThePast, "Orario nel passato", "Non è possibile prenotare nel passato.");
         }
 
         // A1: inizio e fine all'ora esatta o alla mezz'ora, come le fasce della disponibilità.
         if (!IsOnSlotBoundary(request.Start) || !IsOnSlotBoundary(request.End))
         {
-            return Unprocessable("Orario non valido", "Le prenotazioni iniziano e finiscono all'ora esatta o alla mezz'ora.");
+            return Unprocessable(
+                RejectionCodes.SlotBoundary,
+                "Orario non valido",
+                "Le prenotazioni iniziano e finiscono all'ora esatta o alla mezz'ora.",
+                Limits(("slotMinutes", (int)SlotLength.TotalMinutes)));
         }
 
         // Il motivo è facoltativo, ma la colonna nel database ha al massimo 200 caratteri.
         if (request.Purpose?.Length > MaxPurposeLength)
         {
-            return Unprocessable("Motivo troppo lungo", "Il motivo può contenere al massimo 200 caratteri.");
+            return Unprocessable(
+                RejectionCodes.PurposeTooLong,
+                "Motivo troppo lungo",
+                "Il motivo può contenere al massimo 200 caratteri.",
+                Limits(("maxLength", MaxPurposeLength)));
         }
 
         // A2
         if (request.End - request.Start > MaxDuration)
         {
-            return Unprocessable("Durata eccessiva", "Una prenotazione può durare al massimo 4 ore.");
+            return Unprocessable(
+                RejectionCodes.DurationExceeded,
+                "Durata eccessiva",
+                "Una prenotazione può durare al massimo 4 ore.",
+                Limits(("maxDurationMinutes", (int)MaxDuration.TotalMinutes)));
         }
 
         // A2
         if (request.Start > now + MaxAdvance)
         {
-            return Unprocessable("Troppo in anticipo", "Si può prenotare al massimo 14 giorni prima.");
+            return Unprocessable(
+                RejectionCodes.TooFarAhead,
+                "Troppo in anticipo",
+                "Si può prenotare al massimo 14 giorni prima.",
+                Limits(("maxAdvanceDays", (int)MaxAdvance.TotalDays)));
         }
 
         return null;
@@ -69,7 +86,7 @@ public static class ReservationRules
         // INV-4
         if (!room.IsActive || !room.IsBookable)
         {
-            return Unprocessable("Spazio non prenotabile", "Questo spazio non è prenotabile.");
+            return Unprocessable(RejectionCodes.RoomNotBookable, "Spazio non prenotabile", "Questo spazio non è prenotabile.");
         }
 
         // INV-3: gli orari di apertura sono in ora locale del campus.
@@ -78,14 +95,14 @@ public static class ReservationRules
 
         if (localStart.Date != localEnd.Date)
         {
-            return Unprocessable("Orario non valido", "La prenotazione deve iniziare e finire nello stesso giorno.");
+            return Unprocessable(RejectionCodes.DifferentDays, "Orario non valido", "La prenotazione deve iniziare e finire nello stesso giorno.");
         }
 
         var openingHours = room.OpeningHours.SingleOrDefault(hours => hours.DayOfWeek == localStart.DayOfWeek);
 
         if (openingHours is null)
         {
-            return Unprocessable("Fuori orario", "Lo spazio è chiuso in questo giorno.");
+            return Unprocessable(RejectionCodes.RoomClosed, "Fuori orario", "Lo spazio è chiuso in questo giorno.");
         }
 
         var startTime = TimeOnly.FromDateTime(localStart.DateTime);
@@ -94,23 +111,33 @@ public static class ReservationRules
         if (startTime < openingHours.OpensAt || endTime > openingHours.ClosesAt)
         {
             return Unprocessable(
+                RejectionCodes.OutsideOpeningHours,
                 "Fuori orario",
-                $"Lo spazio è aperto dalle {openingHours.OpensAt:HH\\:mm} alle {openingHours.ClosesAt:HH\\:mm}.");
+                $"Lo spazio è aperto dalle {openingHours.OpensAt:HH\\:mm} alle {openingHours.ClosesAt:HH\\:mm}.",
+                Limits(
+                    ("opensAt", openingHours.OpensAt.ToString("HH\\:mm")),
+                    ("closesAt", openingHours.ClosesAt.ToString("HH\\:mm"))));
         }
 
         return null;
     }
 
     // INV-1: conflitto con una prenotazione confermata dello stesso spazio.
-    public static ReservationRejection RoomConflict() =>
-        new(StatusCodes.Status409Conflict, "Spazio già prenotato", "Lo spazio è già prenotato in questa fascia.");
+    // Il testo non cambia (il frontend lo riconosce); le fasce libere dello stesso giorno stanno in FreeSlots.
+    public static ReservationRejection RoomConflict(IReadOnlyList<FreeRange> freeSlots) =>
+        new(
+            StatusCodes.Status409Conflict,
+            "Spazio già prenotato",
+            "Lo spazio è già prenotato in questa fascia.",
+            RejectionCodes.RoomOccupied,
+            FreeSlots: freeSlots);
 
     // INV-8: l'organizzatore ha già una prenotazione confermata sovrapposta, anche in un altro spazio.
     public static ReservationRejection OrganizerConflict() =>
-        new(StatusCodes.Status409Conflict, "Hai già una prenotazione", "Hai già una prenotazione in questa fascia oraria.");
+        new(StatusCodes.Status409Conflict, "Hai già una prenotazione", "Hai già una prenotazione in questa fascia oraria.", RejectionCodes.PersonOccupied);
 
     public static ReservationRejection UserLockTimeout() =>
-        new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Hai un'altra prenotazione in corso, riprova tra qualche secondo.");
+        new(StatusCodes.Status409Conflict, "Prenotazione in corso", "Hai un'altra prenotazione in corso, riprova tra qualche secondo.", RejectionCodes.BookingInProgress);
 
     // Cancellazione (US-08): l'ordine dei controlli è quello del design della change 25-cancella-prenotazione, decisione 2.
     // 1. chi può cancellare: prima di tutto, così un estraneo riceve sempre 403 e non scopre lo stato della prenotazione;
@@ -127,7 +154,8 @@ public static class ReservationRules
             return CancellationDecision.Reject(new ReservationRejection(
                 StatusCodes.Status403Forbidden,
                 "Cancellazione non consentita",
-                "Non puoi cancellare questa prenotazione."));
+                "Non puoi cancellare questa prenotazione.",
+                RejectionCodes.CancellationForbidden));
         }
 
         if (reservation.Status == ReservationStatus.Cancelled)
@@ -138,6 +166,7 @@ public static class ReservationRules
         if (reservation.Start <= now)
         {
             return CancellationDecision.Reject(Unprocessable(
+                RejectionCodes.CancellationTooLate,
                 "Cancellazione non consentita",
                 "Non è possibile cancellare una prenotazione già iniziata o passata."));
         }
@@ -148,6 +177,14 @@ public static class ReservationRules
     private static bool IsOnSlotBoundary(DateTimeOffset value) =>
         value.TimeOfDay.Ticks % SlotLength.Ticks == 0;
 
-    private static ReservationRejection Unprocessable(string title, string detail) =>
-        new(StatusCodes.Status422UnprocessableEntity, title, detail);
+    private static ReservationRejection Unprocessable(
+        string code,
+        string title,
+        string detail,
+        IReadOnlyDictionary<string, object?>? limits = null) =>
+        new(StatusCodes.Status422UnprocessableEntity, title, detail, code, limits);
+
+    // I limiti da rispettare, come coppie nome-valore: finiscono nella proprietà "limits" della risposta.
+    private static Dictionary<string, object?> Limits(params (string Key, object? Value)[] limits) =>
+        limits.ToDictionary(limit => limit.Key, limit => limit.Value);
 }
