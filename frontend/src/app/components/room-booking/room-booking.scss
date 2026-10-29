@@ -54,6 +54,30 @@
   }
 }
 
+// Linea del tempo del giorno scelto, tra il campo «Giorno» e gli orari.
+.day-availability {
+  margin: 0 0 16px;
+
+  h2 {
+    margin: 0 0 8px;
+    font: var(--mat-sys-title-small);
+    color: var(--mat-sys-on-surface);
+  }
+}
+
+.availability-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.availability-note {
+  margin: 0;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface-variant);
+}
+
 // Inizio e fine affiancati; su schermi stretti uno sotto l'altro.
 .times {
   display: grid;

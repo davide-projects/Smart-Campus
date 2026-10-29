@@ -271,6 +271,20 @@ describe('RoomDetail', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('a[href$="/book"]')).toBeNull();
   });
 
+  // La disponibilità sta già nella pagina: accanto a «Prenota spazio» non c'è un pulsante che scorre.
+  it('non dovrebbe avere un pulsante «Vedi disponibilità» accanto a «Prenota spazio»', async () => {
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+    const loader = TestbedHarnessEnvironment.loader(fixture);
+
+    expect(
+      await loader.getHarnessOrNull(MatButtonHarness.with({ text: /Vedi disponibilità/ })),
+    ).toBeNull();
+    expect(
+      await loader.getHarnessOrNull(MatButtonHarness.with({ text: /Prenota spazio/ })),
+    ).not.toBeNull();
+  });
+
   // Test 7: Criteri 2, 3 e 4 - Fasce libere, occupate e privacy
   it('dovrebbe mostrare le fasce libere e occupate senza esporre chi ha prenotato', () => {
     fixture = TestBed.createComponent(RoomDetail);
@@ -279,13 +293,14 @@ describe('RoomDetail', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
 
-    // Verifica orari formattati
-    expect(compiled.textContent).toContain('08:00 – 08:30');
-    expect(compiled.textContent).toContain('08:30 – 09:00');
+    // Verifica orari formattati: la disponibilità è una linea del tempo con un blocco per tratto
+    expect(compiled.querySelector('app-availability-timeline')).not.toBeNull();
+    expect(compiled.textContent).toContain('08:00–08:30');
+    expect(compiled.textContent).toContain('08:30–09:00');
 
     // Verifica etichette degli stati
-    expect(compiled.textContent).toContain('Libera');
-    expect(compiled.textContent).toContain('Occupata');
+    expect(compiled.textContent).toContain('Libera dalle 08:00 alle 08:30');
+    expect(compiled.textContent).toContain('Occupata dalle 08:30 alle 09:00');
 
     // Verifica privacy: nessun nome o campo utente presente
     expect(compiled.textContent).not.toContain('organizer');
@@ -303,7 +318,21 @@ describe('RoomDetail', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     expect(compiled.textContent).toContain('Spazio chiuso');
-    expect(compiled.textContent).not.toContain('08:00 – 08:30');
+    expect(compiled.querySelector('app-availability-timeline')).toBeNull();
+  });
+
+  it('dovrebbe dire che non ci sono fasce quando lo spazio è aperto ma l\'API non ne restituisce', () => {
+    mockBookingsService.getDailyAvailability.mockReturnValue(
+      of({ ...mockAvailability, slots: [] }),
+    );
+
+    fixture = TestBed.createComponent(RoomDetail);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).toContain('Nessuna fascia oraria disponibile per questo giorno.');
+    expect(compiled.querySelector('app-availability-timeline')).toBeNull();
   });
 
   // Test 9: Cambio data da selettore

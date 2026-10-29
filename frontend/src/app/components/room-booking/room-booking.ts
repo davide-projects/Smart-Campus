@@ -12,7 +12,16 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, catchError, debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
+import {
+  Subject,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -34,6 +43,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 
 // Servizi e modelli
+import { DailyAvailability } from '../../models/availability.model';
 import {
   FreeRange,
   MAX_MEMBERS,
@@ -46,6 +56,7 @@ import {
   halfHourSlots,
   pad,
   reservationTimeLabel,
+  toIsoDate,
   toMinutes,
 } from '../../models/booking.model';
 import { OpeningHours, RoomDetail, WEEK_DAYS } from '../../models/room.model';
@@ -56,6 +67,7 @@ import { BookingsService } from '../../services/bookings.service';
 import { rejectionText } from '../../services/rejection-message';
 import { RoomsService } from '../../services/rooms.service';
 import { StudentsService } from '../../services/students.service';
+import { AvailabilityTimeline } from '../shared/availability-timeline/availability-timeline';
 
 // Giorni prenotabili oltre oggi (assunzione A2).
 const MAX_DAYS_AHEAD = 14;
@@ -66,11 +78,9 @@ const MAX_DURATION_MINUTES = 240;
 // Lunghezza massima del motivo, come in Bookings.
 export const MAX_PURPOSE_LENGTH = 200;
 
-// Codice di motivo del conflitto sullo spazio: solo con questo si propone la disponibilità.
+// Codice di motivo del conflitto sullo spazio: solo con questo si propongono le fasce libere e si
+// aggiorna la linea del tempo, perché solo questo conflitto cambia la disponibilità dello spazio.
 const ROOM_OCCUPIED_CODE = 'room-occupied';
-
-// Ripiego per un servizio che non invia il codice: il conflitto si riconosce dal testo.
-export const ROOM_CONFLICT_DETAIL = 'Lo spazio è già prenotato in questa fascia.';
 
 export const GENERIC_ERROR = 'Non è stato possibile completare la prenotazione. Riprova più tardi.';
 
@@ -99,6 +109,7 @@ type MemberSearchResult =
 
 @Component({
   imports: [
+    AvailabilityTimeline,
     ReactiveFormsModule,
     RouterLink,
     MatAutocompleteModule,
@@ -141,14 +152,9 @@ export class RoomBooking implements OnInit {
 
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  private readonly rejectionCode = signal<string | null>(null);
   // Fasce libere proposte dopo un conflitto sullo spazio; null senza conflitto, vuoto se non ce ne sono.
   protected readonly freeSlots = signal<FreeRange[] | null>(null);
   protected readonly confirmation = signal<Confirmation | null>(null);
-  protected readonly showAvailabilityLink = computed(
-    () =>
-      this.rejectionCode() === ROOM_OCCUPIED_CODE || this.errorMessage() === ROOM_CONFLICT_DETAIL,
-  );
 
   // Giorni prenotabili: da oggi a oggi + 14 giorni, come date del campus.
   protected readonly minDay = campusToday();
@@ -200,6 +206,17 @@ export class RoomBooking implements OnInit {
   private readonly selectedDay = signal<Date | null>(null);
   private readonly selectedStart = signal<string | null>(null);
 
+  // Disponibilità del giorno scelto, mostrata come linea del tempo sopra gli orari: chi prenota
+  // vede le fasce libere senza tornare al dettaglio dello spazio. Se non si carica, la
+  // prenotazione resta possibile: l'ultima parola sui conflitti è comunque di Bookings.
+  protected readonly hasDay = computed(() => this.selectedDay() !== null);
+  protected readonly availability = signal<DailyAvailability | null>(null);
+  protected readonly isLoadingAvailability = signal(false);
+  protected readonly availabilityFailed = signal(false);
+
+  // `keepCurrent`: l'aggiornamento dopo un rifiuto non svuota la linea del tempo mentre ricarica.
+  private readonly availabilityRequests = new Subject<{ day: Date | null; keepCurrent: boolean }>();
+
   // Orario di apertura del giorno scelto; null se non c'è un giorno o lo spazio è chiuso.
   protected readonly dayHours = computed(() => {
     const room = this.room();
@@ -245,6 +262,38 @@ export class RoomBooking implements OnInit {
   private readonly confirmButton = viewChild('confirmButton', { read: ElementRef });
 
   constructor() {
+    // switchMap: scegliendo un altro giorno la richiesta precedente viene annullata.
+    this.availabilityRequests
+      .pipe(
+        tap(({ day, keepCurrent }) => {
+          this.availabilityFailed.set(false);
+          if (!keepCurrent) {
+            this.availability.set(null);
+            this.isLoadingAvailability.set(day !== null);
+          }
+        }),
+        switchMap(({ day }) => {
+          const roomId = this.roomId();
+          if (day === null || roomId === null) {
+            return of(null);
+          }
+          return this.bookingsService.getDailyAvailability(roomId, toIsoDate(day)).pipe(
+            catchError(() => {
+              this.availabilityFailed.set(true);
+              return of(null);
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((availability) => {
+        this.isLoadingAvailability.set(false);
+        // Un errore durante l'aggiornamento lascia visibile l'ultima linea del tempo caricata.
+        if (availability !== null || !this.availabilityFailed()) {
+          this.availability.set(availability);
+        }
+      });
+
     // Ricerca degli studenti: da 2 caratteri, dopo una pausa nella scrittura, e solo l'ultima
     // richiesta conta. Un errore non interrompe le ricerche successive; il 401 chiude la sessione
     // nell'interceptor, quindi non mostra il messaggio.
@@ -276,6 +325,7 @@ export class RoomBooking implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((day) => {
         this.selectedDay.set(day);
+        this.availabilityRequests.next({ day, keepCurrent: false });
         // Le fasce libere proposte erano del giorno di prima.
         this.freeSlots.set(null);
         const { start, end } = this.form.controls;
@@ -388,10 +438,13 @@ export class RoomBooking implements OnInit {
           this.submitting.set(false);
           const problem = problemOf(error);
           this.errorMessage.set(rejectionMessage(problem));
-          this.rejectionCode.set(problem.code);
-          this.freeSlots.set(
-            problem.code === ROOM_OCCUPIED_CODE ? this.bookableSlots(problem.freeSlots) : null,
-          );
+          const roomOccupied = problem.code === ROOM_OCCUPIED_CODE;
+          this.freeSlots.set(roomOccupied ? this.bookableSlots(problem.freeSlots) : null);
+          // Solo un conflitto sullo spazio ha cambiato la disponibilità: la linea del tempo si aggiorna.
+          // Gli altri 409 (sulla persona o sui membri) non la toccano.
+          if (roomOccupied) {
+            this.availabilityRequests.next({ day: this.form.controls.day.value, keepCurrent: true });
+          }
         },
       });
   }
@@ -508,10 +561,9 @@ export class RoomBooking implements OnInit {
     });
   }
 
-  // Toglie il rifiuto mostrato: messaggio, codice e fasce libere proposte.
+  // Toglie il rifiuto mostrato: messaggio e fasce libere proposte.
   private clearRejection(): void {
     this.errorMessage.set(null);
-    this.rejectionCode.set(null);
     this.freeSlots.set(null);
   }
 

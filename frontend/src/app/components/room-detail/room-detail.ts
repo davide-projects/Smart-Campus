@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, inject, signal, viewChild } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, catchError, of, switchMap, tap } from 'rxjs';
@@ -27,10 +27,12 @@ import {
 import { AuthService } from '../../services/auth.service';
 import { BookingsService } from '../../services/bookings.service';
 import { RoomsService } from '../../services/rooms.service';
+import { AvailabilityTimeline } from '../shared/availability-timeline/availability-timeline';
 import { DeactivateRoomDialog, DeactivateRoomDialogData } from './deactivate-room-dialog';
 
 @Component({
   imports: [
+    AvailabilityTimeline,
     RouterLink,
     MatCardModule,
     MatButtonModule,
@@ -54,9 +56,6 @@ export class RoomDetail implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
-
-  // Riferimento viewChild alla sezione disponibilità per scroll fluido
-  private readonly availabilitySection = viewChild<ElementRef<HTMLElement>>('availabilitySection');
 
   // Stato autenticazione e ruoli
   protected readonly isStaff = this.authService.isStaff;
@@ -161,11 +160,6 @@ export class RoomDetail implements OnInit {
     });
   }
 
-  // Estrae l'orario HH:mm dalla stringa ISO 8601 (es. "2026-11-03T08:30:00+01:00" -> "08:30")
-  protected formatTime(isoDateTime: string): string {
-    return isoDateTime.slice(11, 16);
-  }
-
   // Invocato quando l'utente sceglie una nuova data dal MatDatepicker
   protected onDateChange(newDate: Date | null): void {
     if (newDate) {
@@ -174,11 +168,6 @@ export class RoomDetail implements OnInit {
         this.dateRequests.next(newDate);
       }
     }
-  }
-
-  // Scorre la pagina dolcemente fino alla sezione della disponibilità tramite viewChild
-  protected scrollToAvailability(): void {
-    this.availabilitySection()?.nativeElement.scrollIntoView({ behavior: 'smooth' });
   }
 
   // Apre la finestra di conferma che mostra il numero di prenotazioni future dello spazio.
