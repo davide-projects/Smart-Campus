@@ -146,7 +146,7 @@ Dopo una risposta `201` la pagina SHALL mostrare, nella stessa pagina e al posto
 - **THEN** la conferma non mostra il numero di partecipanti
 
 ### Requirement: Messaggi di rifiuto della prenotazione
-Se `POST /api/bookings` risponde `409`, `422` o `503`, la pagina SHALL mostrare il messaggio `detail` della risposta, con `role="alert"`, mantenendo i valori inseriti nel modulo, compresi i membri scelti. Se il servizio non risponde o risponde con un altro errore SHALL mostrare «Non è stato possibile completare la prenotazione. Riprova più tardi.».
+Se `POST /api/bookings` risponde `409`, `422` o `503`, la pagina SHALL mostrare, con `role="alert"`, il messaggio scelto dal `code` della risposta per i rifiuti dei gruppi (`too-many-members`, `organizer-as-member`, `duplicate-members`, `members-not-students`, `members-check-unavailable`, `member-booking-in-progress`, `capacity-exceeded` con il numero da `limits.maxParticipants`, `members-occupied`), con i testi di `docs/handoff-architettura.md` 6.2, e il messaggio `detail` della risposta per gli altri codici o se il `code` manca, mantenendo i valori inseriti nel modulo, compresi i membri scelti. Se il servizio non risponde o risponde con un altro errore SHALL mostrare «Non è stato possibile completare la prenotazione. Riprova più tardi.».
 
 #### Scenario: Fuori dall'orario di apertura
 - **WHEN** lo studente chiede l'«Aula A1» dalle 19:00 alle 21:00 e il servizio risponde `422` con `detail` «Lo spazio è aperto dalle 08:00 alle 20:00.»
@@ -169,25 +169,25 @@ Se `POST /api/bookings` risponde `409`, `422` o `503`, la pagina SHALL mostrare 
 - **THEN** la pagina mostra «Non è stato possibile completare la prenotazione. Riprova più tardi.»
 
 #### Scenario: Membro già impegnato
-- **WHEN** lo studente prenota con Anna Bianchi e il servizio risponde `409` con `detail` «Uno o più membri hanno già una prenotazione in questa fascia.»
-- **THEN** la pagina mostra quel messaggio e il chip «Anna Bianchi» resta nel modulo
+- **WHEN** lo studente prenota con Anna Bianchi e il servizio risponde `409` con `code` = `members-occupied`
+- **THEN** la pagina mostra «Uno o più membri hanno già una prenotazione in questa fascia.» e il chip «Anna Bianchi» resta nel modulo
 
 #### Scenario: Capienza superata secondo il servizio
-- **WHEN** il servizio risponde `422` con `detail` «Lo spazio ospita al massimo 4 persone.»
-- **THEN** la pagina mostra quel messaggio
+- **WHEN** il servizio risponde `422` con `code` = `capacity-exceeded` e `limits.maxParticipants` = 4
+- **THEN** la pagina mostra «Lo spazio ospita al massimo 4 persone.»
 
 #### Scenario: Troppi membri secondo il servizio
-- **WHEN** il servizio risponde `422` con `detail` «Puoi aggiungere al massimo 10 membri.»
-- **THEN** la pagina mostra quel messaggio e i membri scelti restano nel modulo
+- **WHEN** il servizio risponde `422` con `code` = `too-many-members` e `limits.maxMembers` = 10
+- **THEN** la pagina mostra «Puoi aggiungere al massimo 10 membri.» e i membri scelti restano nel modulo
 
 #### Scenario: Membro non studente
-- **WHEN** il servizio risponde `422` con `detail` «Puoi aggiungere come membri solo studenti registrati.»
-- **THEN** la pagina mostra quel messaggio e i membri scelti restano nel modulo
+- **WHEN** il servizio risponde `422` con `code` = `members-not-students`
+- **THEN** la pagina mostra «Puoi aggiungere come membri solo studenti registrati.» e i membri scelti restano nel modulo
 
 #### Scenario: Verifica dei membri non disponibile
-- **WHEN** il servizio risponde `503` con `detail` «Non è possibile verificare i membri in questo momento. Riprova tra poco.»
-- **THEN** la pagina mostra quel messaggio e lo studente può riprovare con lo stesso modulo
+- **WHEN** il servizio risponde `503` con `code` = `members-check-unavailable`
+- **THEN** la pagina mostra «Non è possibile verificare i membri in questo momento. Riprova tra poco.» e lo studente può riprovare con lo stesso modulo
 
 #### Scenario: Servizio non disponibile senza messaggio
-- **WHEN** il servizio risponde `503` senza `detail`
+- **WHEN** il servizio risponde `503` senza `code` né `detail`
 - **THEN** la pagina mostra «Non è stato possibile completare la prenotazione. Riprova più tardi.»

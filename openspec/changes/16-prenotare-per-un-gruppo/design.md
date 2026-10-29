@@ -163,7 +163,8 @@ Nuovo ordine di `CreateReservationAsync`:
   - Errore diverso da `401` → «Non è stato possibile cercare gli studenti. Riprova più tardi.» sotto il campo, con `role="alert"`; la sequenza di ricerca non si interrompe (`catchError` dentro lo `switchMap`).
   - Nessun risultato → opzione disabilitata «Nessuno studente trovato.».
   - `401` → lo gestisce `authInterceptor`.
-- **Messaggi della `POST`.** `rejectionMessage()` aggiunge `503` ai codici che mostrano il `detail`. Senza `detail` (per esempio il `503` del Gateway quando Bookings è spento) resta il messaggio generico.
+- **Messaggi della `POST` (decisione dell'utente).** Per `409`, `422` e `503` `rejectionMessage()` sceglie il messaggio dal `code` per i rifiuti introdotti da questa change (tabella «Codici di motivo» della decisione 4, tranne `group-booking-forbidden`), con i testi di `docs/handoff-architettura.md` 6.2; per `capacity-exceeded` il numero viene da `limits.maxParticipants`. Per un codice non previsto, per i rifiuti di #20 o se mancano i `limits` necessari mostra il `detail`; senza `detail` (per esempio il `503` del Gateway quando Bookings è spento) resta il messaggio generico. `group-booking-forbidden` (`403`) riceve il messaggio generico: lo `Staff` non vede il campo dei membri.
+- *Scartata:* scegliere dal `code` anche i rifiuti di #20 (compreso `room-occupied` al posto di `ROOM_CONFLICT_DETAIL`). È fuori dall'ambito di questa storia.
 - **Conferma.** «Partecipanti: N» solo se `participants > 1`. «Prenota un'altra fascia» svuota anche `members`.
 - *Scartata:* membri come `FormArray` nel `FormGroup`. Complica il reset e la validazione senza vantaggi: i membri non si scrivono, si scelgono.
 - *Scartata:* invio consentito con la capienza superata, lasciando al servizio il `422`. Una richiesta che sicuramente fallisce non aggiunge informazioni; l'avviso spiega già il motivo.
@@ -177,7 +178,8 @@ Nuovo ordine di `CreateReservationAsync`:
 - [La ricerca permette di scoprire nomi e username degli studenti] → solo per studenti autenticati, al massimo 10 risultati per richiesta, da 2 caratteri. I dati sono sintetici. Nessun limite di frequenza (come per il login, vedi `docs/identity.md`, «Limiti noti»).
 - [Messaggi generici: lo studente non sa quale membro è impegnato o non è studente] → scelta voluta per non rivelare dati di altri. Lo studente toglie i membri uno alla volta, oppure lo chiede al gruppo.
 - [Frontend e Bookings possono vedere capienze diverse per qualche istante] → il `422` del servizio resta mostrato.
-- [Confronto sul testo del `detail` nel frontend (`ROOM_CONFLICT_DETAIL`)] → invariato; i nuovi messaggi non aggiungono confronti sul testo.
+- [Confronto sul testo del `detail` nel frontend (`ROOM_CONFLICT_DETAIL`)] → invariato; i nuovi messaggi si scelgono dal `code` e non aggiungono confronti sul testo.
+- [Testi dei rifiuti di gruppo duplicati nel frontend e in `ReservationRules`] → coincidono con la tabella 6.2 dell'handoff; un cambio di testo va fatto nei due punti. Il `detail` resta il ripiego per i codici non previsti.
 
 ## Migration Plan
 

@@ -94,7 +94,7 @@ Area: `frontend`. Parte dopo il merge di #123 e #17.
 - [x] 3.4 Mostrare «Partecipanti: N» (1 + membri) in un elemento `aria-live="polite"`. Con N oltre `room().capacity` mostrare «Lo spazio ospita al massimo N persone.» con `role="alert"`, e `submit()` non invia la richiesta. Test: 1 all'apertura, 3 con due membri, avviso e nessuna `POST` con capienza 4 e 4 membri, invio con 3 membri, avviso che sparisce rimuovendo un membro.
 - [x] 3.5 Invio e risposta:
   - `memberIds` nella `POST`;
-  - `rejectionMessage()` mostra il `detail` anche per `503`, e senza `detail` il messaggio generico;
+  - `rejectionMessage()` per `409`, `422` e `503` sceglie dal `code` il messaggio dei rifiuti dei gruppi (testi dell'handoff 6.2, `limits.maxParticipants` per la capienza), altrimenti mostra il `detail`, e senza `detail` il messaggio generico;
   - i chip restano dopo un rifiuto;
   - la conferma mostra «Partecipanti: N» solo con `participants > 1`;
   - «Prenota un'altra fascia» svuota anche i membri.
