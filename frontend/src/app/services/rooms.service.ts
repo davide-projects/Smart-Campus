@@ -39,6 +39,11 @@ export class RoomsService {
     if (filter.buildingId) {
       params = params.set('buildingId', filter.buildingId);
     }
+    if (filter.equipmentIds?.length) {
+      for (const id of filter.equipmentIds) {
+        params = params.append('equipmentIds', id);
+      }
+    }
 
     return this.http.get<RoomSummary[]>('/api/rooms', { params });
   }

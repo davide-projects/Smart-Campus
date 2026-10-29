@@ -37,6 +37,7 @@ export interface RoomFilter {
   minCapacity?: number | null;
   maxCapacity?: number | null;
   buildingId?: string | null;
+  equipmentIds?: string[] | null;
 }
 
 // Attrezzatura di uno spazio nel dettaglio.
