@@ -33,6 +33,7 @@ import {
   campusDateTime,
   campusTime,
   campusToday,
+  halfHourSlots,
   pad,
   reservationTimeLabel,
 } from '../../models/booking.model';
@@ -228,14 +229,17 @@ export class RoomBooking implements OnInit {
     if (queryDate) {
       const [y, m, d] = queryDate.split('-').map(Number);
       if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-        this.form.controls.day.setValue(new Date(y, m - 1, d));
+        const date = new Date(y, m - 1, d);
+        if (this.isOpenDay(date)) {
+          this.form.controls.day.setValue(date);
+        }
       }
     }
-    if (queryStart) {
+    if (queryStart && this.startOptions().includes(queryStart)) {
       this.form.controls.start.setValue(queryStart);
-    }
-    if (queryEnd) {
-      this.form.controls.end.setValue(queryEnd);
+      if (queryEnd && this.endOptions().includes(queryEnd)) {
+        this.form.controls.end.setValue(queryEnd);
+      }
     }
   }
 
@@ -325,21 +329,4 @@ function openingHoursOn(room: RoomDetail, day: Date): OpeningHours | null {
     return null;
   }
   return hours;
-}
-
-// Orari «HH:mm» all'ora esatta o alla mezz'ora, dall'apertura alla chiusura comprese.
-function halfHourSlots(hours: OpeningHours): string[] {
-  const opens = toMinutes(hours.opensAt!);
-  const closes = toMinutes(hours.closesAt!);
-  const slots: string[] = [];
-  for (let minutes = Math.ceil(opens / 30) * 30; minutes <= closes; minutes += 30) {
-    slots.push(`${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`);
-  }
-  return slots;
-}
-
-// «08:00:00» → 480.
-function toMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
 }

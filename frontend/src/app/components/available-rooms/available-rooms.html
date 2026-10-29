@@ -111,9 +111,9 @@
                 matButton="filled"
                 [routerLink]="['/rooms', room.roomId, 'book']"
                 [queryParams]="{
-                  date: selectedIsoDate(),
-                  start: form.controls.start.value,
-                  end: form.controls.end.value
+                  date: lastSearchedParams()?.date,
+                  start: lastSearchedParams()?.start,
+                  end: lastSearchedParams()?.end
                 }"
               >
                 <mat-icon fontSet="material-symbols-outlined">bookmark_add</mat-icon>

@@ -14,7 +14,13 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 
 import { AvailableRoomResponse } from '../../models/availability.model';
-import { addDays, campusToday, toIsoDate } from '../../models/booking.model';
+import {
+  addDays,
+  campusToday,
+  defaultSearchSlot,
+  halfHourSlots,
+  toIsoDate,
+} from '../../models/booking.model';
 import { ROOM_TYPES, roomTypeLabel } from '../../models/room.model';
 import { BookingsService } from '../../services/bookings.service';
 
@@ -25,19 +31,6 @@ interface SearchForm {
   type: FormControl<string | null>;
   minCapacity: FormControl<number | null>;
 }
-
-// Orari a intervalli di 30 minuti tra le 08:00 e le 20:00.
-export const TIME_SLOTS: string[] = (() => {
-  const slots: string[] = [];
-  for (let h = 8; h <= 20; h++) {
-    const hh = String(h).padStart(2, '0');
-    slots.push(`${hh}:00`);
-    if (h < 20) {
-      slots.push(`${hh}:30`);
-    }
-  }
-  return slots;
-})();
 
 @Component({
   selector: 'app-available-rooms',
@@ -68,42 +61,55 @@ export class AvailableRooms implements OnInit {
   protected readonly roomTypes = ROOM_TYPES;
   protected readonly roomTypeLabel = roomTypeLabel;
 
+  protected readonly timeSlots = halfHourSlots('08:00', '20:00');
+  private readonly initialSlot = defaultSearchSlot();
+
   protected readonly results = signal<AvailableRoomResponse[]>([]);
   protected readonly loading = signal(false);
   protected readonly hasSearched = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
+  protected readonly lastSearchedParams = signal<{
+    date: string;
+    start: string;
+    end: string;
+  } | null>(null);
+
   protected readonly form = new FormGroup<SearchForm>({
     date: new FormControl<Date | null>(campusToday(), Validators.required),
-    start: new FormControl<string | null>('09:00', Validators.required),
-    end: new FormControl<string | null>('10:00', Validators.required),
+    start: new FormControl<string | null>(this.initialSlot.start, Validators.required),
+    end: new FormControl<string | null>(this.initialSlot.end, Validators.required),
     type: new FormControl<string | null>(null),
     minCapacity: new FormControl<number | null>(null, [Validators.min(1)]),
   });
 
-  protected readonly startOptions = TIME_SLOTS.slice(0, -1);
+  protected readonly selectedDay = signal<Date | null>(campusToday());
+  protected readonly selectedStart = signal<string | null>(this.initialSlot.start);
+
+  protected readonly startOptions = this.timeSlots.slice(0, -1);
 
   protected readonly endOptions = computed(() => {
-    const start = this.form.controls.start.value;
+    const start = this.selectedStart();
     if (!start) {
-      return TIME_SLOTS.slice(1);
+      return this.timeSlots.slice(1);
     }
-    return TIME_SLOTS.filter((time) => time > start);
-  });
-
-  protected readonly selectedIsoDate = computed(() => {
-    const date = this.form.controls.date.value;
-    return date ? toIsoDate(date) : '';
+    return this.timeSlots.filter((time) => time > start);
   });
 
   ngOnInit(): void {
-    // Quando cambia l'ora di inizio, se l'ora di fine non è più valida viene azzerata.
+    this.form.controls.date.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((date) => this.selectedDay.set(date));
+
+    // Quando cambia l'ora di inizio, aggiorna il signal per ricalcolare endOptions
+    // e se l'ora di fine non è più valida viene aggiornata alla mezz'ora successiva.
     this.form.controls.start.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((start) => {
+        this.selectedStart.set(start);
         const end = this.form.controls.end.value;
         if (start && end && end <= start) {
-          const nextSlot = TIME_SLOTS.find((t) => t > start);
+          const nextSlot = this.timeSlots.find((t) => t > start);
           this.form.controls.end.setValue(nextSlot ?? null);
         }
       });
@@ -125,12 +131,19 @@ export class AvailableRooms implements OnInit {
       return;
     }
 
+    const isoDate = toIsoDate(date);
+    this.lastSearchedParams.set({
+      date: isoDate,
+      start,
+      end,
+    });
+
     this.loading.set(true);
     this.errorMessage.set(null);
 
     this.bookingsService
       .searchAvailableRooms({
-        date: toIsoDate(date),
+        date: isoDate,
         start,
         end,
         type: type || null,

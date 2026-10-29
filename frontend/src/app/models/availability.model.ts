@@ -10,7 +10,7 @@ export interface DailyAvailability {
   slots: AvailabilitySlot[];
 }
 
-//(GET /api/bookings/availability/search)
+// (GET /api/bookings/availability/search)
 export interface AvailableRoomResponse {
   roomId: string;
   name: string;
@@ -20,9 +20,9 @@ export interface AvailableRoomResponse {
 }
 
 export interface AvailabilitySearchFilter {
-  date: string; 
-  start: string; 
-  end: string; 
-  type?: string | null; 
-  minCapacity?: number | null; 
+  date: string;
+  start: string;
+  end: string;
+  type?: string | null;
+  minCapacity?: number | null;
 }

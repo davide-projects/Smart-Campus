@@ -9,7 +9,6 @@ import {
   ReservationResponse,
 } from '../models/booking.model';
 
-
 // Accesso al servizio Bookings attraverso il gateway.
 @Injectable({ providedIn: 'root' })
 export class BookingsService {

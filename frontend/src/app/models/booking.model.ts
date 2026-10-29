@@ -174,3 +174,44 @@ export function toIsoDate(date: Date): string {
 export function addDays(day: Date, days: number): Date {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate() + days);
 }
+
+// «08:00:00» o «08:30» → 480 / 510 minuti da mezzanotte.
+export function toMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// Orari «HH:mm» all'ora esatta o alla mezz'ora, da opensAt a closesAt compresi.
+export function halfHourSlots(
+  opensOrHours: string | { opensAt: string | null; closesAt: string | null } = '08:00',
+  closesAtParam = '20:00',
+): string[] {
+  let opensAt = '08:00';
+  let closesAt = closesAtParam;
+  if (typeof opensOrHours === 'object' && opensOrHours !== null) {
+    opensAt = opensOrHours.opensAt ?? '08:00';
+    closesAt = opensOrHours.closesAt ?? '20:00';
+  } else if (typeof opensOrHours === 'string') {
+    opensAt = opensOrHours;
+  }
+  const opens = toMinutes(opensAt);
+  const closes = toMinutes(closesAt);
+  const slots: string[] = [];
+  for (let minutes = Math.ceil(opens / 30) * 30; minutes <= closes; minutes += 30) {
+    slots.push(`${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`);
+  }
+  return slots;
+}
+
+// Calcola la fascia oraria di ricerca predefinita per oggi in ora del campus (prossima mezz'ora utile).
+export function defaultSearchSlot(now: Date = new Date()): { start: string; end: string } {
+  const nowCampus = campusTime(now);
+  const starts = halfHourSlots('08:00', '19:30').filter((slot) => slot > nowCampus);
+  if (starts.length === 0) {
+    return { start: '09:00', end: '10:00' };
+  }
+  const start = starts[0];
+  const endMinutes = Math.min(toMinutes(start) + 60, 20 * 60);
+  const end = `${pad(Math.floor(endMinutes / 60))}:${pad(endMinutes % 60)}`;
+  return { start, end };
+}

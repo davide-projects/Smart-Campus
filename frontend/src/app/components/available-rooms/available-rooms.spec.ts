@@ -54,11 +54,14 @@ describe('AvailableRooms', () => {
 
   it('inizializza il modulo con data odierna e orario di default', () => {
     expect(component['form'].controls.date.value).toBeTruthy();
-    expect(component['form'].controls.start.value).toBe('09:00');
-    expect(component['form'].controls.end.value).toBe('10:00');
+    expect(component['form'].controls.start.value).toBeTruthy();
+    expect(component['form'].controls.end.value).toBeTruthy();
+    expect(component['form'].controls.end.value! > component['form'].controls.start.value!).toBe(true);
   });
 
   it('cerca gli spazi liberi e mostra i risultati con collegamento alla prenotazione già compilata', () => {
+    component['form'].controls.start.setValue('09:00');
+    component['form'].controls.end.setValue('10:00');
     bookingsServiceMock.searchAvailableRooms.mockReturnValue(of([ROOM_A, ROOM_B]));
 
     const submitButton = element.querySelector<HTMLButtonElement>('button[type="submit"]')!;
@@ -127,6 +130,8 @@ describe('AvailableRooms', () => {
     bookingsServiceMock.searchAvailableRooms.mockReturnValue(of([]));
 
     component['form'].patchValue({
+      start: '09:00',
+      end: '10:00',
       type: 'Laboratory',
       minCapacity: 25,
     });
@@ -177,5 +182,56 @@ describe('AvailableRooms', () => {
     expect(card.textContent).toContain('Edificio non specificato');
     expect(card.textContent).toContain('Spazio');
     expect(card.textContent).toContain('5 posti');
+  });
+
+  it('aggiorna il link Prenota con la data e gli orari cercati per un giorno futuro', () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const expectedDate = toIsoDate(tomorrow);
+
+    component['form'].controls.date.setValue(tomorrow);
+    component['form'].controls.start.setValue('14:00');
+    component['form'].controls.end.setValue('16:00');
+    bookingsServiceMock.searchAvailableRooms.mockReturnValue(of([ROOM_A]));
+
+    const submitButton = element.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    submitButton.click();
+    fixture.detectChanges();
+
+    const bookLink = element.querySelector<HTMLAnchorElement>('.room-card a')!;
+    expect(bookLink.getAttribute('href')).toContain(`date=${expectedDate}`);
+    expect(bookLink.getAttribute('href')).toContain('start=14:00');
+    expect(bookLink.getAttribute('href')).toContain('end=16:00');
+  });
+
+  it('preserva nel link i valori cercati anche se i controlli del form vengono modificati successivamente', () => {
+    component['form'].controls.start.setValue('10:00');
+    component['form'].controls.end.setValue('11:00');
+    bookingsServiceMock.searchAvailableRooms.mockReturnValue(of([ROOM_A]));
+
+    const submitButton = element.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    submitButton.click();
+    fixture.detectChanges();
+
+    // L'utente modifica l'orario nel form dopo aver cercato
+    component['form'].controls.start.setValue('15:00');
+    component['form'].controls.end.setValue('16:00');
+    fixture.detectChanges();
+
+    // Il link della card deve preservare la fascia cercata (10:00 - 11:00), non quella non cercata
+    const bookLink = element.querySelector<HTMLAnchorElement>('.room-card a')!;
+    expect(bookLink.getAttribute('href')).toContain('start=10:00');
+    expect(bookLink.getAttribute('href')).toContain('end=11:00');
+  });
+
+  it('aggiorna reattivamente le opzioni di fine quando cambia l inizio', () => {
+    component['form'].controls.start.setValue('08:00');
+    fixture.detectChanges();
+    expect(component['endOptions']()).toContain('08:30');
+
+    component['form'].controls.start.setValue('14:00');
+    fixture.detectChanges();
+    expect(component['endOptions']()).not.toContain('08:30');
+    expect(component['endOptions']()).toContain('14:30');
   });
 });
