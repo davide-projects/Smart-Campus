@@ -3,6 +3,9 @@
 }
 
 // Contenuto al centro, con spazio sopra e sotto; su mobile resta in colonna con i margini della pagina.
+// Lo sfondo è un'illustrazione decorativa del campus (frontend/public/campus-hero.svg), caricata dal CSS
+// e non inclusa nel bundle. È ancorata in basso: gli edifici stanno ai lati e al centro resta cielo chiaro,
+// così il testo si legge su tutta la larghezza senza bisogno di un velo.
 .home {
   display: flex;
   flex-direction: column;
@@ -10,8 +13,10 @@
   justify-content: center;
   gap: 16px;
   min-height: 60vh;
-  padding: 32px 16px;
+  // Il padding inferiore più ampio alza il testo, lontano dal piazzale in fondo all'immagine.
+  padding: 32px 16px 96px;
   text-align: center;
+  background: var(--mat-sys-surface) url('/campus-hero.svg') center bottom / cover no-repeat;
 }
 
 h1 {
