@@ -45,6 +45,10 @@ namespace SmartCampus.Bookings.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Type")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.HasKey("RoomId");
 
                     b.ToTable("BookableRooms", (string)null);

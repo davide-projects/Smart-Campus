@@ -191,6 +191,57 @@ public sealed class RoomEventsConsumerTests(BookingsApiFixture fixture)
         Assert.Equal("Edificio A", room.BuildingName);
     }
 
+    // --- #43: tipo dello spazio nella copia locale ---
+
+    [Fact]
+    public async Task RoomCreated_WithType_SavesIt()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+
+        await harness.Bus.Publish(new RoomCreated(roomId, "Laboratorio L1", 20, IsBookable: true) { Type = "Laboratory" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.Equal("Laboratory", room.Type);
+    }
+
+    [Fact]
+    public async Task RoomUpdated_WithAnotherType_ReplacesIt()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true) { Type = "Classroom" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1", 30, IsBookable: true, IsActive: true) { Type = "StudyRoom" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomUpdated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.Equal("StudyRoom", room.Type);
+    }
+
+    [Fact]
+    public async Task RoomUpdated_WithoutType_KeepsTheKnownTypeAndUpdatesTheRest()
+    {
+        var roomId = Guid.NewGuid();
+        var harness = fixture.Factory.Services.GetTestHarness();
+        await harness.Bus.Publish(new RoomCreated(roomId, "Aula A1", 30, IsBookable: true) { Type = "Classroom" });
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomCreated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        // Evento senza il campo, per esempio accodato da una versione di Rooms precedente.
+        await harness.Bus.Publish(new RoomUpdated(roomId, "Aula A1 rinnovata", 45, IsBookable: true, IsActive: true));
+        await WaitUntilAsync(() => harness.Consumed.Select<RoomUpdated>(x => x.Context.Message.RoomId == roomId).Any());
+
+        var room = await FindRoomAsync(roomId);
+        Assert.NotNull(room);
+        Assert.Equal("Classroom", room.Type);
+        Assert.Equal("Aula A1 rinnovata", room.Name);
+        Assert.Equal(45, room.Capacity);
+    }
+
     // Legge la copia locale con un DbContext nuovo, così vede i dati realmente salvati nel database.
     private async Task<Api.Entities.BookableRoom?> FindRoomAsync(Guid roomId)
     {
