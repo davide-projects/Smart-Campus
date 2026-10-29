@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartCampus.Bookings.Api.Data.Context;
 using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
+using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.ServiceDefaults;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
@@ -150,7 +151,9 @@ public static class ReservationEndpoints
 
             if (roomTaken)
             {
-                return ToProblem(ReservationRules.RoomConflict());
+                var freeSlots = await FreeRangesOfTheDayAsync(db, room, request.Start, now, cancellationToken);
+
+                return ToProblem(ReservationRules.RoomConflict(freeSlots));
             }
 
             // 7. INV-8: l'organizzatore non è già impegnato altrove, né come organizzatore né come membro.
@@ -350,6 +353,37 @@ public static class ReservationEndpoints
             ? name
             : null;
 
+    // Le fasce libere dello stesso spazio nel giorno della richiesta (in ora del campus), da proporre dopo un conflitto.
+    // Le fasce già iniziate sono escluse: non sarebbero prenotabili.
+    private static async Task<IReadOnlyList<FreeRange>> FreeRangesOfTheDayAsync(
+        BookingDbContext db,
+        BookableRoom room,
+        DateTimeOffset requestedStart,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var date = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(requestedStart, CampusTimeZone).DateTime);
+
+        var dayStartLocal = date.ToDateTime(TimeOnly.MinValue);
+        var dayEndLocal = date.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var dayStart = new DateTimeOffset(dayStartLocal, CampusTimeZone.GetUtcOffset(dayStartLocal));
+        var dayEnd = new DateTimeOffset(dayEndLocal, CampusTimeZone.GetUtcOffset(dayEndLocal));
+
+        var reservations = await db.Reservations
+            .AsNoTracking()
+            .Where(reservation =>
+                reservation.RoomId == room.RoomId &&
+                reservation.Status == ReservationStatus.Confirmed &&
+                reservation.Start < dayEnd &&
+                reservation.End > dayStart)
+            .ToListAsync(cancellationToken);
+
+        var openingHours = room.OpeningHours.SingleOrDefault(hours => hours.DayOfWeek == date.DayOfWeek);
+        var availability = AvailabilityCalculator.Calculate(room.RoomId, date, openingHours, reservations, CampusTimeZone);
+
+        return AvailabilityCalculator.FreeRanges(availability, notBefore: now);
+    }
+
     // Oltre a titolo e dettaglio, la risposta porta il codice di motivo e, se ci sono, i limiti da rispettare.
     private static IResult ToProblem(ReservationRejection rejection)
     {
@@ -358,6 +392,11 @@ public static class ReservationEndpoints
         if (rejection.Limits is not null)
         {
             extensions["limits"] = rejection.Limits;
+        }
+
+        if (rejection.FreeSlots is not null)
+        {
+            extensions["freeSlots"] = rejection.FreeSlots;
         }
 
         return Results.Problem(

@@ -1,5 +1,6 @@
 using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
+using SmartCampus.Bookings.Api.Features.Availability;
 
 namespace SmartCampus.Bookings.Api.Features.Reservations;
 
@@ -122,8 +123,14 @@ public static class ReservationRules
     }
 
     // INV-1: conflitto con una prenotazione confermata dello stesso spazio.
-    public static ReservationRejection RoomConflict() =>
-        new(StatusCodes.Status409Conflict, "Spazio già prenotato", "Lo spazio è già prenotato in questa fascia.", RejectionCodes.RoomOccupied);
+    // Il testo non cambia (il frontend lo riconosce); le fasce libere dello stesso giorno stanno in FreeSlots.
+    public static ReservationRejection RoomConflict(IReadOnlyList<FreeRange> freeSlots) =>
+        new(
+            StatusCodes.Status409Conflict,
+            "Spazio già prenotato",
+            "Lo spazio è già prenotato in questa fascia.",
+            RejectionCodes.RoomOccupied,
+            FreeSlots: freeSlots);
 
     // INV-8: l'organizzatore ha già una prenotazione confermata sovrapposta, anche in un altro spazio.
     public static ReservationRejection OrganizerConflict() =>

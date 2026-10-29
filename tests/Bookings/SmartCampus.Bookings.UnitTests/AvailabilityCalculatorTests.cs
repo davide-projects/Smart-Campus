@@ -96,6 +96,76 @@ public sealed class AvailabilityCalculatorTests
         Assert.Equal(TimeSpan.FromHours(2), result.Slots[0].Start.Offset);   // ora legale: +02:00
     }
 
+    // --- Intervalli liberi ---
+
+    [Fact]
+    public void FreeRanges_MergesConsecutiveFreeSlotsAndSplitsAtOccupiedOnes()
+    {
+        var availability = AvailabilityCalculator.Calculate(
+            RoomId, Tuesday, Hours("08:00", "12:00"), new[] { Confirmed("09:00", "10:00") }, Rome);
+
+        var ranges = AvailabilityCalculator.FreeRanges(availability);
+
+        Assert.Equal(
+            new[]
+            {
+                new FreeRange(At(Tuesday, "08:00"), At(Tuesday, "09:00")),
+                new FreeRange(At(Tuesday, "10:00"), At(Tuesday, "12:00"))
+            },
+            ranges);
+    }
+
+    [Fact]
+    public void FreeRanges_WithoutReservations_IsOneRangeForTheWholeOpeningTime()
+    {
+        var availability = AvailabilityCalculator.Calculate(RoomId, Tuesday, Hours("08:00", "12:00"), [], Rome);
+
+        var ranges = AvailabilityCalculator.FreeRanges(availability);
+
+        Assert.Equal(new FreeRange(At(Tuesday, "08:00"), At(Tuesday, "12:00")), Assert.Single(ranges));
+    }
+
+    [Fact]
+    public void FreeRanges_WhenEverySlotIsOccupied_IsAnEmptyList()
+    {
+        var availability = AvailabilityCalculator.Calculate(
+            RoomId, Tuesday, Hours("08:00", "12:00"), new[] { Confirmed("08:00", "12:00") }, Rome);
+
+        var ranges = AvailabilityCalculator.FreeRanges(availability);
+
+        Assert.NotNull(ranges);
+        Assert.Empty(ranges);
+    }
+
+    [Fact]
+    public void FreeRanges_WhenTheRoomIsClosed_IsAnEmptyList()
+    {
+        var availability = AvailabilityCalculator.Calculate(RoomId, Tuesday, openingHours: null, [], Rome);
+
+        Assert.Empty(AvailabilityCalculator.FreeRanges(availability));
+    }
+
+    [Fact]
+    public void FreeRanges_IgnoresCancelledReservations()
+    {
+        var availability = AvailabilityCalculator.Calculate(
+            RoomId, Tuesday, Hours("08:00", "12:00"), new[] { Cancelled("09:00", "10:00") }, Rome);
+
+        var ranges = AvailabilityCalculator.FreeRanges(availability);
+
+        Assert.Equal(new FreeRange(At(Tuesday, "08:00"), At(Tuesday, "12:00")), Assert.Single(ranges));
+    }
+
+    [Fact]
+    public void FreeRanges_WithNotBefore_SkipsSlotsThatHaveAlreadyStarted()
+    {
+        var availability = AvailabilityCalculator.Calculate(RoomId, Tuesday, Hours("08:00", "12:00"), [], Rome);
+
+        var ranges = AvailabilityCalculator.FreeRanges(availability, notBefore: At(Tuesday, "10:00"));
+
+        Assert.Equal(new FreeRange(At(Tuesday, "10:00"), At(Tuesday, "12:00")), Assert.Single(ranges));
+    }
+
     // --- Dati di prova ---
 
     private static BookableRoomOpeningHours Hours(string opensAt, string closesAt) => new()

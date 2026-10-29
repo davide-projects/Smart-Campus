@@ -1,5 +1,6 @@
 using SmartCampus.Bookings.Api.Entities;
 using SmartCampus.Bookings.Api.Entities.Enums;
+using SmartCampus.Bookings.Api.Features.Availability;
 using SmartCampus.Bookings.Api.Features.Reservations;
 
 namespace SmartCampus.Bookings.UnitTests;
@@ -116,6 +117,27 @@ public sealed class RejectionCodesTests
     }
 
     // --- Conflitti ---
+
+    [Fact]
+    public void RoomConflict_HasTheRoomOccupiedCodeAndTheFreeSlots()
+    {
+        FreeRange[] freeSlots = [new(At(Tuesday, "12:00"), At(Tuesday, "14:00"))];
+
+        var rejection = ReservationRules.RoomConflict(freeSlots);
+
+        AssertRejection(rejection, 409, RejectionCodes.RoomOccupied);
+        Assert.Equal("Lo spazio è già prenotato in questa fascia.", rejection.Detail);
+        Assert.Equal(freeSlots, rejection.FreeSlots);
+    }
+
+    [Fact]
+    public void RoomConflict_WithoutFreeSlots_CarriesAnEmptyListAndNotNull()
+    {
+        var rejection = ReservationRules.RoomConflict([]);
+
+        Assert.NotNull(rejection.FreeSlots);
+        Assert.Empty(rejection.FreeSlots);
+    }
 
     [Fact]
     public void OrganizerConflict_HasThePersonOccupiedCode()
