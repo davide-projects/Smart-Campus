@@ -48,6 +48,13 @@ export interface FutureReservationsCountResponse {
   count: number;
 }
 
+// Intervallo libero dello stesso spazio e giorno di una prenotazione rifiutata per conflitto: le fasce
+// che Bookings propone con il rifiuto «room-occupied» (proprietà «freeSlots» del ProblemDetails).
+export interface FreeRange {
+  start: string;
+  end: string;
+}
+
 // Giorno e orario si mostrano sempre nell'ora del campus, qualunque sia il fuso del dispositivo.
 const CAMPUS_TIME_ZONE = 'Europe/Rome';
 
