@@ -72,9 +72,9 @@ Area: `svc:bookings`.
 
 Area: `frontend`. Parte dopo il merge di #46.
 
-- [ ] 2.1 Aggiungere `checkedInAt: string | null` a `MyReservationItem`, `CheckInResponse` e la funzione pura `isInCheckInWindow(item, now)` in `models/booking.model.ts`. Aggiornare con `checkedInAt: null` i dati di prova esistenti (`my-bookings.spec.ts`, `cancel-booking-dialog.spec.ts`, `bookings.service.spec.ts`). Unit test della funzione: `start − 15 min` e `start + 15 min` dentro, un millisecondo prima e dopo fuori, indipendente dal fuso del dispositivo.
-- [ ] 2.2 Aggiungere `BookingsService.checkIn(id): Observable<CheckInResponse>` (`POST /api/bookings/{id}/check-in`); test con `HttpTestingController` su metodo, URL, corpo vuoto e risposta.
-- [ ] 2.3 In `my-bookings`:
+- [x] 2.1 Aggiungere `checkedInAt: string | null` a `MyReservationItem`, `CheckInResponse` e la funzione pura `isInCheckInWindow(item, now)` in `models/booking.model.ts`. Aggiornare con `checkedInAt: null` i dati di prova esistenti (`my-bookings.spec.ts`, `cancel-booking-dialog.spec.ts`, `bookings.service.spec.ts`). Unit test della funzione: `start − 15 min` e `start + 15 min` dentro, un millisecondo prima e dopo fuori, indipendente dal fuso del dispositivo.
+- [x] 2.2 Aggiungere `BookingsService.checkIn(id): Observable<CheckInResponse>` (`POST /api/bookings/{id}/check-in`); test con `HttpTestingController` su metodo, URL, corpo vuoto e risposta.
+- [x] 2.3 In `my-bookings`:
   - mostrare «Usata» (`tabindex="-1"`) sulle voci con `checkedInAt` nelle schede «Future» e «Passate»;
   - mostrare «Check-in» con `disabledInteractive` sulle voci di «Future» senza check-in, abilitato solo nella finestra, con nome accessibile «Check-in per <spazio>, <giorno e orario>»;
   - fuori finestra, sotto il pulsante il testo «Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio.» collegato con `aria-describedby`;
@@ -90,7 +90,7 @@ Area: `frontend`. Parte dopo il merge di #46.
   - «Cancella» assente sulla voce futura con `checkedInAt` (MODIFIED «Azione «Cancella» nelle prenotazioni future») e presente con «Check-in» sulla voce futura dell'organizzatore senza check-in;
   - dopo 30 secondi il pulsante si abilita all'apertura della finestra e si disabilita alla chiusura, senza nuove `GET /api/bookings/mine`;
   - nessun timer attivo dopo la distruzione del componente.
-- [ ] 2.4 Collegare il pulsante a `checkIn()`: invio senza conferma, pulsante disabilitato durante la richiesta. Dopo il `200`:
+- [x] 2.4 Collegare il pulsante a `checkIn()`: invio senza conferma, pulsante disabilitato durante la richiesta. Dopo il `200`:
   - aggiornare la voce in locale con il `checkedInAt` della risposta;
   - aprire la `MatSnackBar` «Check-in registrato.» senza azione e con `duration` 5000;
   - spostare il focus sull'etichetta «Usata» della voce.
@@ -106,10 +106,12 @@ Area: `frontend`. Parte dopo il merge di #46.
   - messaggio generico con `500` ed errore di rete;
   - avviso rimosso al nuovo tentativo;
   - `401` che porta al login con `returnUrl` `/my-bookings` senza avviso.
-- [ ] 2.5 Verificare a mano e riportarlo nella PR; `npx ng test --watch=false` verde.
+- [x] 2.5 Verificare a mano e riportarlo nella PR; `npx ng test --watch=false` verde.
   - Tastiera: Tab fino a «Check-in», anche disabilitato, con la descrizione letta dallo screen reader; Invio e Spazio; snackbar e avvisi annunciati; focus su «Usata» dopo il check-in; focus visibile.
   - Larghezza 375px: voce con «Cancella», «Check-in», testo di spiegazione, avviso e «Usata» senza scorrimento orizzontale.
-- [ ] 2.6 Verificare con `docker compose up --build` e riportare l'esito nella PR:
+
+  > Nota: prove manuali eseguite il 2026-10-29, esito nella PR.
+- [x] 2.6 Verificare con `docker compose up --build` e riportare l'esito nella PR:
   - creare dal Gateway una prenotazione di `student1` sulla prima mezz'ora che inizia fra più di 15 minuti;
   - aprire la pagina fuori finestra: pulsante disabilitato e testo;
   - lasciare la pagina aperta fino all'apertura della finestra: pulsante abilitato entro 30 secondi;
@@ -117,3 +119,5 @@ Area: `frontend`. Parte dopo il merge di #46.
   - con il token di `staff1` verificare via API il check-in fuori finestra su un'altra prenotazione.
 
   Nella PR dichiarare che il caso del gruppo è coperto dai test 1.6 se la US-05 (PR #126) non è ancora unita.
+
+  > Nota: prove con `docker compose` eseguite il 2026-10-29, esito nella PR.

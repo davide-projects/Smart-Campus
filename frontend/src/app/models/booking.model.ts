@@ -10,6 +10,8 @@ export interface MyReservationItem {
   isGroup: boolean;
   organizerName: string | null;
   isOrganizer: boolean;
+  // Istante del check-in (ISO 8601, UTC); null se la prenotazione non è ancora stata usata.
+  checkedInAt: string | null;
 }
 
 // Risposta di GET /api/bookings/mine: le tre sezioni della pagina «Le mie prenotazioni».
@@ -40,6 +42,22 @@ export interface ReservationResponse {
   end: string;
   participants: number;
   status: ReservationStatus;
+}
+
+// Risposta di POST /api/bookings/{id}/check-in con il 200.
+export interface CheckInResponse {
+  checkedInAt: string;
+}
+
+// Il check-in è possibile da 15 minuti prima a 15 minuti dopo l'inizio, estremi inclusi.
+const CHECK_IN_BEFORE_MS = 15 * 60_000;
+const CHECK_IN_AFTER_MS = 15 * 60_000;
+
+// Vero se l'istante now (millisecondi dall'epoca) è nella finestra del check-in della prenotazione.
+// Confronta istanti assoluti, quindi non dipende dal fuso del dispositivo.
+export function isInCheckInWindow(item: Pick<MyReservationItem, 'start'>, now: number): boolean {
+  const start = Date.parse(item.start);
+  return start - CHECK_IN_BEFORE_MS <= now && now <= start + CHECK_IN_AFTER_MS;
 }
 
 // Risposta di GET /api/bookings/rooms/{id}/future-reservations-count (solo personale).
