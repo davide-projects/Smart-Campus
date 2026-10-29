@@ -14,10 +14,12 @@ import { RouterLink } from '@angular/router';
 import { Subject, catchError, debounceTime, map, of, switchMap, tap } from 'rxjs';
 import {
   BuildingOption,
+  RoomEquipment,
   RoomFilter,
   RoomSummary,
   RoomType,
   buildingsOf,
+  equipmentOf,
   roomTypeLabel,
 } from '../../models/room.model';
 import { RoomsService } from '../../services/rooms.service';
@@ -26,7 +28,6 @@ export const CAPACITY_DEBOUNCE_MS = 300;
 
 export type ResultsView = 'cards' | 'table';
 
-// La vista scelta resta per tutta la sessione della scheda, anche cambiando pagina.
 export const VIEW_STORAGE_KEY = 'smartcampus.roomSearchView';
 
 type SearchResult = { rooms: RoomSummary[] } | { error: true };
@@ -59,15 +60,16 @@ export class RoomSearch {
 
   protected readonly filters = new FormGroup({
     type: new FormControl<RoomType | null>(null),
-    // 0 vuol dire nessuna capienza minima/massima.
     minCapacity: new FormControl(0, { nonNullable: true }),
     maxCapacity: new FormControl(0, { nonNullable: true }),
     buildingId: new FormControl<string | null>(null),
+    equipmentId: new FormControl<string | null>(null),
   });
 
   protected readonly rooms = signal<RoomSummary[]>([]);
   protected readonly types = signal<RoomType[]>([]);
   protected readonly buildings = signal<BuildingOption[]>([]);
+  protected readonly equipment = signal<RoomEquipment[]>([]);
   protected readonly highestCapacity = signal(0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
@@ -94,19 +96,16 @@ export class RoomSearch {
     }
     return `Fino a ${max} posti`;
   });
-  // Lo slider usa lo stesso testo anche per i lettori di schermo (aria-valuetext).
   protected readonly capacityLabel = capacityLabel;
 
   constructor() {
     this.loadFilterOptions();
-
     this.searches
       .pipe(
         tap(() => {
           this.loading.set(true);
           this.loadFailed.set(false);
         }),
-        // switchMap: se l'utente rilancia la ricerca, la risposta precedente viene ignorata.
         switchMap((filter) =>
           this.roomsService.search(filter).pipe(
             map((rooms): SearchResult => ({ rooms })),
@@ -125,8 +124,6 @@ export class RoomSearch {
         }
       });
 
-    // Da tastiera ogni freccia cambia il valore: si cerca solo quando lo slider
-    // resta fermo per 300 ms.
     this.capacityChanges
       .pipe(debounceTime(CAPACITY_DEBOUNCE_MS), takeUntilDestroyed())
       .subscribe(() => this.search());
@@ -139,7 +136,6 @@ export class RoomSearch {
     try {
       sessionStorage.setItem(VIEW_STORAGE_KEY, view);
     } catch {
-      // Senza sessionStorage la vista vale solo finché si resta sulla pagina.
     }
   }
 
@@ -147,32 +143,27 @@ export class RoomSearch {
     this.capacityChanges.next();
   }
 
-  // Parte quando cambia un menu, quando si ferma lo slider e con «Cerca».
   protected search(): void {
-    const { type, minCapacity, maxCapacity, buildingId } = this.filters.getRawValue();
+    const { type, minCapacity, maxCapacity, buildingId, equipmentId } = this.filters.getRawValue();
     const highest = this.highestCapacity();
     this.searches.next({
       type,
       minCapacity: minCapacity > 0 ? minCapacity : null,
       maxCapacity: maxCapacity > 0 && maxCapacity < highest ? maxCapacity : null,
       buildingId,
+      equipmentIds: equipmentId ? [equipmentId] : null,
     });
   }
 
   protected resetFilters(): void {
     this.filters.reset();
     this.filters.controls.maxCapacity.setValue(this.highestCapacity());
-    // Se il primo caricamento dei filtri non era riuscito, è l'occasione per riprovare.
     if (this.types().length === 0) {
       this.loadFilterOptions();
     }
     this.searches.next({});
   }
 
-  // Tipi, edifici e capienza massima dei filtri si ricavano da tutti gli spazi attivi,
-  // così un tipo o un edificio nuovo compare senza modificare il frontend.
-  // È una richiesta separata dalla ricerca: premere «Cerca» durante il primo caricamento
-  // non la annulla.
   private loadFilterOptions(): void {
     this.roomsService
       .search()
@@ -183,6 +174,7 @@ export class RoomSearch {
       .subscribe((rooms) => {
         this.types.set(typesOf(rooms));
         this.buildings.set(buildingsOf(rooms));
+        this.equipment.set(equipmentOf(rooms));
         const highest = Math.max(0, ...rooms.map((room) => room.capacity));
         this.highestCapacity.set(highest);
         this.filters.controls.maxCapacity.setValue(highest);

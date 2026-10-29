@@ -22,27 +22,37 @@
       </mat-select>
     </mat-form-field>
 
+    <mat-form-field appearance="outline">
+      <mat-label>Attrezzatura</mat-label>
+      <mat-select formControlName="equipmentId" (selectionChange)="search()">
+        <mat-option [value]="null">Tutte le attrezzature</mat-option>
+        @for (item of equipment(); track item.id) {
+          <mat-option [value]="item.id">{{ item.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
     <div class="capacity">
       <span class="capacity-label" id="capacity-label">Capienza</span>
       <div class="capacity-control">
-      @if (highestCapacity() > 0) {
-        <mat-slider min="0" [max]="highestCapacity()" step="1" [displayWith]="capacityLabel">
-          <input
-            matSliderStartThumb
-            formControlName="minCapacity"
-            aria-labelledby="capacity-label"
-            (change)="capacityChanged()"
-          />
-          <input
-            matSliderEndThumb
-            formControlName="maxCapacity"
-            aria-labelledby="capacity-label"
-            (change)="capacityChanged()"
-          />
-        </mat-slider>
-      }
-      <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
-    </div>
+        @if (highestCapacity() > 0) {
+          <mat-slider min="0" [max]="highestCapacity()" step="1" [displayWith]="capacityLabel">
+            <input
+              matSliderStartThumb
+              formControlName="minCapacity"
+              aria-labelledby="capacity-label"
+              (change)="capacityChanged()"
+            />
+            <input
+              matSliderEndThumb
+              formControlName="maxCapacity"
+              aria-labelledby="capacity-label"
+              (change)="capacityChanged()"
+            />
+          </mat-slider>
+        }
+        <span class="capacity-value" aria-hidden="true">{{ capacityText() }}</span>
+      </div>
     </div>
 
     <div class="actions">
@@ -77,7 +87,6 @@
     </div>
 
     @if (view() === 'table') {
-      <!-- Su mobile la tabella scorre in orizzontale e la colonna del nome resta ferma. -->
       <div class="table-scroll">
         <table mat-table [dataSource]="rooms()" aria-label="Spazi trovati">
           <ng-container matColumnDef="name" sticky>

@@ -23,6 +23,7 @@ const ROOMS: RoomSummary[] = [
     isBookable: true,
     buildingId: 'b-a',
     buildingName: 'Edificio A',
+    equipment: [{ id: 'e-2', name: 'Lavagna' }],
   },
   {
     id: 'r2',
@@ -33,6 +34,7 @@ const ROOMS: RoomSummary[] = [
     isBookable: false,
     buildingId: 'b-b',
     buildingName: 'Edificio B',
+    equipment: [{ id: 'e-1', name: 'Proiettore' }],
   },
 ];
 
@@ -61,7 +63,7 @@ describe('RoomSearch', () => {
     return [...element.querySelectorAll('mat-card-title')].map((e) => e.textContent!.trim());
   }
 
-  function select(control: 'type' | 'buildingId'): Promise<MatSelectHarness> {
+  function select(control: 'type' | 'buildingId' | 'equipmentId'): Promise<MatSelectHarness> {
     return loader.getHarness(MatSelectHarness.with({ selector: `[formControlName="${control}"]` }));
   }
 
@@ -161,7 +163,7 @@ describe('RoomSearch', () => {
       type: 'StudyRoom',
       minCapacity: null,
       maxCapacity: null,
-      buildingId: null,
+      buildingId: null, equipmentIds: null,
     });
 
     await setMinCapacity(15);
@@ -169,7 +171,7 @@ describe('RoomSearch', () => {
       type: 'StudyRoom',
       minCapacity: 15,
       maxCapacity: null,
-      buildingId: null,
+      buildingId: null, equipmentIds: null,
     });
 
     await (await select('buildingId')).clickOptions({ text: 'Edificio B' });
@@ -177,7 +179,7 @@ describe('RoomSearch', () => {
       type: 'StudyRoom',
       minCapacity: 15,
       maxCapacity: null,
-      buildingId: 'b-b',
+      buildingId: 'b-b', equipmentIds: null,
     });
     expect(cardTitles()).toEqual(['Sala studio B']);
   });
@@ -193,7 +195,7 @@ describe('RoomSearch', () => {
       type: null,
       minCapacity: 15,
       maxCapacity: null,
-      buildingId: null,
+      buildingId: null, equipmentIds: null,
     });
   });
 
@@ -233,7 +235,7 @@ describe('RoomSearch', () => {
 
     await setMinCapacity(0);
     expect(capacityText()).toBe('Qualsiasi');
-    expect(search).toHaveBeenLastCalledWith({ type: null, minCapacity: null, maxCapacity: null, buildingId: null });
+    expect(search).toHaveBeenLastCalledWith({ type: null, minCapacity: null, maxCapacity: null, buildingId: null, equipmentIds: null });
   });
 
   it('uses the singular for one seat', async () => {
@@ -259,7 +261,7 @@ describe('RoomSearch', () => {
       type: null,
       minCapacity: 13,
       maxCapacity: null,
-      buildingId: null,
+      buildingId: null, equipmentIds: null,
     });
   });
 
@@ -276,6 +278,20 @@ describe('RoomSearch', () => {
     expect(search).toHaveBeenLastCalledWith({});
   });
 
+  it('filters rooms by selected equipment', async () => {
+    await render();
+
+    await (await select('equipmentId')).clickOptions({ text: 'Proiettore' });
+
+    expect(search).toHaveBeenLastCalledWith({
+      type: null,
+      minCapacity: null,
+      maxCapacity: null,
+      buildingId: null,
+      equipmentIds: ['e-1'],
+    });
+  });
+
   it('shows the same rooms in the table, one row per room', async () => {
     await render();
 
@@ -288,7 +304,7 @@ describe('RoomSearch', () => {
         type: 'Aula',
         building: 'Edificio A',
         capacity: '40 posti',
-        bookable: 'Sì',
+        bookable: 'S+�',
       },
       {
         name: 'Sala studio B',
@@ -356,7 +372,8 @@ describe('RoomSearch', () => {
     await render();
 
     expect(element.querySelector('[role="alert"]')!.textContent).toContain(
-      'Non è stato possibile caricare gli spazi.',
+      'Non +� stato possibile caricare gli spazi.',
     );
   });
 });
+
