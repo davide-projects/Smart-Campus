@@ -100,8 +100,8 @@ Area: `frontend`. Parte dopo il merge di #123 e #17.
   - «Prenota un'altra fascia» svuota anche i membri.
 
   Test: `409` membro impegnato, `422` capienza, troppi membri e non studente, `503` con e senza `detail`, conferma di gruppo e singola, reset dei membri.
-- [ ] 3.6 Verificare a mano la tastiera (Tab sul campo, frecce e Invio sulle proposte, Esc, chip raggiungibili e rimossi con Canc o Backspace o con il pulsante, focus visibile, annuncio dei partecipanti) e la larghezza di 375px con quattro chip senza scorrimento orizzontale; riportarlo nella PR. `npx ng test --watch=false` verde.
-- [ ] 3.7 Verificare con `docker compose up --build`:
+- [x] 3.6 Verificare a mano la tastiera (Tab sul campo, frecce e Invio sulle proposte, Esc, chip raggiungibili e rimossi con Canc o Backspace o con il pulsante, focus visibile, annuncio dei partecipanti) e la larghezza di 375px con quattro chip senza scorrimento orizzontale; riportarlo nella PR. `npx ng test --watch=false` verde.
+- [x] 3.7 Verificare con `docker compose up --build`:
   - con `student1` prenotare uno spazio con `student2` e `student3`: conferma con «Partecipanti: 3» e prenotazione visibile in «Le mie prenotazioni» di `student2` come «Prenotazione di gruppo», senza «Cancella»;
   - cercare «Conti» non propone `staff1`;
   - superare la capienza di uno spazio piccolo mostra l'avviso;
@@ -116,7 +116,7 @@ Area: `frontend`. Parte dopo il merge di #123 e #17.
   Test di integrazione con lo stub di Identity: nomi salvati; `displayName` assente, vuoto e di 129 caratteri → `201` e `DisplayName` `null`.
 - [x] 3.9 Bookings, `members` in `GET /api/bookings/mine`: record `MyReservationMember(Id, DisplayName)` e `MyReservationItem.Members`, nella stessa query; ordine per `displayName` (`OrdinalIgnoreCase`), `null` in fondo, poi `id`; `[]` per le singole. Test di integrazione: elenco visto dall'organizzatore (in ordine, organizzatore escluso) e da un membro (uguale, con il suo nome); singola `[]`; riga con `DisplayName` `null` in fondo; gruppo cancellato con i membri in `cancelled`. Aggiornare i test esistenti di `/mine` che confrontano le voci.
 - [x] 3.10 Frontend: `ReservationMemberSummary` e `members` in `MyReservationItem`; `membersLabel(item)` in `models/booking.model.ts` («Membri: A, B», «Nome non disponibile» per `null`, `null` per voci singole o senza membri); in `my-bookings` `<p class="members">` sotto l'organizzatore, con `overflow-wrap` per i 375px. Test Vitest: `membersLabel` (due nomi, nome `null`, singola); pagina con voce di gruppo, nome non noto e voce singola senza riga. Aggiornare le fixture esistenti con `members`.
-- [ ] 3.11 Documentazione e verifica:
+- [x] 3.11 Documentazione e verifica:
   - `docs/endpoints.md`: `members` nella risposta di `GET /api/bookings/mine`;
   - `docs/architettura.md` e `docs/handoff-architettura.md`: `DisplayName` di `ReservationMember`.
 
