@@ -6,6 +6,7 @@ import {
   CreateReservationRequest,
   FutureReservationsCountResponse,
   MyReservationsResponse,
+  ReservationListItem,
   ReservationResponse,
 } from '../models/booking.model';
 
@@ -59,5 +60,13 @@ export class BookingsService {
     }
 
     return this.http.get<AvailableRoomResponse[]>('/api/bookings/availability/search', { params });
+  }
+
+  // Elenco delle prenotazioni di uno spazio in un giorno (riservato al personale).
+  getReservations(roomId: string, date: string): Observable<ReservationListItem[]> {
+    const params = new HttpParams()
+      .set('roomId', roomId)
+      .set('date', date);
+    return this.http.get<ReservationListItem[]>('/api/bookings', { params });
   }
 }

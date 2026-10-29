@@ -47,6 +47,13 @@ export const routes: Routes = [
       import('./components/my-bookings/my-bookings').then((m) => m.MyBookings),
   },
   {
+    path: 'staff/reservations',
+    title: 'Prenotazioni per spazio',
+    canActivate: [staffGuard],
+    loadComponent: () =>
+      import('./components/room-reservations/room-reservations').then((m) => m.RoomReservations),
+  },
+  {
     path: 'staff/rooms/new',
     title: 'Nuovo spazio',
     canActivate: [staffGuard],

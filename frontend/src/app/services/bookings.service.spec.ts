@@ -5,6 +5,7 @@ import { DailyAvailability, AvailableRoomResponse } from '../models/availability
 import {
   CreateReservationRequest,
   MyReservationsResponse,
+  ReservationListItem,
   ReservationResponse,
 } from '../models/booking.model';
 import { BookingsService } from './bookings.service';
@@ -182,5 +183,45 @@ describe('BookingsService', () => {
     request.flush(mockResults);
 
     expect(await result).toEqual(mockResults);
+  });
+
+  it('recupera le prenotazioni di uno spazio inviando roomId e date come parametri di query', async () => {
+    const list: ReservationListItem[] = [
+      {
+        id: 'res-1',
+        start: '2026-11-05T09:00:00+01:00',
+        end: '2026-11-05T10:00:00+01:00',
+        organizerId: 'user-1',
+        participants: 3,
+        memberIds: ['user-2', 'user-3'],
+        status: 'Confirmed',
+        cancelledAt: null,
+      },
+      {
+        id: 'res-2',
+        start: '2026-11-05T11:00:00+01:00',
+        end: '2026-11-05T12:00:00+01:00',
+        organizerId: 'user-4',
+        participants: 1,
+        memberIds: [],
+        status: 'Cancelled',
+        cancelledAt: '2026-11-04T18:00:00+01:00',
+      },
+    ];
+
+    const result = new Promise((resolve) =>
+      service.getReservations('room-123', '2026-11-05').subscribe(resolve),
+    );
+
+    const request = http.expectOne(
+      (req) =>
+        req.url === '/api/bookings' &&
+        req.params.get('roomId') === 'room-123' &&
+        req.params.get('date') === '2026-11-05',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(list);
+
+    expect(await result).toEqual(list);
   });
 });

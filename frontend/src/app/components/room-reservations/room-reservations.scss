@@ -1,0 +1,145 @@
+.room-reservations {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 16px;
+
+  .page-header {
+    margin-bottom: 24px;
+
+    h1 {
+      margin: 0 0 8px;
+      font: var(--mat-sys-headline-medium);
+      color: var(--mat-sys-on-surface);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--mat-sys-on-surface-variant);
+      font: var(--mat-sys-body-medium);
+    }
+  }
+}
+
+.filters-card {
+  margin-bottom: 24px;
+
+  mat-card-content {
+    padding: 16px;
+  }
+}
+
+.filters-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.loading-bar {
+  margin: 16px 0;
+}
+
+.message {
+  margin: 24px 0;
+  text-align: center;
+  font: var(--mat-sys-body-medium);
+
+  &.error-message {
+    color: var(--mat-sys-error);
+  }
+}
+
+.table-container {
+  overflow-x: auto;
+  margin-top: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface);
+}
+
+.reservations-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font: var(--mat-sys-body-medium);
+
+  th,
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  th {
+    background-color: var(--mat-sys-surface-container);
+    color: var(--mat-sys-on-surface);
+    font: var(--mat-sys-title-small);
+    font-weight: 600;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr:hover td {
+    background-color: var(--mat-sys-surface-container-low);
+  }
+
+  .cancelled-row {
+    opacity: 0.75;
+    background-color: var(--mat-sys-surface-container-lowest);
+  }
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font: var(--mat-sys-label-medium);
+  font-weight: 600;
+
+  &.confirmed {
+    background-color: #e6f4ea;
+    color: #137333;
+  }
+
+  &.cancelled {
+    background-color: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+    text-decoration: line-through;
+  }
+}
+
+.user-name {
+  font-weight: 500;
+  color: var(--mat-sys-on-surface);
+}
+
+.user-id {
+  font-family: monospace;
+  font-size: 0.9em;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.empty-state,
+.prompt-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-large);
+
+  .empty-icon,
+  .prompt-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.6;
+  }
+}
